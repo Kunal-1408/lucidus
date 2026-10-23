@@ -6,17 +6,19 @@
 
 **Status:** ready-for-agent
 
-- [ ] One Haiku 5.5 call per new or changed Scholarship, over the full cleaned text capped near 15,000 characters, using structured output in the Criterion shape
-- [ ] Every LLM value carries a verbatim quote; medium if the quote appears in the text and the value is an allowed option, low otherwise
-- [ ] Amount text and deadline fall back to the LLM (with quote) when regex finds none
-- [ ] Scholarship Confidence is its weakest Criterion's; a missing deadline does not lower it
-- [ ] Medium cards show "verify on the official site"; low Scholarships are set needs review and hidden
-- [ ] Extra requirements are stored with their sentence, shown on cards as "Also requires: …", never matched
-- [ ] If the LLM call fails: a new Scholarship is not stored; a changed one keeps its previous version; no hash is saved, so the next run retries; the run summary reports it
-- [ ] The LLM is faked in all tests except one opt-in test against the real Haiku
-- [ ] The LLM is never called at match time
+- [x] One Haiku 5.5 call per new or changed Scholarship, over the full cleaned text capped near 15,000 characters, using structured output in the Criterion shape
+- [x] Every LLM value carries a verbatim quote; medium if the quote appears in the text and the value is an allowed option, low otherwise
+- [x] Amount text and deadline fall back to the LLM (with quote) when regex finds none
+- [x] Scholarship Confidence is its weakest Criterion's; a missing deadline does not lower it
+- [x] Medium cards show "verify on the official site"; low Scholarships are set needs review and hidden
+- [x] Extra requirements are stored with their sentence, shown on cards as "Also requires: …", never matched
+- [x] If the LLM call fails: a new Scholarship is not stored; a changed one keeps its previous version; no hash is saved, so the next run retries; the run summary reports it
+- [x] The LLM is faked in all tests except one opt-in test against the real Haiku
+- [x] The LLM is never called at match time
 - [ ] Deployed to Render; the post-deploy smoke check passes
 
 ## Comments
 
 **2026-10-23 (agent, feat/08-llm-confidence):** Built test-first at Seam 3 (`backend/src/ingestion/extractor-llm.spec.ts`) and Seam 1 (`backend/test/llm-confidence.e2e-spec.ts`). The LLM sits behind `LLM_CLIENT` (`backend/src/ingestion/llm.ts`, `LlmClient.read(request)`). The real client is `AnthropicLlmClient` (`anthropic-llm.ts`): one `claude-haiku-5-5` call with a fixed JSON-schema structured output. It is created on first use and needs `ANTHROPIC_API_KEY`, which is now in `render.yaml` and `.env.example` and must be set on Render before the next ingest. `extract(text, llm)` runs the rules (`extractByRules`, the old sync `extract`), then always makes exactly one LLM call over `text.slice(0, LLM_TEXT_LIMIT = 15_000)`. The call asks for the `LLM_FIELDS` the rules missed, plus Amount text and deadline only when the regex found none. Rules always win over the LLM for a field, an Amount text or a deadline. The code, not the model, sets each LLM Criterion's `op` and `changeable` (`LLM_FIELDS` in `extractor.ts`). The quote check compares with whitespace collapsed. A **medium** Criterion's quote is in the text and every value it names normalises onto the fixed list. Otherwise the Criterion is kept at **low** with the model's raw `values` array as `value` and the quote as `sourceText`. Amount text and deadline from the LLM are used only when the value sits inside its quote and the quote is in the text (and the deadline parses as a date); otherwise they are dropped. Extra requirements whose quote isn't in the text are dropped too, since they never affect Confidence. Conventions for 11/12: needs review is still `needsReview: confidence === 'low' || criteria.length === 0` in `IngestionService.upsertScholarship`, with Scholarship `confidence` set by `weakest(criteria)` (deadline and Amount text never count). Nothing records *which* Criterion is weakest; the Review report should take the first Criterion whose `confidence` equals the Scholarship's (low) and show its `sourceText`. Zero-Criteria Scholarships have `confidence: 'high'` with `needsReview: true`, which is how 11 can tell the two reasons apart. Extra requirements are stored as `extraRequirements: { text, sourceText }[]` on the Scholarship. They are on every Match `Card` and in Saved snapshots (older snapshots read back as `[]`). The frontend shows "Also requires: …" and "Verify on the official site" for `confidence === 'medium'`. If extraction fails, nothing is written for that section. Other sections of a many source still go through. The source's outcome is `failed` with `detail: "Extraction failed for <scheme>: <reason>; …"`, `counts.failed` goes up once per source, and the hash isn't saved, so the next run retries. The harness fakes the LLM (`llm` option, `serveLlm`, `llmCalls`; by default it finds nothing). The opt-in real test is `anthropic-llm.real.spec.ts`, run with `REAL_LLM=1 npx vitest run anthropic-llm`. It has not been run yet because there was no key in this environment. After merging ticket 10, structured JSON Criteria (high) replace any rule or LLM Criterion for the same field (`withStructured`), so a bad LLM reading of a structured field cannot lower Confidence. Left unticked: the Render deploy check.
+
+**2026-10-23 (agent):** Merged into `integrate/wave-2` (a04290b), including the wave-2 code-review fixes. Every box except the Render deploy is met; backend 252 tests (1 skipped: the opt-in real-Haiku test, never run, no key here), lint, build and frontend build/tests pass. Status stays as is until the deploy and smoke check pass after merge to main; then set `Status: done`.
