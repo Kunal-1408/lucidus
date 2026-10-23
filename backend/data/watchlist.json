@@ -8,5 +8,128 @@
     "scholarshipType": "corporate",
     "officialUrl": "https://www.santoorscholarships.com/",
     "holds": "one"
+  },
+  {
+    "url": "https://www.myscheme.gov.in/api/apisetu/schemes?slug=nmmss&lang=en",
+    "type": "json",
+    "region": "india",
+    "name": "National Means-cum-Merit Scholarship Scheme",
+    "provider": "Department of School Education & Literacy, Ministry of Education",
+    "scholarshipType": "government",
+    "officialUrl": "https://www.myscheme.gov.in/schemes/nmmss",
+    "holds": "one"
+  },
+  {
+    "url": "https://scholarships.gov.in/public/schemeGuidelines/AICTE/AICTE_2010_G.pdf",
+    "type": "pdf",
+    "region": "india",
+    "name": "AICTE Pragati Scholarship for Girl Students (Technical Degree)",
+    "provider": "All India Council for Technical Education",
+    "scholarshipType": "government",
+    "officialUrl": "https://scholarships.gov.in/All-Scholarships",
+    "holds": "one"
+  },
+  {
+    "url": "https://scholarships.gov.in/public/schemeGuidelines/AICTE/AICTE_2012_G.pdf",
+    "type": "pdf",
+    "region": "india",
+    "name": "AICTE Saksham Scholarship for Specially Abled Students (Technical Degree)",
+    "provider": "All India Council for Technical Education",
+    "scholarshipType": "government",
+    "officialUrl": "https://scholarships.gov.in/All-Scholarships",
+    "holds": "one"
+  },
+  {
+    "url": "https://scholarships.gov.in/public/schemeGuidelines/Top_Class_Education_Scheme_2018.pdf",
+    "type": "pdf",
+    "region": "india",
+    "name": "Central Sector Scholarship of Top Class Education for SC Students",
+    "provider": "Department of Social Justice & Empowerment",
+    "scholarshipType": "government",
+    "officialUrl": "https://scholarships.gov.in/All-Scholarships",
+    "holds": "one"
+  },
+  {
+    "url": "https://socialjustice.gov.in/schemes/25",
+    "type": "html",
+    "region": "india",
+    "name": "Post-Matric Scholarship for SC Students",
+    "provider": "Department of Social Justice & Empowerment",
+    "scholarshipType": "government",
+    "officialUrl": "https://socialjustice.gov.in/schemes/25",
+    "holds": "one"
+  },
+  {
+    "url": "https://licindia.in/documents/d/guest/golden-jubilee-scholarship-scheme-2026",
+    "type": "pdf",
+    "region": "india",
+    "name": "LIC Golden Jubilee Scholarship Scheme 2026",
+    "provider": "LIC Golden Jubilee Foundation",
+    "scholarshipType": "corporate",
+    "officialUrl": "https://www.licindia.in/golden-jubilee-scholarship-scheme",
+    "holds": "many",
+    "split": {
+      "splitPattern": "^\\[[AB]\\]\\.\\s*(\\w+ Scholarship)"
+    }
+  },
+  {
+    "url": "https://future.utoronto.ca/pearson/about/",
+    "type": "html",
+    "region": "abroad",
+    "name": "Lester B. Pearson International Scholarship",
+    "provider": "University of Toronto",
+    "scholarshipType": "university",
+    "officialUrl": "https://future.utoronto.ca/pearson/about/",
+    "holds": "one"
+  },
+  {
+    "url": "https://futurestudents.yorku.ca/financing-your-degree/international-scholarships",
+    "type": "html",
+    "region": "abroad",
+    "name": "York University International Entrance Scholarships",
+    "provider": "York University",
+    "scholarshipType": "university",
+    "officialUrl": "https://futurestudents.yorku.ca/financing-your-degree/international-scholarships",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.exeter.ac.uk/study/funding/award/?id=5917",
+    "type": "html",
+    "region": "abroad",
+    "name": "University of Exeter Undergraduate Scholarships for India",
+    "provider": "University of Exeter",
+    "scholarshipType": "university",
+    "officialUrl": "https://www.exeter.ac.uk/study/funding/award/?id=5917",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.manchester.ac.uk/study/international/finance-and-scholarships/funding/global-futures-scholarship/index.htm",
+    "type": "html",
+    "region": "abroad",
+    "name": "Global Futures Scholarships",
+    "provider": "The University of Manchester",
+    "scholarshipType": "university",
+    "officialUrl": "https://www.manchester.ac.uk/study/international/finance-and-scholarships/funding/global-futures-scholarship/index.htm",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.sydney.edu.au/scholarships/e/sydney-scholars-india-scholarship-program.html",
+    "type": "html",
+    "region": "abroad",
+    "name": "Sydney Scholars India Scholarship Program",
+    "provider": "The University of Sydney",
+    "scholarshipType": "university",
+    "officialUrl": "https://www.sydney.edu.au/scholarships/e/sydney-scholars-india-scholarship-program.html",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.chennai.in.emb-japan.go.jp/itpr_ja/11_000001_00446.html",
+    "type": "html",
+    "region": "abroad",
+    "name": "Japanese Government (MEXT) Scholarship for Undergraduate Students",
+    "provider": "Ministry of Education, Culture, Sports, Science and Technology, Japan",
+    "scholarshipType": "government",
+    "officialUrl": "https://www.chennai.in.emb-japan.go.jp/itpr_ja/11_000001_00446.html",
+    "holds": "one"
   }
 ]

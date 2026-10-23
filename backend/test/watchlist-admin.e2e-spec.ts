@@ -59,23 +59,28 @@ describe('Watchlist admin endpoints', () => {
       });
     });
 
-    it('adds an entry and lists it after the seeded one', async () => {
+    it('adds an entry and lists it after the seeded ones', async () => {
+      const seeded = await list();
+      expect(seeded).toContainEqual(
+        expect.objectContaining({ id: expect.any(String), url: SANTOOR }),
+      );
       const res = await add(GIRLS_ENTRY).expect(201);
       expect(res.body).toEqual({ id: expect.any(String), ...GIRLS_ENTRY });
 
       expect(await list()).toEqual([
-        expect.objectContaining({ id: expect.any(String), url: SANTOOR }),
+        ...seeded,
         { id: res.body.id as string, ...GIRLS_ENTRY },
       ]);
     });
 
     it('keeps operator changes over a restart instead of re-seeding', async () => {
-      const [santoor] = await list();
-      await harness
-        .http()
-        .delete(`/api/admin/watchlist/${santoor.id as string}`)
-        .set('x-admin-token', ADMIN_TOKEN)
-        .expect(204);
+      for (const seeded of await list()) {
+        await harness
+          .http()
+          .delete(`/api/admin/watchlist/${seeded.id as string}`)
+          .set('x-admin-token', ADMIN_TOKEN)
+          .expect(204);
+      }
       const girls = await add(GIRLS_ENTRY).expect(201);
 
       await harness.restart();
@@ -106,11 +111,14 @@ describe('Watchlist admin endpoints', () => {
       await add(GIRLS_ENTRY).expect(201);
       await harness.ingest();
 
-      // The seeded Santoor page isn't served here, so it reads as removed.
-      expect(await list()).toEqual([
+      // The seeded pages aren't served here, so they read as removed.
+      const entries = await list();
+      expect(entries).toContainEqual(
         expect.objectContaining({ url: SANTOOR, lastResult: 'not_found' }),
+      );
+      expect(entries).toContainEqual(
         expect.objectContaining({ url: GIRLS, lastResult: 'ok' }),
-      ]);
+      );
     });
   });
 
