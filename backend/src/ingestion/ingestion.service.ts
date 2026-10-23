@@ -6,13 +6,14 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { isValidObjectId, Model, Types } from 'mongoose';
+import { isValidObjectId, Model, type QueryFilter, Types } from 'mongoose';
 import { CLOCK, type Clock } from '../clock.js';
 import {
   ConfidenceLevel,
   Criterion,
   Scholarship,
 } from '../scholarships/scholarship.schema.js';
+import type { ScholarshipKey } from '../scholarships/scholarship-key.js';
 import { UniversityPointersService } from '../universities/university-pointers.service.js';
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
 import { EXTRACTOR, type Extractor } from './extractor.js';
@@ -96,6 +97,7 @@ export class IngestionService implements OnApplicationBootstrap {
       finishedAt: run.finishedAt,
       counts: run.counts,
       sources: run.sources,
+      universityPointers: run.universityPointers ?? [],
     };
   }
 
@@ -115,7 +117,7 @@ export class IngestionService implements OnApplicationBootstrap {
         );
         await this.runs.updateOne({ _id: id }, { counts, sources });
       }
-      await this.refreshUniversityPointers(id, counts, sources);
+      await this.refreshUniversityPointers(id, counts);
       await this.finish(id, 'finished');
     } catch (err) {
       this.logger.error(`Ingestion run ${id.toHexString()} failed`, err);
@@ -129,26 +131,35 @@ export class IngestionService implements OnApplicationBootstrap {
     entries: WatchlistEntry[],
     counts: RunCounts,
   ): Promise<void> {
-    const retired = await this.scholarships.updateMany(
-      { sourceUrl: { $nin: entries.map((e) => e.url) }, status: 'active' },
-      { status: 'inactive' },
+    await this.markInactive(
+      { sourceUrl: { $nin: entries.map((e) => e.url) } },
+      counts,
     );
-    counts.inactive += retired.modifiedCount;
   }
 
-  // University pointers come from WorqNow, not the Watchlist; a country that
-  // fails is reported beside the sources but has no Watchlist entry.
+  // Takes the matching active Scholarships out of results, counting them.
+  private async markInactive(
+    filter: QueryFilter<Scholarship>,
+    counts: RunCounts,
+  ): Promise<void> {
+    const marked = await this.scholarships.updateMany(
+      { ...filter, status: 'active' },
+      { status: 'inactive' },
+    );
+    counts.inactive += marked.modifiedCount;
+  }
+
+  // University pointers come from WorqNow, not the Watchlist, so their
+  // outcomes are reported apart from the sources.
   private async refreshUniversityPointers(
     id: Types.ObjectId,
     counts: RunCounts,
-    sources: SourceOutcome[],
   ) {
-    const failures = await this.universityPointers.refresh();
-    counts.worqnow_failed = failures.length;
-    for (const { country, detail } of failures) {
-      sources.push({ url: `worqnow:${country}`, result: 'failed', detail });
-    }
-    await this.runs.updateOne({ _id: id }, { counts, sources });
+    const universityPointers = await this.universityPointers.refresh();
+    counts.worqnow_failed = universityPointers.filter(
+      (o) => o.result === 'failed',
+    ).length;
+    await this.runs.updateOne({ _id: id }, { counts, universityPointers });
   }
 
   private finish(id: Types.ObjectId, state: 'finished' | 'failed') {
@@ -185,11 +196,7 @@ export class IngestionService implements OnApplicationBootstrap {
       if (fetched.failure === 'not_found') {
         // The provider removed the page: its Scholarships drop out of
         // results but are never deleted.
-        const removed = await this.scholarships.updateMany(
-          { sourceUrl: url, status: 'active' },
-          { status: 'inactive' },
-        );
-        counts.inactive += removed.modifiedCount;
+        await this.markInactive({ sourceUrl: url }, counts);
         return { url, result: 'not_found' };
       }
       // A flaky server must not wipe data: leave everything as it was.
@@ -217,15 +224,13 @@ export class IngestionService implements OnApplicationBootstrap {
     }
     // A scheme the source no longer lists drops out of results; a renamed
     // one goes this way too and comes back above as a new Scholarship.
-    const dropped = await this.scholarships.updateMany(
+    await this.markInactive(
       {
         sourceUrl: url,
-        status: 'active',
         schemeName: { $nin: sections.map((s) => s.schemeName) },
       },
-      { status: 'inactive' },
+      counts,
     );
-    counts.inactive += dropped.modifiedCount;
     return { url, result: extracted > 0 ? 'ok' : 'unchanged' };
   }
 
@@ -236,7 +241,7 @@ export class IngestionService implements OnApplicationBootstrap {
     entry: WatchlistEntry,
     { schemeName, text, officialUrl }: Section,
   ): Promise<'unchanged' | 'extracted'> {
-    const key = { sourceUrl: entry.url, schemeName };
+    const key: ScholarshipKey = { sourceUrl: entry.url, schemeName };
     const contentHash = sha256(text);
     const same = await this.scholarships.updateOne(
       { ...key, contentHash },

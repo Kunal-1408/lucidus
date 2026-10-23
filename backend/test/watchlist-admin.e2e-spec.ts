@@ -239,6 +239,11 @@ describe('Watchlist admin endpoints', () => {
         'split.splitSelector is required for an html source',
       ],
       [
+        'an HTML split selector that is not a heading',
+        { ...GIRLS_ENTRY, holds: 'many', split: { splitSelector: 'div.card' } },
+        'split.splitSelector must be a heading tag (h1 to h6)',
+      ],
+      [
         'a JSON split rule with no name field',
         {
           ...GIRLS_ENTRY,

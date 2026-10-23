@@ -95,6 +95,13 @@ function splitRule(
     }
     rule[field] = given;
   }
+  // The Splitter starts a section at each heading, so the selector names one.
+  if (
+    rule.splitSelector !== undefined &&
+    !/^h[1-6]$/i.test(rule.splitSelector.trim())
+  ) {
+    reasons.push('split.splitSelector must be a heading tag (h1 to h6)');
+  }
   if (rule.splitPattern !== undefined && !isRegex(rule.splitPattern)) {
     reasons.push('split.splitPattern must be a valid regular expression');
   }

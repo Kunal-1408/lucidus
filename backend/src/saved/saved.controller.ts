@@ -15,7 +15,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model, Types } from 'mongoose';
 import { CLOCK, type Clock, indiaDate } from '../clock.js';
 import { deadlineStatus, type DeadlineStatus } from '../match/matcher.js';
-import { Scholarship } from '../scholarships/scholarship.schema.js';
+import { scholarshipKey } from '../scholarships/scholarship-key.js';
+import { Scholarship, VISIBLE } from '../scholarships/scholarship.schema.js';
 import { CardSnapshot, SavedScholarship } from './saved-scholarship.schema.js';
 
 export type SavedState =
@@ -46,32 +47,31 @@ export class SavedController {
   ): Promise<SavedCard> {
     const visitor = requireVisitor(visitorId);
     const id = body?.scholarshipId;
-    const s =
+    // Saving is only from Results cards, so only a visible Scholarship can
+    // be saved.
+    const scholarship =
       typeof id === 'string' && isValidObjectId(id)
-        ? await this.scholarships.findById(id).lean()
+        ? await this.scholarships.findOne({ _id: id, ...VISIBLE }).lean()
         : null;
-    if (!s) throw new NotFoundException(`No scholarship ${String(id)}`);
+    if (!scholarship)
+      throw new NotFoundException(`No scholarship ${String(id)}`);
 
     // Saving again keeps the first save and its snapshot.
-    const key = {
-      visitorId: visitor,
-      sourceUrl: s.sourceUrl,
-      schemeName: s.schemeName,
-    };
+    const key = { visitorId: visitor, ...scholarshipKey(scholarship) };
     const saved = await this.saved.findOneAndUpdate(
       key,
       {
         $setOnInsert: {
           ...key,
-          snapshot: snapshotOf(s),
-          contentHash: s.contentHash,
+          snapshot: snapshotOf(scholarship),
+          contentHash: scholarship.contentHash,
           savedAt: this.clock.now(),
         },
       },
       { upsert: true, returnDocument: 'after', lean: true },
     );
     if (!saved) throw new Error('Upsert returned no saved scholarship');
-    return this.toCard(saved, s);
+    return this.toCard(saved, scholarship);
   }
 
   @Delete(':id')
@@ -101,7 +101,7 @@ export class SavedController {
     return Promise.all(
       saved.map(async (item) => {
         const live = await this.scholarships
-          .findOne({ sourceUrl: item.sourceUrl, schemeName: item.schemeName })
+          .findOne(scholarshipKey(item))
           .lean();
         return this.toCard(item, live);
       }),
@@ -148,14 +148,14 @@ function requireVisitor(visitorId: string | undefined): string {
   return visitor;
 }
 
-function snapshotOf(s: Scholarship): CardSnapshot {
+function snapshotOf(scholarship: Scholarship): CardSnapshot {
   return {
-    name: s.name,
-    provider: s.provider,
-    amountText: s.amountText,
-    officialUrl: s.officialUrl,
-    deadline: s.deadline,
-    lastVerified: s.lastVerified.toISOString(),
-    confidence: s.confidence,
+    name: scholarship.name,
+    provider: scholarship.provider,
+    amountText: scholarship.amountText,
+    officialUrl: scholarship.officialUrl,
+    deadline: scholarship.deadline,
+    lastVerified: scholarship.lastVerified.toISOString(),
+    confidence: scholarship.confidence,
   };
 }

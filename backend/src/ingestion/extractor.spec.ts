@@ -101,6 +101,20 @@ describe('Normalisation onto the fixed lists', () => {
   });
 
   it.each([
+    ['Applicants must have secured 60% marks in Class 10.', 'class10Marks', 60],
+    ['Students should have scored 75% marks in Class 12.', 'latestMarks', 75],
+    [
+      'Candidates who obtained 80% in the previous examination are eligible.',
+      'latestMarks',
+      80,
+    ],
+  ])('reads the marks in "%s" as %s', (text, field, percent) => {
+    expect(criterion(text, field)?.value).toBe(percent);
+    const other = field === 'class10Marks' ? 'latestMarks' : 'class10Marks';
+    expect(criterion(text, other)).toBeUndefined();
+  });
+
+  it.each([
     ['a class outside Class 9–12', 'Open to students studying in Class 8.'],
     [
       'a state not on the list',
@@ -118,6 +132,12 @@ describe('Normalisation onto the fixed lists', () => {
     ['Apply by 5 Nov 2026.', '2026-11-05'],
     ['The last date to apply is November 30, 2026.', '2026-11-30'],
     ['Last date: 31/02/2026', undefined],
+    [
+      'Applications are open from 1 July 2026, last date 31 October 2026.',
+      '2026-10-31',
+    ],
+    ['Portal opens 01/08/2026 and closes on 15/11/2026.', '2026-11-15'],
+    ['Apply by 20 Dec 2026; results on 10 Jan 2027.', '2026-12-20'],
   ])('turns "%s" into an ISO deadline', (text, iso) => {
     expect(extract(text).deadline).toBe(iso);
   });
