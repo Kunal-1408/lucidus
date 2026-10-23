@@ -1,0 +1,11 @@
+{
+  "title": "Kanya Vidya Scholarship",
+  "summary": "The scholarship supports girls at any recognised school.",
+  "benefit": "Rs. 12,000 per annum",
+  "deadline": "2026-10-31",
+  "class": [10],
+  "incomeBand": 250000,
+  "category": ["SC", "ST"],
+  "domicileState": "Atlantis",
+  "contact": { "email": "scholarships@example.org" }
+}

@@ -1,0 +1,18 @@
+{
+  "status": "success",
+  "data": {
+    "total": 2,
+    "schemes": [
+      {
+        "title": "Pragati Scholarship for Girls",
+        "eligibility": "The scheme is open to girls studying in Class 11 at a government school in the state.",
+        "benefit": "Each selected student receives Rs. 10,000 per annum."
+      },
+      {
+        "title": "Merit Scholarship for Class 9",
+        "eligibility": "Students of either gender studying in Class 9 who scored well in Class 8 may apply.",
+        "benefit": "The award is Rs. 6,000 per annum."
+      }
+    ]
+  }
+}

@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import * as cheerio from 'cheerio';
+import { PDFParse } from 'pdf-parse';
 import { SourceType } from '../watchlist/watchlist-entry.schema.js';
+import { jsonText, parseJson } from './json-source.js';
 
 // The raw HTTP call is injected so tests can serve committed fixtures.
 export const HTTP_FETCH = Symbol('HTTP_FETCH');
@@ -39,12 +41,39 @@ export class Fetcher {
     }
     if (!response.ok) return { ok: false, failure: 'server_error' };
 
-    if (type !== 'html') {
-      throw new Error(`Source type ${type} is not supported yet`);
-    }
+    return { ok: true, ...(await READERS[type](response)) };
+  }
+}
+
+type Read = { text: string; raw: string; needsJs: boolean };
+
+// How each source type's body becomes cleaned text. Only an HTML page can be
+// built by JavaScript; a short PDF or JSON body is simply short.
+const READERS: Record<SourceType, (response: Response) => Promise<Read>> = {
+  html: async (response) => {
     const raw = await response.text();
     const text = cleanHtml(raw);
-    return { ok: true, text, raw, needsJs: text.length < NEEDS_JS_BELOW_CHARS };
+    return { text, raw, needsJs: text.length < NEEDS_JS_BELOW_CHARS };
+  },
+  // The Splitter reads a PDF's lines, so its raw form is its text too.
+  pdf: async (response) => {
+    const text = await pdfText(await response.arrayBuffer());
+    return { text, raw: text, needsJs: false };
+  },
+  json: async (response) => {
+    const raw = await response.text();
+    return { text: jsonText(parseJson(raw)), raw, needsJs: false };
+  },
+};
+
+async function pdfText(body: ArrayBuffer): Promise<string> {
+  const parser = new PDFParse({ data: new Uint8Array(body) });
+  try {
+    // No page markers: they would land in the text and its hash.
+    const { text } = await parser.getText({ pageJoiner: '' });
+    return tidyLines(text);
+  } finally {
+    await parser.destroy();
   }
 }
 
