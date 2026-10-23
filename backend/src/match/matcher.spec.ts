@@ -77,8 +77,8 @@ describe('Matcher: never-changeable fields', () => {
     ],
     [
       'domicile',
-      { field: 'domicileState', value: 'Kerala' },
-      { domicileState: 'Goa' },
+      { field: 'domicileState', value: 'kerala' },
+      { domicileState: 'goa' },
     ],
     [
       'income',
@@ -156,7 +156,7 @@ describe('Matcher: list answers and yes/no answers', () => {
       {
         field: 'parentOccupation',
         op: 'in',
-        value: ['defence', 'central_police'],
+        value: ['defence', 'central_armed_police'],
       },
     ]);
     expect(bucketOf({ parentOccupation: ['defence'] }, s)).toBe('eligible');
@@ -472,7 +472,7 @@ describe('Matcher: missing fields', () => {
     const s = scholarship([
       { field: 'incomeBand', op: 'lte', value: 250000 },
       { field: 'incomeBand', op: 'gte', value: 100000 },
-      { field: 'domicileState', value: 'Kerala' },
+      { field: 'domicileState', value: 'kerala' },
     ]);
     expect(cardFor({}, s).missing).toEqual([
       { field: 'incomeBand', label: 'family income' },
