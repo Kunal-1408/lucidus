@@ -97,9 +97,10 @@ const incomeRule: FieldRule = (sentences) => {
   return undefined;
 };
 
-// "minimum of 60% marks", "at least 75%", "80% or above".
+// "minimum of 60% marks", "at least 75%", "80% or above", "secured 60%
+// marks".
 const MIN_PERCENT =
-  /\b(?:minimum(?: of)?|at least|not less than)\s*(\d{2,3}(?:\.\d+)?)\s*%|\b(\d{2,3}(?:\.\d+)?)\s*%\s*(?:marks\s*)?(?:or above|or more|and above)/i;
+  /\b(?:minimum(?: of)?|at least|not less than)\s*(\d{2,3}(?:\.\d+)?)\s*%|\b(\d{2,3}(?:\.\d+)?)\s*%\s*(?:marks\s*)?(?:or above|or more|and above)|\b(?:secur|scor|obtain)(?:e|ed|es|ing)\s+(?:an? )?(?:aggregate of\s*)?(\d{2,3}(?:\.\d+)?)\s*%/i;
 // Cut-offs in a selection test, or marks in a class before Class 9, are not
 // marks a Student's Profile records.
 const NOT_PROFILE_MARKS =
@@ -116,7 +117,7 @@ function marksRule(field: 'class10Marks' | 'latestMarks'): FieldRule {
       if (NAMES_CLASS_10.test(sentence) !== (field === 'class10Marks'))
         continue;
       const m = sentence.match(MIN_PERCENT);
-      if (m) return found(field, 'gte', m[1] ?? m[2], sentence, true);
+      if (m) return found(field, 'gte', m[1] ?? m[2] ?? m[3], sentence, true);
     }
     return undefined;
   };
@@ -276,14 +277,25 @@ function keywordRule(spec: KeywordField): FieldRule {
 }
 
 const DEADLINE_CUE =
-  /\b(?:last date|deadline|closing date|apply (?:by|before)|open till|closes on|on or before|due date)\b/i;
+  /\b(?:last date|deadline|closing date|apply (?:by|before)|open till|closes?(?: on)?|on or before|due date)\b/i;
 
-// The sentence stating the last date a Student can apply, if any. Dates for
-// officials ("Institute Verification Open till") are not the deadline.
-export function deadlineSentence(sentences: string[]): string | undefined {
-  return sentences.find(
-    (s) => DEADLINE_CUE.test(s) && !/verification/i.test(s) && DATE.test(s),
-  );
+// The date a Student must apply by, as the source wrote it, if any. It comes
+// from the first sentence with a closing cue and a date; dates for officials
+// ("Institute Verification Open till") are not the deadline. A sentence can
+// carry an opening date too ("open from 1 July 2026, last date 31 October
+// 2026"), so the date is the first one after the cue, else the nearest one
+// before it.
+export function deadlineText(sentences: string[]): string | undefined {
+  for (const sentence of sentences) {
+    const cue = sentence.match(DEADLINE_CUE);
+    if (!cue || /verification/i.test(sentence)) continue;
+    const dates = [...sentence.matchAll(new RegExp(DATE.source, 'gi'))];
+    if (dates.length === 0) continue;
+    const cueAt = cue.index ?? 0;
+    const after = dates.find((d) => d.index >= cueAt);
+    return (after ?? dates[dates.length - 1])[0];
+  }
+  return undefined;
 }
 
 // Every field rule, each finding at most one Criterion.

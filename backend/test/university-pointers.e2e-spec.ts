@@ -156,6 +156,10 @@ describe('University pointers', () => {
       const summary = await harness.ingest();
 
       expect(summary.counts.worqnow_failed).toBe(0);
+      expect(summary.universityPointers).toContainEqual({
+        country: 'uk',
+        result: 'ok',
+      });
       expect(
         (await matchFor({ destination: 'uk' })).universityPointers,
       ).toEqual([
@@ -173,11 +177,14 @@ describe('University pointers', () => {
 
       expect(summary.state).toBe('finished');
       expect(summary.counts.worqnow_failed).toBe(1);
-      expect(summary.sources).toContainEqual({
-        url: 'worqnow:uk',
-        result: 'failed',
-        detail: 'WorqNow answered 503',
-      });
+      expect(summary.universityPointers).toEqual([
+        { country: 'uk', result: 'failed', detail: 'WorqNow answered 503' },
+        { country: 'usa', result: 'ok' },
+        { country: 'canada', result: 'ok' },
+        { country: 'australia', result: 'ok' },
+      ]);
+      // WorqNow is not a Watchlist source.
+      expect(summary.sources).toEqual([{ url: GIRLS, result: 'unchanged' }]);
       expect(
         (await matchFor({ destination: 'uk' })).universityPointers,
       ).toEqual([
@@ -186,6 +193,34 @@ describe('University pointers', () => {
       expect(
         (await matchFor({ destination: 'usa' })).universityPointers,
       ).toEqual([expect.objectContaining({ names: ['Stanford University'] })]);
+    });
+
+    it('keeps the previous list for a country whose new list cannot be stored, and reports it', async () => {
+      // A university with no code can't be stored as a pointer.
+      harness.serveWorqNow('uk', [
+        { code: 'glasgow', name: 'University of Glasgow' },
+        { code: '' },
+      ]);
+
+      const summary = await harness.ingest();
+
+      expect(summary.counts.worqnow_failed).toBe(1);
+      expect(summary.universityPointers).toContainEqual({
+        country: 'uk',
+        result: 'failed',
+        detail: expect.any(String),
+      });
+      expect(
+        (await matchFor({ destination: 'uk' })).universityPointers,
+      ).toEqual([
+        expect.objectContaining({ names: ['University of Edinburgh'] }),
+      ]);
+    });
+
+    it('returns no group for a destination WorqNow lists no universities for', async () => {
+      expect(
+        (await matchFor({ destination: 'canada' })).universityPointers,
+      ).toEqual([]);
     });
   });
 

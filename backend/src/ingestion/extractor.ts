@@ -1,6 +1,6 @@
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import {
-  deadlineSentence,
+  deadlineText,
   FIELD_RULES,
   Found,
   isEligibilitySentence,
@@ -29,7 +29,7 @@ export function extract(text: string): Extraction {
     .map(normalise)
     .filter((c): c is Omit<Criterion, 'confidence'> => c !== undefined)
     .map((c) => ({ ...c, confidence: 'high' as const }));
-  const deadline = deadlineSentence(sentences);
+  const deadline = deadlineText(sentences);
   return {
     criteria,
     amountText: amountRule(sentences) ?? AMOUNT_NOT_STATED,

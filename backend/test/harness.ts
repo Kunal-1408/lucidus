@@ -67,6 +67,7 @@ export interface RunSummaryBody {
   state: string;
   counts: Record<string, number>;
   sources: { url: string; result: string; detail?: string }[];
+  universityPointers: { country: string; result: string; detail?: string }[];
 }
 
 // The real Nest app against an in-memory MongoDB, with only the edges faked:

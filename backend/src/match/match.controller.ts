@@ -1,10 +1,10 @@
 import { Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { CLOCK, type Clock } from '../clock.js';
-import { Scholarship } from '../scholarships/scholarship.schema.js';
+import { CLOCK, type Clock, indiaDate } from '../clock.js';
+import { Scholarship, VISIBLE } from '../scholarships/scholarship.schema.js';
 import {
-  type PointerGroup,
+  type UniversityPointerGroup,
   UniversityPointersService,
 } from '../universities/university-pointers.service.js';
 import { match, MatchResult } from './matcher.js';
@@ -23,10 +23,8 @@ export class MatchController {
   @HttpCode(200)
   async match(
     @Body() profile: Profile,
-  ): Promise<MatchResult & { universityPointers: PointerGroup[] }> {
-    const visible = await this.scholarships
-      .find({ status: 'active', needsReview: false })
-      .lean();
+  ): Promise<MatchResult & { universityPointers: UniversityPointerGroup[] }> {
+    const visible = await this.scholarships.find(VISIBLE).lean();
     const result = match(
       profile ?? {},
       visible.map((s) => Object.assign(s, { id: s._id.toString() })),
@@ -40,9 +38,4 @@ export class MatchController {
       ),
     };
   }
-}
-
-// Students are in India, so "today" is the date in India Standard Time.
-function indiaDate(now: Date): string {
-  return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }

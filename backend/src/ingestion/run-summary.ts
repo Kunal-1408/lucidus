@@ -1,3 +1,4 @@
+import type { UniversityPointerOutcome } from '../universities/university-pointers.service.js';
 import type { LastResult } from '../watchlist/watchlist-entry.schema.js';
 
 // The counters a run summary reports. Adding a counter means adding its name
@@ -38,4 +39,7 @@ export interface RunSummary {
   finishedAt?: Date;
   counts: RunCounts;
   sources: SourceOutcome[];
+  // How each country's University pointers refreshed from WorqNow; not
+  // Watchlist sources, so reported apart from them.
+  universityPointers: UniversityPointerOutcome[];
 }

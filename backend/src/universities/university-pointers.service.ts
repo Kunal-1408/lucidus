@@ -2,26 +2,30 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { UniversityPointer } from './university-pointer.schema.js';
 import {
   POINTER_COUNTRIES,
   type PointerCountry,
   WORQNOW,
   type WorqNowClient,
+  type WorqNowUniversity,
 } from './worqnow.js';
 
 // One destination's pointers as Match returns them: names only, under a
 // label saying they were not checked against the Profile.
-export interface PointerGroup {
+export interface UniversityPointerGroup {
   country: PointerCountry;
   label: string;
   names: string[];
 }
 
-export interface PointerRefreshFailure {
+// How refreshing one country's pointers went, for the run summary.
+export interface UniversityPointerOutcome {
   country: PointerCountry;
-  detail: string;
+  result: 'ok' | 'failed';
+  // Why the refresh failed, for the operator.
+  detail?: string;
 }
 
 // Resolves to backend/data from both src/universities and dist/universities.
@@ -68,36 +72,58 @@ export class UniversityPointersService {
   ) {}
 
   // Replaces each country's pointers with WorqNow's current list. A country
-  // whose fetch fails keeps its previous list and is returned as a failure.
-  async refresh(): Promise<PointerRefreshFailure[]> {
-    const failures: PointerRefreshFailure[] = [];
+  // whose fetch or write fails keeps its previous list and is reported as
+  // failed.
+  async refresh(): Promise<UniversityPointerOutcome[]> {
+    const outcomes: UniversityPointerOutcome[] = [];
     for (const country of POINTER_COUNTRIES) {
       try {
         const universities =
           await this.worqnow.universitiesWithScholarships(country);
-        await this.pointers.deleteMany({ country });
-        await this.pointers.insertMany(
-          universities.map((u) => ({
-            country,
-            code: u.code,
-            name: u.name ?? nameFromCode(u.code),
-          })),
-        );
+        await this.replace(country, universities);
+        outcomes.push({ country, result: 'ok' });
       } catch (err) {
-        failures.push({
+        outcomes.push({
           country,
+          result: 'failed',
           detail: err instanceof Error ? err.message : String(err),
         });
       }
     }
-    return failures;
+    return outcomes;
   }
 
-  // The pointers for a destination, or none when WorqNow doesn't cover it.
-  async forDestination(destination: unknown): Promise<PointerGroup[]> {
+  // Writes the new list before removing the old one, so a failed write
+  // leaves the country's previous list in place.
+  private async replace(
+    country: PointerCountry,
+    universities: WorqNowUniversity[],
+  ): Promise<void> {
+    const old = await this.pointers.find({ country }, { _id: 1 }).lean();
+    const fresh = universities.map((u) => ({
+      _id: new Types.ObjectId(),
+      country,
+      code: u.code,
+      name: u.name ?? nameFromCode(u.code),
+    }));
+    try {
+      await this.pointers.insertMany(fresh);
+    } catch (err) {
+      await this.pointers.deleteMany({ _id: { $in: fresh.map((p) => p._id) } });
+      throw err;
+    }
+    await this.pointers.deleteMany({ _id: { $in: old.map((p) => p._id) } });
+  }
+
+  // The pointers for a destination, or none when WorqNow doesn't cover it
+  // or lists no universities there.
+  async forDestination(
+    destination: unknown,
+  ): Promise<UniversityPointerGroup[]> {
     const country = POINTER_COUNTRIES.find((c) => c === destination);
     if (!country) return [];
     const found = await this.pointers.find({ country }).lean();
+    if (found.length === 0) return [];
     return [
       {
         country,

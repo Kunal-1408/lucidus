@@ -105,3 +105,7 @@ export class Scholarship {
 export type ScholarshipDocument = HydratedDocument<Scholarship>;
 export const ScholarshipSchema = SchemaFactory.createForClass(Scholarship);
 ScholarshipSchema.index({ sourceUrl: 1, schemeName: 1 }, { unique: true });
+
+// The filter for Scholarships a Student can see in results: listed and not
+// awaiting review.
+export const VISIBLE = { status: 'active', needsReview: false } as const;

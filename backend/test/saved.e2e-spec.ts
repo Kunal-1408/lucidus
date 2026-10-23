@@ -180,6 +180,26 @@ describe('Saved scholarships', () => {
     await save('000000000000000000000000').expect(404);
     await save('not-an-id').expect(404);
   });
+
+  it('rejects saving a scholarship that is no longer listed', async () => {
+    const scholarshipId = await firstEligibleId();
+    harness.serve(GIRLS, { status: 404 });
+    harness.setNow(DAY_2);
+    await harness.ingest();
+
+    await save(scholarshipId).expect(404);
+    expect(await savedList()).toEqual([]);
+  });
+
+  it('rejects saving a scholarship that is being re-checked', async () => {
+    const scholarshipId = await firstEligibleId();
+    await harness
+      .model<Scholarship>(Scholarship.name)
+      .updateOne({ sourceUrl: GIRLS }, { needsReview: true });
+
+    await save(scholarshipId).expect(404);
+    expect(await savedList()).toEqual([]);
+  });
 });
 
 interface SavedBody {
