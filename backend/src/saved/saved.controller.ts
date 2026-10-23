@@ -125,6 +125,7 @@ export class SavedController {
       state,
       card: {
         ...card,
+        extraRequirements: card.extraRequirements ?? [],
         deadlineStatus: deadlineStatus(
           card.deadline,
           indiaDate(this.clock.now()),
@@ -157,5 +158,8 @@ function snapshotOf(scholarship: Scholarship): CardSnapshot {
     deadline: scholarship.deadline,
     lastVerified: scholarship.lastVerified.toISOString(),
     confidence: scholarship.confidence,
+    extraRequirements: scholarship.extraRequirements.map(
+      ({ text, sourceText }) => ({ text, sourceText }),
+    ),
   };
 }

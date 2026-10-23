@@ -17,7 +17,11 @@ export interface Card {
   deadline?: string;
   deadlineStatus: 'open' | 'closing_soon' | 'closed' | 'not_announced';
   lastVerified: string;
+  // Medium cards carry a "verify on the official site" nudge.
   confidence: 'high' | 'medium' | 'low';
+  // Conditions no Profile field answers, each with its source sentence;
+  // shown as "Also requires: …", never matched.
+  extraRequirements: { text: string; sourceText: string }[];
   // What would turn a Within reach card Eligible; empty in other buckets.
   goals: string[];
   // Profile fields left empty that this scholarship checks.
@@ -59,6 +63,7 @@ export interface SavedCard {
     | 'deadlineStatus'
     | 'lastVerified'
     | 'confidence'
+    | 'extraRequirements'
   >;
 }
 

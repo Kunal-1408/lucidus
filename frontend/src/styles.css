@@ -123,8 +123,14 @@ a {
 }
 
 .deadline,
-.missing {
+.missing,
+.extra {
   font-size: 0.9rem;
+}
+
+.verify {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .closing-soon {

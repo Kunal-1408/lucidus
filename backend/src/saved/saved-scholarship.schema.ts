@@ -1,5 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import type { ConfidenceLevel } from '../scholarships/scholarship.schema.js';
+import type {
+  ConfidenceLevel,
+  ExtraRequirement,
+} from '../scholarships/scholarship.schema.js';
 
 // How a card looked when the Visitor saved it. Deadline status is left out:
 // it depends on the day the Saved list is read.
@@ -11,6 +14,8 @@ export interface CardSnapshot {
   deadline?: string;
   lastVerified: string;
   confidence: ConfidenceLevel;
+  // Absent from snapshots taken before Extra requirements were extracted.
+  extraRequirements?: ExtraRequirement[];
 }
 
 // A scholarship a Visitor kept, with a snapshot so it stays readable if the
