@@ -1,4 +1,4 @@
-import { ADMIN_TOKEN, Harness, startApp } from './harness.js';
+import { Harness, startApp } from './harness.js';
 
 const SANTOOR = 'https://www.santoorscholarships.com/';
 
@@ -24,12 +24,8 @@ describe('Seed → ingest → match', () => {
   });
 
   it('ingests the seeded Watchlist entry', async () => {
-    const res = await harness
-      .http()
-      .post('/api/admin/ingest')
-      .set('x-admin-token', ADMIN_TOKEN)
-      .expect(200);
-    expect(res.body.sources).toEqual([{ url: SANTOOR, result: 'ok' }]);
+    const summary = await harness.ingest();
+    expect(summary.sources).toEqual([{ url: SANTOOR, result: 'ok' }]);
   });
 
   it('matches a Profile whose gender and class pass as Eligible', async () => {
