@@ -20,3 +20,5 @@
 ## Comments
 
 **2026-10-23 (agent):** Built test-first on `feat/05-ingestion-lifecycle`. `POST /api/admin/ingest` now answers 202 `{ runId }` (409 `{ runId }` while a run is in progress) and runs in the background; `GET /api/admin/ingest/:runId` returns `{ runId, state, startedAt, finishedAt, counts, sources }`, written after every source so it can be read mid-run. A run cut off by the host stopping is marked `interrupted` on the next startup, and the next trigger resumes it through hash skipping. Counters live in `COUNT_NAMES` in `backend/src/ingestion/run-summary.ts`; add a name there for a new counter (09: `empty`). The Extractor is now injected (`EXTRACTOR`), as are the fetch and clock. The last-result box is met in storage only; 06's `GET /api/admin/watchlist` will make it visible. Left unticked: the Render deploy check.
+
+**2026-10-23 (agent):** Merged into `integrate/wave-1` (873368b), including the wave-1 code-review fixes. Every box except the Render deploy is met; backend 181 tests, lint, build and frontend build/tests pass. Status stays as is until the deploy and smoke check pass after merge to main; then set `Status: done`.

@@ -23,3 +23,5 @@
 ## Comments
 
 **2026-10-23** (agent, feat/02-matcher): Matcher built test-first at Seam 2 (`backend/src/match/matcher.spec.ts`), plus one Seam 1 check for a next-class card. Conventions later tickets rely on: `match(profile, scholarships, today)` takes today as an ISO date in India time (the controller derives it from the injected clock); income Criteria use field `incomeBand` with a rupee threshold (`lte`/`gte`) or band keys (`eq`/`in`); UG admission is a `class` Criterion with value `ug`; a fail is changeable only if the Criterion says `changeable: true` AND it is within the field limit. Cards now carry `deadlineStatus`, `goals` and `missing` (`{ field, label }[]`, for Prompts in ticket 04). Awaiting deploy and smoke check.
+
+**2026-10-23 (agent):** Merged into `integrate/wave-1` (873368b), including the wave-1 code-review fixes. Every box except the Render deploy is met; backend 181 tests, lint, build and frontend build/tests pass. Status stays as is until the deploy and smoke check pass after merge to main; then set `Status: done`.
