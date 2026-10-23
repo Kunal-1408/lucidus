@@ -1,3 +1,7 @@
+## Checks
+
+`npm run check` at the repo root runs every format, lint, build and test check for backend/ and frontend/; the pre-commit hook and CI run the same. In a fresh clone, `npm run setup` installs all three packages first.
+
 ## Agent skills
 
 ### Issue tracker

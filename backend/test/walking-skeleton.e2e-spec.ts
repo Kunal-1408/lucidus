@@ -14,6 +14,16 @@ describe('Seed → ingest → match', () => {
 
   afterAll(() => harness.close());
 
+  it('reports the deployed commit on the health check', async () => {
+    process.env.RENDER_GIT_COMMIT = 'abc1234';
+    try {
+      const res = await harness.http().get('/api/health').expect(200);
+      expect(res.body).toEqual({ ok: true, commit: 'abc1234' });
+    } finally {
+      delete process.env.RENDER_GIT_COMMIT;
+    }
+  });
+
   it('rejects ingestion with a missing or wrong admin token', async () => {
     await harness.http().post('/api/admin/ingest').expect(401);
     await harness

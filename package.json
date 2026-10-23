@@ -1,0 +1,19 @@
+{
+  "name": "lucidus",
+  "private": true,
+  "description": "Repo-wide checks. The app itself lives in backend/ and frontend/, each with its own package.json.",
+  "scripts": {
+    "setup": "npm ci && npm ci --prefix backend && npm ci --prefix frontend",
+    "check": "npm run check --prefix backend && npm run check --prefix frontend",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "backend/{src,test}/**/*.ts": "prettier --write",
+    "frontend/src/**/*.{ts,html,css}": "prettier --write"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10"
+  }
+}
