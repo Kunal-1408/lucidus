@@ -1,0 +1,26 @@
+<h1>Find scholarships</h1>
+<p>Tell us a little about yourself. Every question is optional.</p>
+
+<form (submit)="$event.preventDefault(); findScholarships()">
+  <label>
+    Class
+    <select (change)="setClass($any($event.target).value)">
+      <option value="">Not saying</option>
+      @for (c of classes; track c) {
+        <option [value]="c" [selected]="profile().class === c">Class {{ c }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Gender
+    <select (change)="setGender($any($event.target).value)">
+      <option value="">Not saying</option>
+      @for (g of genders; track g.value) {
+        <option [value]="g.value" [selected]="profile().gender === g.value">{{ g.label }}</option>
+      }
+    </select>
+  </label>
+
+  <button type="submit">Show my scholarships</button>
+</form>

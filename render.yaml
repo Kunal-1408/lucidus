@@ -1,0 +1,16 @@
+# One free web service: NestJS serves the built Angular app and the API under /api.
+services:
+  - type: web
+    name: scholarship-finder
+    runtime: node
+    plan: free
+    buildCommand: cd frontend && npm ci && npm run build && cd ../backend && npm ci && npm run build
+    startCommand: cd backend && node dist/main.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: MONGODB_URI
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false

@@ -1,0 +1,35 @@
+# One ignore file for the whole repo (backend/ and frontend/ included).
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out-tsc/
+*.tsbuildinfo
+
+# Secrets: only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# Test output
+coverage/
+__screenshots__/
+
+# Angular CLI cache
+.angular/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.history/
+.DS_Store
+Thumbs.db

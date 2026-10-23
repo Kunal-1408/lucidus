@@ -1,0 +1,19 @@
+<a routerLink="/">← Change my answers</a>
+<h1>Your scholarships</h1>
+
+@if (result(); as r) {
+  <h2>Eligible</h2>
+  @for (card of r.eligible; track card.id) {
+    <article class="card">
+      <h3>{{ card.name }}</h3>
+      <p class="provider">{{ card.provider }}</p>
+      <p class="amount">{{ card.amountText }}</p>
+      <p class="verified">Last verified {{ card.lastVerified | date: 'd MMM y' }}</p>
+      <a [href]="card.officialUrl" target="_blank" rel="noopener">Official site</a>
+    </article>
+  } @empty {
+    <p>No scholarships match every answer yet.</p>
+  }
+} @else {
+  <p>Checking scholarships…</p>
+}
