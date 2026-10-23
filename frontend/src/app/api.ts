@@ -29,7 +29,15 @@ export interface MatchResult {
   eligible: Card[];
   withinReach: Card[];
   tellUsMore: Card[];
-  universityPointers: unknown[];
+  // At most one group, for a destination WorqNow covers.
+  universityPointers: UniversityPointerGroup[];
+}
+
+// Universities listed by name only, never checked against the Profile.
+export interface UniversityPointerGroup {
+  country: 'uk' | 'usa' | 'canada' | 'australia';
+  label: string;
+  names: string[];
 }
 
 @Injectable({ providedIn: 'root' })
