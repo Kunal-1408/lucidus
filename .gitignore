@@ -1,7 +1,7 @@
 # One ignore file for the whole repo (backend/ and frontend/ included).
 
 # Dependencies
-node_modules/
+node_modules
 
 # Build output
 dist/
@@ -33,3 +33,6 @@ npm-debug.log*
 .history/
 .DS_Store
 Thumbs.db
+
+# Claude Code agent worktrees
+.claude/worktrees/
