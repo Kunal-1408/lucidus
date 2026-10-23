@@ -94,6 +94,18 @@ describe('Normalisation onto the fixed lists', () => {
     expect(criterion(text, 'domicileState')?.value).toEqual(slugs);
   });
 
+  it('reads no disability Criterion from a seat reservation', () => {
+    // From the CSSS guidelines on NSP: a quota, not a condition.
+    const text =
+      '15% seats are earmarked for SCs, 7.5% for STs and 27 % for OBCs and 5% horizontal reservation for students with Benchmark Disabilities (Disability of 40% or more) in all the categories].';
+    expect(criterion(text, 'disability')).toBeUndefined();
+  });
+
+  it('still reads a scholarship reserved for students with disabilities', () => {
+    const text = 'This scholarship is reserved for students with disabilities.';
+    expect(criterion(text, 'disability')?.value).toBe(true);
+  });
+
   it('reads the categories a Student must belong to', () => {
     const text =
       'Students belonging to Scheduled Caste, ST or OBC categories are eligible.';
@@ -220,5 +232,40 @@ describe('Extractor rules on an NSP page', () => {
         confidence: 'high',
       },
     ]);
+  });
+});
+
+describe('Extractor rules on an NSP guideline PDF (Top Class Education for SC)', () => {
+  // The PDF's text as the Fetcher reads it: lines wrap mid-sentence.
+  const guidelines = extractByRules(
+    readFileSync(
+      join(FIXTURES, 'extractor/nsp-top-class-sc-guidelines.txt'),
+      'utf8',
+    ),
+  );
+
+  it('reads an income limit whose unit wraps onto the next line', () => {
+    expect(guidelines.criteria.find((c) => c.field === 'incomeBand')).toEqual(
+      expect.objectContaining({
+        op: 'lte',
+        value: 800_000,
+        sourceText: expect.stringContaining('up to Rs. 8.00 lakh and having'),
+      }),
+    );
+  });
+
+  it('keeps the lakh and the decimals in the Amount text', () => {
+    expect(guidelines.amountText).toBe('Rs. 2.00 lakh per annum');
+  });
+
+  it('keeps list items apart, each its own condition', () => {
+    const text = [
+      'The following students are eligible:',
+      'a. family income up to Rs. 2.5 lakh',
+      'b. belonging to SC category',
+    ].join('\n');
+    expect(criterion(text, 'incomeBand')?.sourceText).toBe(
+      'family income up to Rs. 2.5 lakh',
+    );
   });
 });

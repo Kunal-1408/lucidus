@@ -180,6 +180,8 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'disability',
+    // A seat quota for them isn't a condition; "reserved for" them is.
+    skip: /reservation|quota/i,
     options: [
       [
         'yes',

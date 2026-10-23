@@ -33,9 +33,9 @@ describe('Seed → ingest → match', () => {
       .expect(401);
   });
 
-  it('ingests the seeded Watchlist entry', async () => {
+  it('ingests the seeded Santoor entry', async () => {
     const summary = await harness.ingest();
-    expect(summary.sources).toEqual([{ url: SANTOOR, result: 'ok' }]);
+    expect(summary.sources).toContainEqual({ url: SANTOOR, result: 'ok' });
   });
 
   it('matches a Profile whose gender and class pass as Eligible', async () => {

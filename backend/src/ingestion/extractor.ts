@@ -192,8 +192,15 @@ function quotedIn(text: string, quote: string): boolean {
 const SENTENCE_END =
   /(?<!\b(?:Rs|No|Nos|Std|Dr|Mr|Mrs|Ms|Smt|Shri|viz|approx)\.)(?<=[.!?])\s+/i;
 
+// A line starting in lower case carries on the sentence above it: PDFs wrap
+// their lines mid-sentence ("up to Rs. 8.00" / "lakh and having ..."). A
+// line after a full stop, colon or semicolon, or one starting a list item
+// ("a. ...", "iv) ..."), begins a condition of its own.
+const WRAPPED_LINE = /(?<![.:;!?])\n(?=\p{Ll})(?!(?:[a-z]|[ivx]+)[.)]\s)/gu;
+
 function splitSentences(text: string): string[] {
   return text
+    .replace(WRAPPED_LINE, ' ')
     .split('\n')
     .flatMap((line) => line.split(SENTENCE_END))
     .map((s) => s.trim())
@@ -201,7 +208,7 @@ function splitSentences(text: string): string[] {
 }
 
 const AMOUNT =
-  /(?:₹|\bRs\.?|\bINR)\s*[\d,]+(?:\/-)?(?:\s*(?:per|a|\/)\s*(?:annum|year|month))?/i;
+  /(?:₹|\bRs\.?|\bINR)\s*[\d,]+(?:\.\d+)?(?:\s*(?:lakhs?|crores?)\b)?(?:\/-)?(?:\s*(?:per|a|\/)\s*(?:annum|year|month))?/i;
 
 // The first figure stated as what is paid; an income limit is not an amount.
 function amountRule(sentences: string[]): string | undefined {
