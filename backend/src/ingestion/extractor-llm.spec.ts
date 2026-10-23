@@ -101,6 +101,24 @@ describe('Extractor with the LLM for what the rules miss', () => {
     ]);
   });
 
+  it('sets the same op on an LLM Criterion as the rules set for its field', async () => {
+    const ladies = 'Only young ladies may apply.';
+    const passport = 'Applicants must hold a passport issued by India.';
+    const { llm } = fakeLlm({
+      criteria: [
+        { field: 'gender', values: ['female'], quote: ladies },
+        { field: 'citizenship', values: ['indian'], quote: passport },
+      ],
+    });
+    const { criteria } = await extract([ladies, passport].join('\n'), llm);
+    expect(
+      criteria.map(({ field, op, value }) => ({ field, op, value })),
+    ).toEqual([
+      { field: 'gender', op: 'eq', value: 'female' },
+      { field: 'citizenship', op: 'eq', value: 'indian' },
+    ]);
+  });
+
   it("asks the LLM once, only for the fields the rules missed, and keeps the rules' value", async () => {
     const { llm, requests } = fakeLlm({
       criteria: [

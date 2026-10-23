@@ -1,3 +1,4 @@
+import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
 import type {
   Criterion,
   ExtraRequirement,
@@ -11,7 +12,7 @@ import {
 import {
   type Quoted,
   type LlmClient,
-  type LlmCriterion,
+  type CriterionReading,
   LLM_TEXT_LIMIT,
 } from './llm.js';
 import { normaliseValue, toIsoDate } from './normalise.js';
@@ -38,13 +39,13 @@ export async function extract(
   const found = new Set(byRules.criteria.map((c) => c.field));
   const answer = await llm.read({
     text: text.slice(0, LLM_TEXT_LIMIT),
-    fields: Object.keys(LLM_FIELDS).filter((f) => !found.has(f)),
+    fields: Object.keys(CRITERION_FIELDS).filter((f) => !found.has(f)),
     wantAmountText: byRules.amountText === AMOUNT_NOT_STATED,
     wantDeadline: byRules.deadline === undefined,
   });
   const fromLlm = answer.criteria
-    .filter((c) => c.field in LLM_FIELDS && !found.has(c.field))
-    .map((c) => fromLlmCriterion(c, text));
+    .filter((c) => c.field in CRITERION_FIELDS && !found.has(c.field))
+    .map((reading) => fromCriterionReading(reading, text));
   // Extra requirements are never matched, so one whose sentence isn't on the
   // page is simply dropped rather than shown.
   const extraRequirements = answer.extraRequirements
@@ -91,48 +92,35 @@ function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {
   return { field, op, value, changeable, sourceText };
 }
 
-// The fields the LLM may give a Criterion for, with the op and
-// changeability the code (not the model) sets for each, as the rules do.
-export const LLM_FIELDS: Record<
-  string,
-  { op: Criterion['op']; changeable: boolean }
-> = {
-  class: { op: 'in', changeable: true },
-  class10Marks: { op: 'gte', changeable: true },
-  latestMarks: { op: 'gte', changeable: true },
-  incomeBand: { op: 'lte', changeable: false },
-  gender: { op: 'in', changeable: false },
-  category: { op: 'in', changeable: false },
-  minority: { op: 'eq', changeable: false },
-  disability: { op: 'eq', changeable: false },
-  singleGirlChild: { op: 'eq', changeable: false },
-  citizenship: { op: 'in', changeable: false },
-  domicileState: { op: 'in', changeable: false },
-  schoolState: { op: 'in', changeable: false },
-  schoolType: { op: 'in', changeable: false },
-  board: { op: 'in', changeable: false },
-  stream: { op: 'in', changeable: false },
-  fieldOfStudy: { op: 'in', changeable: false },
-  destination: { op: 'in', changeable: false },
-  parentOccupation: { op: 'in', changeable: false },
-  examsQualified: { op: 'in', changeable: false },
-};
-
 // An LLM value is medium Confidence when it passes the quote check;
-// otherwise it is kept, as the model gave it, at low Confidence, which
-// sends the Scholarship to review.
-function fromLlmCriterion(c: LlmCriterion, text: string): Criterion {
-  const checked = checkQuoted(c, text);
+// otherwise it is kept at low Confidence, which sends the Scholarship to
+// review. A low Criterion's value is always the model's raw values as given,
+// which approving it normalises (see approvedValue).
+function fromCriterionReading(
+  reading: CriterionReading,
+  text: string,
+): Criterion {
+  const checked = checkQuoted(reading, text);
   if (checked.ok) return { ...checked.criterion, confidence: 'medium' };
-  const { op, changeable } = LLM_FIELDS[c.field];
   return {
-    field: c.field,
-    op,
-    value: c.values,
-    changeable,
-    sourceText: c.quote,
+    field: reading.field,
+    ...CRITERION_FIELDS[reading.field],
+    value: reading.values,
+    sourceText: reading.quote,
     confidence: 'low',
   };
+}
+
+// The value a low Criterion goes live with once a reviewer approves it, or
+// undefined when its raw values aren't all allowed options (such a
+// Criterion can't be compared with any Profile).
+export function approvedValue(criterion: Criterion): unknown {
+  if (criterion.confidence !== 'low') return criterion.value;
+  const { field, value } = criterion;
+  const raw = Array.isArray(value) ? value : [value];
+  return raw.every((v) => typeof v === 'string')
+    ? readValue(field, raw)
+    : undefined;
 }
 
 export type QuoteCheck =
@@ -142,33 +130,34 @@ export type QuoteCheck =
 // The quote check for a Criterion read off the page, by the LLM or by a
 // reviewer in an Override: its sentence must be in the text and every value
 // it names must be an allowed option. Op and changeability are set by the
-// code (LLM_FIELDS), never by whoever read it.
-export function checkQuoted(c: LlmCriterion, text: string): QuoteCheck {
-  const { op, changeable } = LLM_FIELDS[c.field];
-  if (!quotedIn(text, c.quote)) {
-    return { ok: false, problem: `${c.field}: sentence not in the page text` };
+// code (CRITERION_FIELDS), never by whoever read it.
+export function checkQuoted(
+  reading: CriterionReading,
+  text: string,
+): QuoteCheck {
+  const { field, values, quote } = reading;
+  if (!quotedIn(text, quote)) {
+    return { ok: false, problem: `${field}: sentence not in the page text` };
   }
-  const value = llmValue(c.field, op, c.values);
+  const value = readValue(field, values);
   if (value === undefined) {
     return {
       ok: false,
-      problem: `${c.field}: values outside the allowed options`,
+      problem: `${field}: values outside the allowed options`,
     };
   }
   return {
     ok: true,
-    criterion: { field: c.field, op, value, changeable, sourceText: c.quote },
+    criterion: { field, ...CRITERION_FIELDS[field], value, sourceText: quote },
   };
 }
 
-// The normalised value, or undefined unless every raw value is an allowed
-// option (a list field must not quietly lose one of the values it named).
-function llmValue(
-  field: string,
-  op: Criterion['op'],
-  values: string[],
-): unknown {
-  const raw = values.map((v) => tidyLlmRaw(field, v.trim()));
+// The normalised value of values read off the page (by the LLM or a
+// reviewer), or undefined unless every one is an allowed option (a list
+// field must not quietly lose one of the values it named).
+export function readValue(field: string, values: string[]): unknown {
+  const { op } = CRITERION_FIELDS[field];
+  const raw = values.map((v) => tidyReadValue(field, v.trim()));
   if (raw.length === 0) return undefined;
   if (op !== 'in') {
     return raw.length === 1 ? normaliseValue(field, op, raw[0]) : undefined;
@@ -178,12 +167,9 @@ function llmValue(
   return normaliseValue(field, op, raw);
 }
 
-// The model writes some values more plainly than sources do: a bare rupee
-// figure ("250000") or a percentage with its sign ("60%").
-function tidyLlmRaw(field: string, raw: string): string {
-  if (field === 'incomeBand' && /^\d[\d,]*$/.test(raw)) return `₹${raw}`;
-  if (field.endsWith('Marks')) return raw.replace(/\s*%$/, '');
-  return raw;
+// The model and reviewers write a percentage with its sign ("60%").
+function tidyReadValue(field: string, raw: string): string {
+  return field.endsWith('Marks') ? raw.replace(/\s*%$/, '') : raw;
 }
 
 // A value the model says the source states, kept only when the value sits

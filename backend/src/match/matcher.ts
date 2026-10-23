@@ -36,7 +36,7 @@ export interface Card {
   deadline?: string;
   deadlineStatus: DeadlineStatus;
   lastVerified: string;
-  // Medium cards carry a "verify on the official site" nudge.
+  // Medium cards carry a "verify on the official site" warning.
   confidence: ConfidenceLevel;
   // Conditions no Profile field answers, each with its source sentence;
   // shown as "Also requires: …".
@@ -277,6 +277,16 @@ function compareIncome(
   return 'unknown';
 }
 
+// Extra requirements as a card carries them: their text and sentence only.
+export function plainExtraRequirements(
+  extraRequirements: ExtraRequirement[],
+): ExtraRequirement[] {
+  return extraRequirements.map(({ text, sourceText }) => ({
+    text,
+    sourceText,
+  }));
+}
+
 function toCard(
   s: MatchableScholarship,
   deadlineStatus: DeadlineStatus,
@@ -293,9 +303,7 @@ function toCard(
     deadlineStatus,
     lastVerified: s.lastVerified.toISOString(),
     confidence: s.confidence,
-    extraRequirements: (s.extraRequirements ?? []).map(
-      ({ text, sourceText }) => ({ text, sourceText }),
-    ),
+    extraRequirements: plainExtraRequirements(s.extraRequirements ?? []),
     goals,
     missing,
   };

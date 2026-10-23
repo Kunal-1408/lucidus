@@ -1,8 +1,8 @@
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import type { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
 import { BLOCK_ELEMENTS, loadWithoutChrome, tidyLines } from './fetcher.js';
+import { isObject } from '../input-checks.js';
 import {
-  isObject,
   itemsAt,
   jsonText,
   parseJson,
@@ -96,8 +96,8 @@ function splitPdf(entry: WatchlistEntry, source: FetchedSource): Section[] {
     }
   };
   for (const line of source.text.split('\n')) {
-    const m = line.match(startsSection);
-    const schemeName = m && (m[1] ?? m[0]).trim();
+    const start = line.match(startsSection);
+    const schemeName = start && (start[1] ?? start[0]).trim();
     if (schemeName) {
       close();
       current = { schemeName, lines: [] };

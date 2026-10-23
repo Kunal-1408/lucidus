@@ -1,5 +1,6 @@
-// Checks shared by the admin endpoints' input parsers; each pushes the
-// reason a field is rejected onto the list it is given.
+// Checks shared by the parsers of outside input (admin endpoints, repo
+// seed files, JSON sources); the field checks push the reason a field is
+// rejected onto the list they are given.
 
 export function text(
   raw: Record<string, unknown>,

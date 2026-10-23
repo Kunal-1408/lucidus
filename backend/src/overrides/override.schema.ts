@@ -1,8 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
 
-export type OverrideAction = 'approve' | 'replace';
-export type OverrideResult = 'applied' | 'invalid' | 'page changed';
+export const OVERRIDE_ACTIONS = ['approve', 'replace'] as const;
+export type OverrideAction = (typeof OVERRIDE_ACTIONS)[number];
+export const OVERRIDE_RESULTS = ['applied', 'invalid', 'page changed'] as const;
+export type OverrideResult = (typeof OVERRIDE_RESULTS)[number];
 
 // A corrected Criterion as the reviewer writes it: the field, its raw
 // value(s) as the fixed lists name them (as the LLM gives them), and the
@@ -32,7 +33,7 @@ export class Override {
   @Prop({ required: true })
   contentHash: string;
 
-  @Prop({ type: String, required: true, enum: ['approve', 'replace'] })
+  @Prop({ type: String, required: true, enum: OVERRIDE_ACTIONS })
   action: OverrideAction;
 
   // Only when replacing.
@@ -45,13 +46,14 @@ export class Override {
   @Prop({ required: true })
   reviewedBy: string;
 
-  // When the Override was written; the Scholarship's reviewed at.
+  // When the reviewer wrote it (set by the endpoint, or taken from the
+  // overrides file); the Scholarship's reviewed at.
   @Prop({ required: true })
   reviewedAt: Date;
 
   // What the last Ingestion run that reached this Scholarship made of it.
   // Only Ingestion writes these.
-  @Prop({ type: String, enum: ['applied', 'invalid', 'page changed'] })
+  @Prop({ type: String, enum: OVERRIDE_RESULTS })
   lastResult?: OverrideResult;
 
   // Why it was skipped, when invalid.
@@ -59,6 +61,5 @@ export class Override {
   problems?: string[];
 }
 
-export type OverrideDocument = HydratedDocument<Override>;
 export const OverrideSchema = SchemaFactory.createForClass(Override);
 OverrideSchema.index({ sourceUrl: 1, schemeName: 1 }, { unique: true });

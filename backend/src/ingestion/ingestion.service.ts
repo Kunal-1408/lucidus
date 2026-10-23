@@ -8,18 +8,17 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model, type QueryFilter, Types } from 'mongoose';
 import { CLOCK, type Clock } from '../clock.js';
-import {
-  checkOverride,
-  type Review,
-  reviewedCriteria,
-} from '../overrides/override-check.js';
+import { checkOverride } from '../overrides/override-check.js';
 import { Override } from '../overrides/override.schema.js';
 import { scholarshipConfidence } from '../scholarships/confidence.js';
-import { Scholarship } from '../scholarships/scholarship.schema.js';
+import {
+  type Criterion,
+  Scholarship,
+} from '../scholarships/scholarship.schema.js';
 import type { ScholarshipKey } from '../scholarships/scholarship-key.js';
 import { UniversityPointersService } from '../universities/university-pointers.service.js';
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
-import { EXTRACTOR, type Extractor } from './extractor.js';
+import { EXTRACTOR, type Extraction, type Extractor } from './extractor.js';
 import { Fetcher } from './fetcher.js';
 import { withStructured } from './json-source.js';
 import { IngestionRun } from './ingestion-run.schema.js';
@@ -256,56 +255,54 @@ export class IngestionService implements OnApplicationBootstrap {
     return { url, result: extracted > 0 ? 'ok' : 'unchanged' };
   }
 
-  // Extracts and upserts one section's Scholarship, unless its content hash
-  // shows the text is the same as last time and its Override (if any) is
-  // already applied; then only its last verified date moves.
+  // Extracts and upserts one section's Scholarship. When its content hash
+  // shows the text is the same as last time, the stored extraction is used
+  // instead of reading the page again: that is what the Review report showed
+  // and what an Override added or removed since applies to or restores. The
+  // Scholarship's Override, if any, is checked against that extraction.
   private async upsertScholarship(
     entry: WatchlistEntry,
     { schemeName, text, officialUrl, criteria: structured }: Section,
   ): Promise<'unchanged' | 'extracted'> {
     const key: ScholarshipKey = { sourceUrl: entry.url, schemeName };
     const contentHash = sha256(text);
-    const review = await this.applicableReview(key, contentHash, text);
-    // An Override added or removed since the last run changes the reviewed
-    // at it should have, so the Scholarship is extracted again without or
-    // with the fix.
-    const same = await this.scholarships.updateOne(
-      {
-        ...key,
-        contentHash,
-        reviewedAt: review ? review.reviewedAt : { $exists: false },
-      },
-      // A source back after a 404 with the same text is listed again.
-      { lastVerified: this.clock.now(), status: 'active' },
-    );
-    if (same.matchedCount > 0) return 'unchanged';
-
+    const stored = await this.scholarships.findOne(key).lean();
+    const previous =
+      stored?.contentHash === contentHash
+        ? storedExtraction(stored)
+        : undefined;
     // A failed extraction throws before anything is written: a new
     // Scholarship isn't stored, a changed one keeps its previous version,
     // and with no new hash saved the next run tries again.
-    const extraction = await this.extractor.extract(text);
+    const extraction = previous ?? (await this.extract(text, structured));
+    const override = await this.overrides.findOne(key).lean();
+    const check =
+      override &&
+      checkOverride(override, contentHash, text, extraction.criteria);
+    const review = check?.result === 'applied' ? check.review : undefined;
+
     const { extraRequirements, amountText, deadline } = extraction;
-    // Structured JSON Criteria (high) replace any extracted one for the same
-    // field, so an LLM value there can't lower the Scholarship's Confidence.
-    const extracted = withStructured(structured, extraction.criteria);
-    const criteria = review ? reviewedCriteria(extracted, review) : extracted;
-    const confidence = scholarshipConfidence(criteria);
+    const criteria = review?.criteria ?? extraction.criteria;
+    const url = officialUrl ?? entry.officialUrl;
+    const confidence = scholarshipConfidence(criteria, url);
     const scholarship: Scholarship = {
       name: schemeName,
       provider: entry.provider,
       type: entry.scholarshipType,
       amountText,
       ...(deadline && { deadline }),
-      officialUrl: officialUrl ?? entry.officialUrl,
+      officialUrl: url,
       ...key,
       contentHash,
       lastVerified: this.clock.now(),
+      // A source back after a 404 with the same text is listed again.
       status: 'active',
       confidence,
       // Zero Criteria would show as Eligible to everyone, unless a person
       // checked that.
       needsReview: !review && (confidence === 'low' || criteria.length === 0),
       criteria,
+      extractedCriteria: extraction.criteria,
       extraRequirements,
       ...(review && {
         reviewedBy: review.reviewedBy,
@@ -325,28 +322,43 @@ export class IngestionService implements OnApplicationBootstrap {
       },
       { upsert: true },
     );
-    return 'extracted';
+    // Recorded only once the Scholarship is stored, for the Review report.
+    if (override && check) {
+      await this.overrides.updateOne(
+        { _id: override._id },
+        check.result === 'invalid'
+          ? { lastResult: check.result, problems: check.problems }
+          : { lastResult: check.result, $unset: { problems: 1 } },
+      );
+    }
+    return previous ? 'unchanged' : 'extracted';
   }
 
-  // The review this Scholarship's Override applies to the section, if any,
-  // recording on the Override what this run made of it for the Review
-  // report.
-  private async applicableReview(
-    key: ScholarshipKey,
-    contentHash: string,
+  // One LLM call per new or changed text. Structured JSON Criteria (high)
+  // replace any extracted one for the same field, so an LLM value there
+  // can't lower the Scholarship's Confidence.
+  private async extract(
     text: string,
-  ): Promise<Review | undefined> {
-    const override = await this.overrides.findOne(key).lean();
-    if (!override) return undefined;
-    const check = checkOverride(override, contentHash, text);
-    await this.overrides.updateOne(
-      { _id: override._id },
-      check.result === 'invalid'
-        ? { lastResult: check.result, problems: check.problems }
-        : { lastResult: check.result, $unset: { problems: 1 } },
-    );
-    return check.result === 'applied' ? check.review : undefined;
+    structured: Criterion[] | undefined,
+  ): Promise<Extraction> {
+    const extraction = await this.extractor.extract(text);
+    return {
+      ...extraction,
+      criteria: withStructured(structured, extraction.criteria),
+    };
   }
+}
+
+// The extraction a Scholarship was stored with, if it was kept.
+function storedExtraction(stored: Scholarship): Extraction | undefined {
+  const { extractedCriteria, extraRequirements, amountText, deadline } = stored;
+  if (!extractedCriteria) return undefined;
+  return {
+    criteria: extractedCriteria,
+    extraRequirements,
+    amountText,
+    ...(deadline && { deadline }),
+  };
 }
 
 function sha256(text: string): string {

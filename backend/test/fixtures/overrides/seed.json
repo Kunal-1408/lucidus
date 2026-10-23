@@ -5,10 +5,19 @@
     "contentHash": "0000000000000000000000000000000000000000000000000000000000000000",
     "action": "approve",
     "note": "Seeded from the repo.",
-    "reviewedBy": "Kunal"
+    "reviewedBy": "Kunal",
+    "reviewedAt": "2026-07-01T10:30:00.000Z"
   },
   {
     "sourceUrl": "https://example.org/broken",
     "action": "approve"
+  },
+  {
+    "sourceUrl": "https://example.org/undated",
+    "schemeName": "Example Undated Scholarship",
+    "contentHash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "action": "approve",
+    "note": "Written without a date.",
+    "reviewedBy": "Kunal"
   }
 ]

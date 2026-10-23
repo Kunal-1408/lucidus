@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { Override } from '../overrides/override.schema.js';
 import {
   NEEDING_REVIEW,
-  overrideEntry,
+  overrideEntries,
   type ReviewEntry,
   scholarshipEntry,
   type StoredOverride,
@@ -30,31 +30,25 @@ export class ReviewController {
 
   @Get()
   async report(): Promise<ReviewEntry[]> {
-    const needing = await this.scholarships
+    const needingReview = await this.scholarships
       .find(NEEDING_REVIEW)
       .sort(BY_KEY)
       .lean<StoredScholarship[]>();
-    return [
-      ...needing.map(scholarshipEntry),
-      ...(await this.overrideEntries()),
-    ];
-  }
-
-  // An Override whose Scholarship is no longer listed has nothing left to
-  // check, so it isn't reported.
-  private async overrideEntries(): Promise<ReviewEntry[]> {
     const overrides = await this.overrides
       .find()
       .sort(BY_KEY)
       .lean<StoredOverride[]>();
-    const entries: ReviewEntry[] = [];
-    for (const override of overrides) {
-      const scholarship = await this.scholarships
-        .findOne({ ...scholarshipKey(override), status: 'active' })
-        .lean<StoredScholarship>();
-      const entry = scholarship && overrideEntry(override, scholarship);
-      if (entry) entries.push(entry);
-    }
-    return entries;
+    const listed = overrides.length
+      ? await this.scholarships
+          .find({
+            status: 'active',
+            $or: overrides.map(scholarshipKey),
+          })
+          .lean<StoredScholarship[]>()
+      : [];
+    return [
+      ...needingReview.map(scholarshipEntry),
+      ...overrideEntries(overrides, listed),
+    ];
   }
 }
