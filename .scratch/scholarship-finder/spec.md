@@ -113,7 +113,7 @@ Behind this, an Ingestion run fetches every source on the Watchlist, skips uncha
 71. As the operator, I want a scheme that disappears from a many-scholarship source marked inactive, so that results stay accurate.
 72. As the operator, I want to list Watchlist entries with each one's last result, so that I can spot broken sources.
 73. As the operator, I want to delete a Watchlist entry and have its scholarships go inactive on the next run, so that I can retire sources cleanly.
-74. As the operator, I want the Watchlist seeded from a JSON file in the repo when the database has none, so that a fresh deploy starts with the curated list.
+74. As the operator, I want the Watchlist seeded from a JSON file in the repo, with entries new to the file added on the next deploy, so that a fresh deploy starts with the curated list and a later one brings in additions without undoing my removals.
 75. As the operator, I want about 20 curated scholarships covering every source type and edge path (PDF, many, JSON, needs_js, deadline not announced), so that the demo exercises every path.
 
 ### Extraction and Confidence
@@ -211,7 +211,7 @@ Behind this, an Ingestion run fetches every source on the Watchlist, skips uncha
   - `POST`, `GET`, `DELETE /api/admin/watchlist`: add (validated), list with last result, remove.
   - `POST`, `GET`, `DELETE /api/admin/overrides`.
   - `GET /api/admin/review`: the Review report.
-- On startup, the Watchlist and Overrides collections are seeded from their repo JSON files only when empty.
+- On startup, the Watchlist is seeded with every entry in its repo JSON file that it has never seeded before (recorded by URL), so removed entries stay removed. The Overrides collection is seeded from its repo JSON file only when empty.
 
 ### WorqNow
 

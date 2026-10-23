@@ -41,10 +41,18 @@ import {
 import { UniversityPointersService } from './universities/university-pointers.service.js';
 import { HttpWorqNowClient, WORQNOW } from './universities/worqnow.js';
 import {
+  SeededSource,
+  SeededSourceSchema,
+} from './watchlist/seeded-source.schema.js';
+import {
   WatchlistEntry,
   WatchlistEntrySchema,
 } from './watchlist/watchlist-entry.schema.js';
-import { WatchlistSeeder } from './watchlist/watchlist-seeder.js';
+import {
+  REPO_WATCHLIST_FILE,
+  WATCHLIST_FILE,
+  WatchlistSeeder,
+} from './watchlist/watchlist-seeder.js';
 
 // The built Angular app, served from the same service as the API.
 const FRONTEND_DIST = join(
@@ -65,6 +73,7 @@ const FRONTEND_DIST = join(
     MongooseModule.forFeature([
       { name: Scholarship.name, schema: ScholarshipSchema },
       { name: WatchlistEntry.name, schema: WatchlistEntrySchema },
+      { name: SeededSource.name, schema: SeededSourceSchema },
       { name: IngestionRun.name, schema: IngestionRunSchema },
       { name: UniversityPointer.name, schema: UniversityPointerSchema },
       { name: SavedScholarship.name, schema: SavedScholarshipSchema },
@@ -90,6 +99,7 @@ const FRONTEND_DIST = join(
   ],
   providers: [
     WatchlistSeeder,
+    { provide: WATCHLIST_FILE, useValue: REPO_WATCHLIST_FILE },
     OverrideSeeder,
     { provide: OVERRIDES_FILE, useValue: REPO_OVERRIDES_FILE },
     Fetcher,

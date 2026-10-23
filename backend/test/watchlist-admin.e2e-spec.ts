@@ -122,6 +122,54 @@ describe('Watchlist admin endpoints', () => {
     });
   });
 
+  describe('seeding', () => {
+    afterEach(() => harness.close());
+
+    const SANTOOR_ENTRY: WatchlistEntry = {
+      url: SANTOOR,
+      type: 'html',
+      region: 'india',
+      name: "Santoor Women's Scholarship",
+      provider: 'Wipro Consumer Care and Wipro Cares',
+      scholarshipType: 'corporate',
+      officialUrl: SANTOOR,
+      holds: 'one',
+    };
+
+    it('adds entries new to the seed file on the next boot, leaving removed ones out', async () => {
+      harness = await startApp({
+        fixtures: {},
+        now: DAY_1,
+        watchlistFile: 'watchlist/santoor.json',
+      });
+      const [santoor] = await list();
+      await harness
+        .http()
+        .delete(`/api/admin/watchlist/${santoor.id as string}`)
+        .set('x-admin-token', ADMIN_TOKEN)
+        .expect(204);
+
+      // A redeploy with Girls added to the seed file.
+      await harness.restart({
+        watchlistFile: 'watchlist/santoor-and-girls.json',
+      });
+
+      expect((await list()).map((e) => e.url)).toEqual([GIRLS]);
+    });
+
+    it('adds the seed file to a Watchlist filled before seeding was recorded', async () => {
+      // As on the deploy that had only Santoor when the demo seed landed.
+      harness = await startApp({
+        fixtures: {},
+        now: DAY_1,
+        watchlist: [SANTOOR_ENTRY],
+        watchlistFile: 'watchlist/santoor-and-girls.json',
+      });
+
+      expect((await list()).map((e) => e.url)).toEqual([SANTOOR, GIRLS]);
+    });
+  });
+
   describe('removing', () => {
     beforeEach(async () => {
       harness = await startApp({

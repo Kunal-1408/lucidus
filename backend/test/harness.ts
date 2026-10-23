@@ -28,6 +28,10 @@ import {
   WorqNowUniversity,
 } from '../src/universities/worqnow.js';
 import { WatchlistEntry } from '../src/watchlist/watchlist-entry.schema.js';
+import {
+  REPO_WATCHLIST_FILE,
+  WATCHLIST_FILE,
+} from '../src/watchlist/watchlist-seeder.js';
 
 export const ADMIN_TOKEN = 'test-admin-token';
 const FIXTURES = join(import.meta.dirname, 'fixtures');
@@ -48,8 +52,12 @@ export interface HarnessOptions {
   // Source URL → what it serves. Any other URL 404s.
   fixtures: Record<string, Served>;
   now: Date;
-  // Replaces the repo's seed Watchlist for this test.
+  // Entries already on the Watchlist when the app first starts. The repo's
+  // seed file is then left out, unless watchlistFile names one.
   watchlist?: WatchlistEntry[];
+  // A fixture file (under test/fixtures) seeding the Watchlist in place of
+  // the repo's seed file.
+  watchlistFile?: string;
   // Country → what the fake WorqNow returns. Any other country has none.
   worqnow?: Partial<Record<PointerCountry, WorqNowServed>>;
   // What the fake LLM answers. By default it finds nothing.
@@ -77,8 +85,8 @@ export interface Harness {
   // Reads a run's summary as it stands.
   summary: (runId: string) => Promise<RunSummaryBody>;
   // Stops the app mid-flight and starts a fresh one on the same database,
-  // like the host sleeping and waking.
-  restart: () => Promise<void>;
+  // like the host sleeping and waking, or a redeploy with a new seed file.
+  restart: (redeploy?: { watchlistFile: string }) => Promise<void>;
   // A collection's model, for seeding state a test can't reach through the
   // API (e.g. the needs-review flag). Never for asserting.
   model: <T>(name: string) => Model<T>;
@@ -110,12 +118,18 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
   const overridesFile = options.overridesFile
     ? join(FIXTURES, options.overridesFile)
     : REPO_OVERRIDES_FILE;
+  let watchlistFile = options.watchlistFile
+    ? join(FIXTURES, options.watchlistFile)
+    : options.watchlist
+      ? join(FIXTURES, 'watchlist', 'empty.json')
+      : REPO_WATCHLIST_FILE;
   let app = await createApp(
     web,
     worqnow,
     llm,
     clock,
     overridesFile,
+    watchlistFile,
     options.watchlist,
   );
   const http = () => request(app.getHttpServer());
@@ -146,10 +160,18 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
         .expect(202);
       return waitForRun(summary, res.body.runId as string);
     },
-    restart: async () => {
+    restart: async (redeploy) => {
       await app.close();
       web.abandonHeld();
-      app = await createApp(web, worqnow, llm, clock, overridesFile);
+      if (redeploy) watchlistFile = join(FIXTURES, redeploy.watchlistFile);
+      app = await createApp(
+        web,
+        worqnow,
+        llm,
+        clock,
+        overridesFile,
+        watchlistFile,
+      );
     },
     model: <T>(name: string) => app.get<Model<T>>(getModelToken(name)),
     close: async () => {
@@ -165,6 +187,7 @@ async function createApp(
   llm: FakeLlm,
   clock: Clock,
   overridesFile: string,
+  watchlistFile: string,
   watchlist?: WatchlistEntry[],
 ): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -178,9 +201,11 @@ async function createApp(
     .useValue(clock)
     .overrideProvider(OVERRIDES_FILE)
     .useValue(overridesFile)
+    .overrideProvider(WATCHLIST_FILE)
+    .useValue(watchlistFile)
     .compile();
   if (watchlist) {
-    // Inserted before bootstrap, so the seeder finds the collection filled.
+    // Inserted before bootstrap, so the seeder finds them already listed.
     await moduleRef
       .get<Model<WatchlistEntry>>(getModelToken(WatchlistEntry.name))
       .insertMany(watchlist);

@@ -1,0 +1,22 @@
+[
+  {
+    "url": "https://www.santoorscholarships.com/",
+    "type": "html",
+    "region": "india",
+    "name": "Santoor Women's Scholarship",
+    "provider": "Wipro Consumer Care and Wipro Cares",
+    "scholarshipType": "corporate",
+    "officialUrl": "https://www.santoorscholarships.com/",
+    "holds": "one"
+  },
+  {
+    "url": "https://example.org/girls-merit",
+    "type": "html",
+    "region": "india",
+    "name": "Example Girls Merit Scholarship",
+    "provider": "Example Foundation",
+    "scholarshipType": "corporate",
+    "officialUrl": "https://example.org/girls-merit",
+    "holds": "one"
+  }
+]

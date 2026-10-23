@@ -9,7 +9,8 @@ export default defineConfig({
     root: './',
     include: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
     exclude: ['node_modules', 'dist'],
-    // The first run downloads a MongoDB binary for the in-memory server.
+    globalSetup: ['./test/global-setup.ts'],
+    // Starting an in-memory MongoDB per e2e file can be slow on a busy runner.
     hookTimeout: 180_000,
   },
 });
