@@ -100,7 +100,10 @@ export class IngestionService implements OnApplicationBootstrap {
     const counts = zeroCounts();
     const sources: SourceOutcome[] = [];
     try {
-      for (const entry of await this.watchlist.find().lean()) {
+      const entries = await this.watchlist.find().lean();
+      await this.retireRemovedSources(entries, counts);
+      await this.runs.updateOne({ _id: id }, { counts });
+      for (const entry of entries) {
         const outcome = await this.ingestSource(entry, counts);
         sources.push(outcome);
         await this.watchlist.updateOne(
@@ -114,6 +117,19 @@ export class IngestionService implements OnApplicationBootstrap {
       this.logger.error(`Ingestion run ${id.toHexString()} failed`, err);
       await this.finish(id, 'failed').catch(() => undefined);
     }
+  }
+
+  // Scholarships whose source was deleted from the Watchlist drop out of
+  // results; like every Scholarship, they are never deleted.
+  private async retireRemovedSources(
+    entries: WatchlistEntry[],
+    counts: RunCounts,
+  ): Promise<void> {
+    const retired = await this.scholarships.updateMany(
+      { sourceUrl: { $nin: entries.map((e) => e.url) }, status: 'active' },
+      { status: 'inactive' },
+    );
+    counts.inactive += retired.modifiedCount;
   }
 
   private finish(id: Types.ObjectId, state: 'finished' | 'failed') {
