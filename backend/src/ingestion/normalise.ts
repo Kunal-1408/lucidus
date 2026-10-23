@@ -103,7 +103,7 @@ export const STATE_NAMES: [IndianState, RegExp][] = STATES.map(
 );
 
 // The fixed lists, as the Profile stores them.
-const FIXED_LISTS: Record<string, readonly string[]> = {
+export const FIXED_LISTS: Record<string, readonly string[]> = {
   domicileState: STATES,
   schoolState: STATES,
   schoolType: ['government', 'aided', 'private'],

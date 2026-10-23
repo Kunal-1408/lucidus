@@ -218,10 +218,18 @@ export class IngestionService implements OnApplicationBootstrap {
       return { url, result: 'empty' };
     }
     let extracted = 0;
+    // One Scholarship's failed extraction leaves it as it was without
+    // holding back the source's others.
+    const failures: string[] = [];
     for (const section of sections) {
-      const done = await this.upsertScholarship(entry, section);
-      counts[done]++;
-      if (done === 'extracted') extracted++;
+      try {
+        const done = await this.upsertScholarship(entry, section);
+        counts[done]++;
+        if (done === 'extracted') extracted++;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        failures.push(`${section.schemeName}: ${reason}`);
+      }
     }
     // A scheme the source no longer lists drops out of results; a renamed
     // one goes this way too and comes back above as a new Scholarship.
@@ -232,6 +240,14 @@ export class IngestionService implements OnApplicationBootstrap {
       },
       counts,
     );
+    if (failures.length > 0) {
+      counts.failed++;
+      return {
+        url,
+        result: 'failed',
+        detail: `Extraction failed for ${failures.join('; ')}`,
+      };
+    }
     return { url, result: extracted > 0 ? 'ok' : 'unchanged' };
   }
 
@@ -251,8 +267,13 @@ export class IngestionService implements OnApplicationBootstrap {
     );
     if (same.matchedCount > 0) return 'unchanged';
 
+    // A failed extraction throws before anything is written: a new
+    // Scholarship isn't stored, a changed one keeps its previous version,
+    // and with no new hash saved the next run tries again.
     const extraction = await this.extractor.extract(text);
-    const { amountText, deadline } = extraction;
+    const { extraRequirements, amountText, deadline } = extraction;
+    // Structured JSON Criteria (high) replace any extracted one for the same
+    // field, so an LLM value there can't lower the Scholarship's Confidence.
     const criteria = withStructured(structured, extraction.criteria);
     const confidence = weakest(criteria);
     const scholarship: Scholarship = {
@@ -270,7 +291,7 @@ export class IngestionService implements OnApplicationBootstrap {
       // Zero Criteria would show as Eligible to everyone.
       needsReview: confidence === 'low' || criteria.length === 0,
       criteria,
-      extraRequirements: [],
+      extraRequirements,
     };
     // A deadline the changed page no longer states must not linger.
     await this.scholarships.updateOne(

@@ -236,6 +236,18 @@ describe('PDF and JSON sources', () => {
         (await match({ ...GIRL, domicileState: 'kerala' })).eligible,
       ).toHaveLength(1);
     });
+
+    it('keeps a structured field high even when the LLM reads that field badly', async () => {
+      harness.serveLlm(() => ({
+        criteria: [
+          { field: 'class', values: ['ug'], quote: 'Not on the page.' },
+        ],
+      }));
+      await harness.ingest();
+      expect((await match(GIRL)).eligible).toEqual([
+        expect.objectContaining({ confidence: 'high' }),
+      ]);
+    });
   });
 
   describe('a JSON source holding many Scholarships', () => {

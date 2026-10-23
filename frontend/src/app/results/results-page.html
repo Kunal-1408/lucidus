@@ -25,6 +25,12 @@
         }
       }
     </p>
+    @if (card.confidence === 'medium') {
+      <p class="verify">Verify on the official site</p>
+    }
+    @if (card.extraRequirements.length) {
+      <p class="extra">Also requires: {{ extraRequirementTexts(card) }}</p>
+    }
     @if (card.missing.length) {
       <p class="missing">Tell us your {{ missingLabels(card) }} to check this one.</p>
     }

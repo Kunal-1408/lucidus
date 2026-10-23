@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, SavedCard } from '../api';
+import { extraRequirementTexts } from '../extra-requirements';
 
 @Component({
   selector: 'app-saved-page',
@@ -13,6 +14,7 @@ export class SavedPage {
 
   // Undefined until the list has loaded.
   protected readonly items = signal<SavedCard[] | undefined>(undefined);
+  protected readonly extraRequirementTexts = extraRequirementTexts;
 
   constructor() {
     this.api.saved().subscribe((items) => this.items.set(items));

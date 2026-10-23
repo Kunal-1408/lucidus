@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { Api, Card } from '../api';
+import { extraRequirementTexts } from '../extra-requirements';
 import { ProfileStore } from '../profile-store';
 
 @Component({
@@ -18,6 +19,7 @@ export class ResultsPage {
 
   // Scholarship IDs this Visitor has saved, so cards show "Saved".
   protected readonly savedIds = signal(new Set<string>());
+  protected readonly extraRequirementTexts = extraRequirementTexts;
 
   constructor() {
     this.api.saved().subscribe((items) => {
