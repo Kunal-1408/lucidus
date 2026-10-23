@@ -17,6 +17,10 @@ import {
   LlmRequest,
 } from '../src/ingestion/llm.js';
 import {
+  OVERRIDES_FILE,
+  REPO_OVERRIDES_FILE,
+} from '../src/overrides/override-seeder.js';
+import {
   POINTER_COUNTRIES,
   PointerCountry,
   WORQNOW,
@@ -50,6 +54,9 @@ export interface HarnessOptions {
   worqnow?: Partial<Record<PointerCountry, WorqNowServed>>;
   // What the fake LLM answers. By default it finds nothing.
   llm?: LlmServed;
+  // A fixture file (under test/fixtures) seeding the Overrides in place of
+  // the repo's overrides file.
+  overridesFile?: string;
 }
 
 export interface Harness {
@@ -100,7 +107,17 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
   let now = options.now;
   const clock: Clock = { now: () => now };
 
-  let app = await createApp(web, worqnow, llm, clock, options.watchlist);
+  const overridesFile = options.overridesFile
+    ? join(FIXTURES, options.overridesFile)
+    : REPO_OVERRIDES_FILE;
+  let app = await createApp(
+    web,
+    worqnow,
+    llm,
+    clock,
+    overridesFile,
+    options.watchlist,
+  );
   const http = () => request(app.getHttpServer());
 
   const summary = async (runId: string) => {
@@ -132,7 +149,7 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
     restart: async () => {
       await app.close();
       web.abandonHeld();
-      app = await createApp(web, worqnow, llm, clock);
+      app = await createApp(web, worqnow, llm, clock, overridesFile);
     },
     model: <T>(name: string) => app.get<Model<T>>(getModelToken(name)),
     close: async () => {
@@ -147,6 +164,7 @@ async function createApp(
   worqnow: FakeWorqNow,
   llm: FakeLlm,
   clock: Clock,
+  overridesFile: string,
   watchlist?: WatchlistEntry[],
 ): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -158,6 +176,8 @@ async function createApp(
     .useValue(llm)
     .overrideProvider(CLOCK)
     .useValue(clock)
+    .overrideProvider(OVERRIDES_FILE)
+    .useValue(overridesFile)
     .compile();
   if (watchlist) {
     // Inserted before bootstrap, so the seeder finds the collection filled.

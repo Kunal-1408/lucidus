@@ -1,0 +1,14 @@
+[
+  {
+    "sourceUrl": "https://example.org/engineering-girls",
+    "schemeName": "Example Engineering Girls Scholarship",
+    "contentHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "action": "approve",
+    "note": "Seeded from the repo.",
+    "reviewedBy": "Kunal"
+  },
+  {
+    "sourceUrl": "https://example.org/broken",
+    "action": "approve"
+  }
+]

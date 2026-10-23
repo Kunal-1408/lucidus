@@ -1,4 +1,5 @@
 import type { Types } from 'mongoose';
+import type { Override } from '../overrides/override.schema.js';
 import { weakestCriterion } from '../scholarships/confidence.js';
 import type {
   Criterion,
@@ -27,11 +28,35 @@ export interface NoCriteriaEntry extends ReviewEntryBase {
   reason: 'no criteria';
 }
 
+// An Override for the current text that the last run skipped: a replacement
+// Criterion's sentence isn't on the page or its values aren't allowed.
+export interface InvalidOverrideEntry extends ReviewEntryBase {
+  reason: 'invalid override';
+  overrideId: string;
+  problems: string[];
+  note: string;
+}
+
+// An Override written against text the page no longer has. It is kept but
+// no longer holds, so the Scholarship is checked again.
+export interface PageChangedEntry extends ReviewEntryBase {
+  reason: 'page changed';
+  overrideId: string;
+  oldHash: string;
+  newHash: string;
+  note: string;
+}
+
 // One line of the Review report. Each reason is its own shape; a new reason
 // joins this union and gets its own builder.
-export type ReviewEntry = LowConfidenceEntry | NoCriteriaEntry;
+export type ReviewEntry =
+  | LowConfidenceEntry
+  | NoCriteriaEntry
+  | InvalidOverrideEntry
+  | PageChangedEntry;
 
 export type StoredScholarship = Scholarship & { _id: Types.ObjectId };
+export type StoredOverride = Override & { _id: Types.ObjectId };
 
 // The filter for Scholarships the Review report lists: listed, but hidden
 // from Students until a person checks them.
@@ -41,7 +66,43 @@ export const NEEDING_REVIEW = { status: 'active', needsReview: true } as const;
 // with needs review set, so they are told apart by the empty list;
 // otherwise the weakest Criterion is the first low one.
 export function scholarshipEntry(scholarship: StoredScholarship): ReviewEntry {
-  const base: ReviewEntryBase = {
+  const base = entryBase(scholarship);
+  const weakest = weakestCriterion(scholarship.criteria);
+  if (!weakest) return { ...base, reason: 'no criteria' };
+  return { ...base, reason: 'low confidence', criterion: weakest };
+}
+
+// What is wrong with an Override for this (listed) Scholarship, if
+// anything. A changed page comes first: problems found against the old text
+// no longer matter.
+export function overrideEntry(
+  override: StoredOverride,
+  scholarship: StoredScholarship,
+): ReviewEntry | undefined {
+  const base = entryBase(scholarship);
+  const about = { overrideId: override._id.toHexString(), note: override.note };
+  if (override.contentHash !== scholarship.contentHash) {
+    return {
+      ...base,
+      reason: 'page changed',
+      ...about,
+      oldHash: override.contentHash,
+      newHash: scholarship.contentHash,
+    };
+  }
+  if (override.lastResult === 'invalid') {
+    return {
+      ...base,
+      reason: 'invalid override',
+      ...about,
+      problems: override.problems ?? [],
+    };
+  }
+  return undefined;
+}
+
+function entryBase(scholarship: StoredScholarship): ReviewEntryBase {
+  return {
     id: scholarship._id.toHexString(),
     name: scholarship.name,
     sourceUrl: scholarship.sourceUrl,
@@ -49,7 +110,4 @@ export function scholarshipEntry(scholarship: StoredScholarship): ReviewEntry {
     officialUrl: scholarship.officialUrl,
     contentHash: scholarship.contentHash,
   };
-  const weakest = weakestCriterion(scholarship.criteria);
-  if (!weakest) return { ...base, reason: 'no criteria' };
-  return { ...base, reason: 'low confidence', criterion: weakest };
 }

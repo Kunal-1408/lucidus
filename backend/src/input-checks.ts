@@ -1,0 +1,51 @@
+// Checks shared by the admin endpoints' input parsers; each pushes the
+// reason a field is rejected onto the list it is given.
+
+export function text(
+  raw: Record<string, unknown>,
+  field: string,
+  reasons: string[],
+  // How the reason names the field, e.g. "criteria[0].sourceText".
+  label = field,
+): string | undefined {
+  const value = raw[field];
+  if (value === undefined || value === null || value === '') {
+    reasons.push(`${label} is required`);
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    reasons.push(`${label} must be a string`);
+    return undefined;
+  }
+  if (value.trim() === '') {
+    reasons.push(`${label} is required`);
+    return undefined;
+  }
+  return value.trim();
+}
+
+export function oneOf<T extends string>(
+  raw: Record<string, unknown>,
+  field: string,
+  allowed: readonly T[],
+  reasons: string[],
+  label = field,
+): T | undefined {
+  const value = raw[field];
+  if (
+    typeof value === 'string' &&
+    (allowed as readonly string[]).includes(value)
+  ) {
+    return value as T;
+  }
+  reasons.push(
+    value === undefined
+      ? `${label} is required`
+      : `${label} must be one of ${allowed.join(', ')}`,
+  );
+  return undefined;
+}
+
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}

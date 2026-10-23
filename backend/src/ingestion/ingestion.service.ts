@@ -8,6 +8,12 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model, type QueryFilter, Types } from 'mongoose';
 import { CLOCK, type Clock } from '../clock.js';
+import {
+  checkOverride,
+  type Review,
+  reviewedCriteria,
+} from '../overrides/override-check.js';
+import { Override } from '../overrides/override.schema.js';
 import { scholarshipConfidence } from '../scholarships/confidence.js';
 import { Scholarship } from '../scholarships/scholarship.schema.js';
 import type { ScholarshipKey } from '../scholarships/scholarship-key.js';
@@ -44,6 +50,8 @@ export class IngestionService implements OnApplicationBootstrap {
     private readonly scholarships: Model<Scholarship>,
     @InjectModel(IngestionRun.name)
     private readonly runs: Model<IngestionRun>,
+    @InjectModel(Override.name)
+    private readonly overrides: Model<Override>,
     private readonly fetcher: Fetcher,
     @Inject(EXTRACTOR) private readonly extractor: Extractor,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -249,16 +257,24 @@ export class IngestionService implements OnApplicationBootstrap {
   }
 
   // Extracts and upserts one section's Scholarship, unless its content hash
-  // shows the text is the same as last time; then only its last verified
-  // date moves.
+  // shows the text is the same as last time and its Override (if any) is
+  // already applied; then only its last verified date moves.
   private async upsertScholarship(
     entry: WatchlistEntry,
     { schemeName, text, officialUrl, criteria: structured }: Section,
   ): Promise<'unchanged' | 'extracted'> {
     const key: ScholarshipKey = { sourceUrl: entry.url, schemeName };
     const contentHash = sha256(text);
+    const review = await this.applicableReview(key, contentHash, text);
+    // An Override added or removed since the last run changes the reviewed
+    // at it should have, so the Scholarship is extracted again without or
+    // with the fix.
     const same = await this.scholarships.updateOne(
-      { ...key, contentHash },
+      {
+        ...key,
+        contentHash,
+        reviewedAt: review ? review.reviewedAt : { $exists: false },
+      },
       // A source back after a 404 with the same text is listed again.
       { lastVerified: this.clock.now(), status: 'active' },
     );
@@ -271,7 +287,8 @@ export class IngestionService implements OnApplicationBootstrap {
     const { extraRequirements, amountText, deadline } = extraction;
     // Structured JSON Criteria (high) replace any extracted one for the same
     // field, so an LLM value there can't lower the Scholarship's Confidence.
-    const criteria = withStructured(structured, extraction.criteria);
+    const extracted = withStructured(structured, extraction.criteria);
+    const criteria = review ? reviewedCriteria(extracted, review) : extracted;
     const confidence = scholarshipConfidence(criteria);
     const scholarship: Scholarship = {
       name: schemeName,
@@ -285,18 +302,50 @@ export class IngestionService implements OnApplicationBootstrap {
       lastVerified: this.clock.now(),
       status: 'active',
       confidence,
-      // Zero Criteria would show as Eligible to everyone.
-      needsReview: confidence === 'low' || criteria.length === 0,
+      // Zero Criteria would show as Eligible to everyone, unless a person
+      // checked that.
+      needsReview: !review && (confidence === 'low' || criteria.length === 0),
       criteria,
       extraRequirements,
+      ...(review && {
+        reviewedBy: review.reviewedBy,
+        reviewedAt: review.reviewedAt,
+      }),
     };
-    // A deadline the changed page no longer states must not linger.
+    // A deadline the changed page no longer states, or a review whose
+    // Override no longer holds, must not linger.
+    const stale = (['deadline', 'reviewedBy', 'reviewedAt'] as const).filter(
+      (field) => scholarship[field] === undefined,
+    );
     await this.scholarships.updateOne(
       key,
-      deadline ? scholarship : { $set: scholarship, $unset: { deadline: 1 } },
+      {
+        $set: scholarship,
+        $unset: Object.fromEntries(stale.map((field) => [field, 1])),
+      },
       { upsert: true },
     );
     return 'extracted';
+  }
+
+  // The review this Scholarship's Override applies to the section, if any,
+  // recording on the Override what this run made of it for the Review
+  // report.
+  private async applicableReview(
+    key: ScholarshipKey,
+    contentHash: string,
+    text: string,
+  ): Promise<Review | undefined> {
+    const override = await this.overrides.findOne(key).lean();
+    if (!override) return undefined;
+    const check = checkOverride(override, contentHash, text);
+    await this.overrides.updateOne(
+      { _id: override._id },
+      check.result === 'invalid'
+        ? { lastResult: check.result, problems: check.problems }
+        : { lastResult: check.result, $unset: { problems: 1 } },
+    );
+    return check.result === 'applied' ? check.review : undefined;
   }
 }
 
