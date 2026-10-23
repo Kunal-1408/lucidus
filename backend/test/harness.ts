@@ -11,6 +11,16 @@ import { CLOCK, Clock } from '../src/clock.js';
 import { configureApp } from '../src/configure-app.js';
 import { HTTP_FETCH, HttpFetch } from '../src/ingestion/fetcher.js';
 import {
+  LLM_CLIENT,
+  LlmAnswer,
+  LlmClient,
+  LlmRequest,
+} from '../src/ingestion/llm.js';
+import {
+  OVERRIDES_FILE,
+  REPO_OVERRIDES_FILE,
+} from '../src/overrides/override-seeder.js';
+import {
   POINTER_COUNTRIES,
   PointerCountry,
   WORQNOW,
@@ -30,6 +40,10 @@ export type Served = string | { status: number } | { networkError: true };
 // international scholarships, or a failed fetch.
 export type WorqNowServed = WorqNowUniversity[] | { failure: string };
 
+// What the fake LLM answers for one request: its reading (anything left out
+// is empty), or an error, as when the API is down.
+export type LlmServed = (request: LlmRequest) => Partial<LlmAnswer> | Error;
+
 export interface HarnessOptions {
   // Source URL → what it serves. Any other URL 404s.
   fixtures: Record<string, Served>;
@@ -38,6 +52,11 @@ export interface HarnessOptions {
   watchlist?: WatchlistEntry[];
   // Country → what the fake WorqNow returns. Any other country has none.
   worqnow?: Partial<Record<PointerCountry, WorqNowServed>>;
+  // What the fake LLM answers. By default it finds nothing.
+  llm?: LlmServed;
+  // A fixture file (under test/fixtures) seeding the Overrides in place of
+  // the repo's overrides file.
+  overridesFile?: string;
 }
 
 export interface Harness {
@@ -46,6 +65,10 @@ export interface Harness {
   serve: (url: string, served: Served) => void;
   // Changes what the fake WorqNow returns for a country from now on.
   serveWorqNow: (country: PointerCountry, served: WorqNowServed) => void;
+  // Changes what the fake LLM answers from now on.
+  serveLlm: (served: LlmServed) => void;
+  // How many times the LLM has been called so far.
+  llmCalls: () => number;
   // Holds every fetch of a URL until the returned release is called.
   hold: (url: string) => () => void;
   setNow: (now: Date) => void;
@@ -71,7 +94,8 @@ export interface RunSummaryBody {
 }
 
 // The real Nest app against an in-memory MongoDB, with only the edges faked:
-// the web is served from committed fixtures and the clock is pinned.
+// the web is served from committed fixtures, WorqNow and the LLM give canned
+// answers, and the clock is pinned.
 export async function startApp(options: HarnessOptions): Promise<Harness> {
   const mongo = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongo.getUri();
@@ -79,10 +103,21 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
 
   const web = new FakeWeb(options.fixtures);
   const worqnow = new FakeWorqNow(options.worqnow ?? {});
+  const llm = new FakeLlm(options.llm ?? (() => ({})));
   let now = options.now;
   const clock: Clock = { now: () => now };
 
-  let app = await createApp(web, worqnow, clock, options.watchlist);
+  const overridesFile = options.overridesFile
+    ? join(FIXTURES, options.overridesFile)
+    : REPO_OVERRIDES_FILE;
+  let app = await createApp(
+    web,
+    worqnow,
+    llm,
+    clock,
+    overridesFile,
+    options.watchlist,
+  );
   const http = () => request(app.getHttpServer());
 
   const summary = async (runId: string) => {
@@ -97,6 +132,8 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
     http,
     serve: (url, served) => web.serve(url, served),
     serveWorqNow: (country, served) => worqnow.serve(country, served),
+    serveLlm: (served) => llm.serve(served),
+    llmCalls: () => llm.calls,
     hold: (url) => web.hold(url),
     setNow: (date) => {
       now = date;
@@ -112,7 +149,7 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
     restart: async () => {
       await app.close();
       web.abandonHeld();
-      app = await createApp(web, worqnow, clock);
+      app = await createApp(web, worqnow, llm, clock, overridesFile);
     },
     model: <T>(name: string) => app.get<Model<T>>(getModelToken(name)),
     close: async () => {
@@ -125,7 +162,9 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
 async function createApp(
   web: FakeWeb,
   worqnow: FakeWorqNow,
+  llm: FakeLlm,
   clock: Clock,
+  overridesFile: string,
   watchlist?: WatchlistEntry[],
 ): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -133,8 +172,12 @@ async function createApp(
     .useValue(web.fetch)
     .overrideProvider(WORQNOW)
     .useValue(worqnow)
+    .overrideProvider(LLM_CLIENT)
+    .useValue(llm)
     .overrideProvider(CLOCK)
     .useValue(clock)
+    .overrideProvider(OVERRIDES_FILE)
+    .useValue(overridesFile)
     .compile();
   if (watchlist) {
     // Inserted before bootstrap, so the seeder finds the collection filled.
@@ -222,5 +265,28 @@ class FakeWorqNow implements WorqNowClient {
     const served = this.served.get(country) ?? [];
     if ('failure' in served) return Promise.reject(new Error(served.failure));
     return Promise.resolve(served);
+  }
+}
+
+class FakeLlm implements LlmClient {
+  calls = 0;
+
+  constructor(private served: LlmServed) {}
+
+  serve(served: LlmServed) {
+    this.served = served;
+  }
+
+  read(request: LlmRequest): Promise<LlmAnswer> {
+    this.calls++;
+    const answer = this.served(request);
+    if (answer instanceof Error) return Promise.reject(answer);
+    return Promise.resolve({
+      criteria: [],
+      extraRequirements: [],
+      amountText: null,
+      deadline: null,
+      ...answer,
+    });
   }
 }

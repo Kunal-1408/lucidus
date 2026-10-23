@@ -37,6 +37,12 @@
           }
         }
       </p>
+      @if (item.card.confidence === 'medium') {
+        <p class="verify">Verify on the official site</p>
+      }
+      @if (item.card.extraRequirements.length) {
+        <p class="extra">Also requires: {{ extraRequirementTexts(item.card) }}</p>
+      }
       @if (item.state === 'no_longer_listed' || item.state === 'being_rechecked') {
         <p class="verified">
           As it looked when you saved it on {{ item.savedAt | date: 'd MMM y' }}

@@ -1,6 +1,7 @@
 import type {
   ConfidenceLevel,
   Criterion,
+  ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
 import type { Profile } from './profile.js';
 
@@ -16,6 +17,8 @@ export interface MatchableScholarship {
   lastVerified: Date;
   confidence: ConfidenceLevel;
   criteria: Criterion[];
+  // Shown on the card, never matched.
+  extraRequirements?: ExtraRequirement[];
   status?: 'active' | 'inactive';
   needsReview?: boolean;
 }
@@ -23,6 +26,7 @@ export interface MatchableScholarship {
 export type DeadlineStatus =
   'open' | 'closing_soon' | 'closed' | 'not_announced';
 
+// Mirrored in frontend/src/app/api.ts.
 export interface Card {
   id: string;
   name: string;
@@ -32,7 +36,11 @@ export interface Card {
   deadline?: string;
   deadlineStatus: DeadlineStatus;
   lastVerified: string;
+  // Medium cards carry a "verify on the official site" warning.
   confidence: ConfidenceLevel;
+  // Conditions no Profile field answers, each with its source sentence;
+  // shown as "Also requires: …".
+  extraRequirements: ExtraRequirement[];
   // What would turn a Within reach card Eligible; empty in other buckets.
   goals: string[];
   // Profile fields left empty that this scholarship checks.
@@ -269,6 +277,16 @@ function compareIncome(
   return 'unknown';
 }
 
+// Extra requirements as a card carries them: their text and sentence only.
+export function plainExtraRequirements(
+  extraRequirements: ExtraRequirement[],
+): ExtraRequirement[] {
+  return extraRequirements.map(({ text, sourceText }) => ({
+    text,
+    sourceText,
+  }));
+}
+
 function toCard(
   s: MatchableScholarship,
   deadlineStatus: DeadlineStatus,
@@ -285,6 +303,7 @@ function toCard(
     deadlineStatus,
     lastVerified: s.lastVerified.toISOString(),
     confidence: s.confidence,
+    extraRequirements: plainExtraRequirements(s.extraRequirements ?? []),
     goals,
     missing,
   };

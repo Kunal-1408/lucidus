@@ -103,7 +103,7 @@ export const STATE_NAMES: [IndianState, RegExp][] = STATES.map(
 );
 
 // The fixed lists, as the Profile stores them.
-const FIXED_LISTS: Record<string, readonly string[]> = {
+export const FIXED_LISTS: Record<string, readonly string[]> = {
   domicileState: STATES,
   schoolState: STATES,
   schoolType: ['government', 'aided', 'private'],
@@ -155,7 +155,10 @@ export function normaliseValue(
   raw: string | string[],
 ): unknown {
   if (field === 'incomeBand') {
-    return typeof raw === 'string' ? toRupees(raw) : undefined;
+    if (typeof raw !== 'string') return undefined;
+    // A bare figure ("250000", as the LLM, a reviewer or a JSON number
+    // writes it) is rupees.
+    return toRupees(/^\d[\d,]*$/.test(raw.trim()) ? `₹${raw.trim()}` : raw);
   }
   if (field === 'class') {
     const levels = [

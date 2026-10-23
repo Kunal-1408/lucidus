@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AMOUNT_NOT_STATED, extract } from './extractor.js';
+import { AMOUNT_NOT_STATED, extractByRules } from './extractor.js';
 import { cleanHtml } from './fetcher.js';
 
 // Seam 3: the Extractor as a pure function over a Scholarship's cleaned text,
@@ -12,7 +12,7 @@ function page(file: string): string {
 }
 
 function criterion(text: string, field: string) {
-  return extract(text).criteria.find((c) => c.field === field);
+  return extractByRules(text).criteria.find((c) => c.field === field);
 }
 
 describe('Extractor rules on a myScheme page (NMMSS)', () => {
@@ -41,7 +41,7 @@ describe('Extractor rules on a myScheme page (NMMSS)', () => {
   });
 
   it('finds the marks that name Class 10, skipping test cut-offs and earlier classes', () => {
-    const marks = extract(nmmss).criteria.filter((c) =>
+    const marks = extractByRules(nmmss).criteria.filter((c) =>
       c.field.endsWith('Marks'),
     );
     expect(marks).toEqual([
@@ -68,7 +68,7 @@ describe('Extractor rules on a myScheme page (NMMSS)', () => {
   });
 
   it('takes the Amount text from what is paid, not the income limit', () => {
-    expect(extract(nmmss).amountText).toBe('₹12,000/- per annum');
+    expect(extractByRules(nmmss).amountText).toBe('₹12,000/- per annum');
   });
 });
 
@@ -123,7 +123,7 @@ describe('Normalisation onto the fixed lists', () => {
     ['a stream not on the list', 'Open to students in the vocational stream.'],
     ['marks over 100', 'Students must score a minimum of 450% marks.'],
   ])('drops %s', (_, text) => {
-    expect(extract(text).criteria).toEqual([]);
+    expect(extractByRules(text).criteria).toEqual([]);
   });
 
   it.each([
@@ -139,18 +139,20 @@ describe('Normalisation onto the fixed lists', () => {
     ['Portal opens 01/08/2026 and closes on 15/11/2026.', '2026-11-15'],
     ['Apply by 20 Dec 2026; results on 10 Jan 2027.', '2026-12-20'],
   ])('turns "%s" into an ISO deadline', (text, iso) => {
-    expect(extract(text).deadline).toBe(iso);
+    expect(extractByRules(text).deadline).toBe(iso);
   });
 
   it('leaves the deadline and amount unstated when the text has none', () => {
-    const { deadline, amountText } = extract('Open to girls in Class 11.');
+    const { deadline, amountText } = extractByRules(
+      'Open to girls in Class 11.',
+    );
     expect(deadline).toBeUndefined();
     expect(amountText).toBe(AMOUNT_NOT_STATED);
   });
 });
 
 describe('Extractor rules on a corporate page (Santoor)', () => {
-  const santoor = extract(page('santoor-scholarship.html'));
+  const santoor = extractByRules(page('santoor-scholarship.html'));
 
   it('finds only the girls-only and Class 12 Criteria the page states', () => {
     expect(santoor.criteria).toEqual([
@@ -193,7 +195,7 @@ describe('Extractor rules on an NSP page', () => {
     const nmms = section(
       'National Means Cum Merit Scholarship (Merit Based Scheme)',
     );
-    expect(extract(nmms).deadline).toBe('2026-10-31');
+    expect(extractByRules(nmms).deadline).toBe('2026-10-31');
   });
 
   it.each([
@@ -210,7 +212,7 @@ describe('Extractor rules on an NSP page', () => {
       { field: 'gender', op: 'eq', value: 'female' },
     ],
   ])('finds the fixed-list Criterion in %s', (name, expected) => {
-    expect(extract(section(name)).criteria).toEqual([
+    expect(extractByRules(section(name)).criteria).toEqual([
       {
         ...expected,
         changeable: false,

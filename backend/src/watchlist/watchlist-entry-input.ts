@@ -3,6 +3,7 @@ import type {
   SplitRule,
   WatchlistEntry,
 } from './watchlist-entry.schema.js';
+import { isObject, oneOf, text } from '../input-checks.js';
 
 // A Watchlist entry as the operator may send it: everything but the last
 // result, which only Ingestion writes.
@@ -108,27 +109,6 @@ function splitRule(
   return rule;
 }
 
-function text(
-  raw: Record<string, unknown>,
-  field: string,
-  reasons: string[],
-): string | undefined {
-  const value = raw[field];
-  if (value === undefined || value === null || value === '') {
-    reasons.push(`${field} is required`);
-    return undefined;
-  }
-  if (typeof value !== 'string') {
-    reasons.push(`${field} must be a string`);
-    return undefined;
-  }
-  if (value.trim() === '') {
-    reasons.push(`${field} is required`);
-    return undefined;
-  }
-  return value.trim();
-}
-
 function httpUrl(
   raw: Record<string, unknown>,
   field: string,
@@ -141,31 +121,6 @@ function httpUrl(
     return undefined;
   }
   return value;
-}
-
-function oneOf<T extends string>(
-  raw: Record<string, unknown>,
-  field: string,
-  allowed: readonly T[],
-  reasons: string[],
-): T | undefined {
-  const value = raw[field];
-  if (
-    typeof value === 'string' &&
-    (allowed as readonly string[]).includes(value)
-  ) {
-    return value as T;
-  }
-  reasons.push(
-    value === undefined
-      ? `${field} is required`
-      : `${field} must be one of ${allowed.join(', ')}`,
-  );
-  return undefined;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isRegex(pattern: string): boolean {

@@ -26,6 +26,7 @@ export class Criterion {
   confidence: ConfidenceLevel;
 }
 
+// Mirrored in frontend/src/app/api.ts.
 @Schema({ _id: false })
 export class ExtraRequirement {
   @Prop({ required: true })
@@ -89,8 +90,17 @@ export class Scholarship {
   @Prop({ required: true })
   needsReview: boolean;
 
+  // The Criteria it is matched on: as extracted, or as an Override reviewed
+  // them.
   @Prop({ type: [Criterion], default: [] })
   criteria: Criterion[];
+
+  // The Criteria as extracted from the current text, before any Override:
+  // what the Review report showed, what an approve applies to and what
+  // removing an Override restores, without reading the page again. Absent
+  // on records stored before it was kept; those are read again once.
+  @Prop({ type: [Criterion], default: undefined })
+  extractedCriteria?: Criterion[];
 
   @Prop({ type: [ExtraRequirement], default: [] })
   extraRequirements: ExtraRequirement[];
