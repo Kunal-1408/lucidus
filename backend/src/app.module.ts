@@ -6,7 +6,12 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { AdminController } from './admin/admin.controller.js';
 import { AppController } from './app.controller.js';
 import { CLOCK, systemClock } from './clock.js';
+import { EXTRACTOR, ruleExtractor } from './ingestion/extractor.js';
 import { Fetcher, HTTP_FETCH } from './ingestion/fetcher.js';
+import {
+  IngestionRun,
+  IngestionRunSchema,
+} from './ingestion/ingestion-run.schema.js';
 import { IngestionService } from './ingestion/ingestion.service.js';
 import { MatchController } from './match/match.controller.js';
 import {
@@ -38,6 +43,7 @@ const FRONTEND_DIST = join(
     MongooseModule.forFeature([
       { name: Scholarship.name, schema: ScholarshipSchema },
       { name: WatchlistEntry.name, schema: WatchlistEntrySchema },
+      { name: IngestionRun.name, schema: IngestionRunSchema },
     ]),
     ...(existsSync(FRONTEND_DIST)
       ? [
@@ -54,6 +60,7 @@ const FRONTEND_DIST = join(
     Fetcher,
     IngestionService,
     { provide: HTTP_FETCH, useValue: globalThis.fetch },
+    { provide: EXTRACTOR, useValue: ruleExtractor },
     { provide: CLOCK, useValue: systemClock },
   ],
 })

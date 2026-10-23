@@ -80,3 +80,15 @@ function regexCriterion(
 ): Criterion {
   return { field, op, value, changeable, sourceText, confidence: 'high' };
 }
+
+// The Extractor as Ingestion sees it, injected so tests (and the LLM step to
+// come) can swap it. Async because extraction will call the LLM.
+export const EXTRACTOR = Symbol('EXTRACTOR');
+
+export interface Extractor {
+  extract(text: string): Promise<Extraction>;
+}
+
+export const ruleExtractor: Extractor = {
+  extract: (text) => Promise.resolve(extract(text)),
+};

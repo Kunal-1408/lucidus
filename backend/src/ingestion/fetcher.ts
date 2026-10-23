@@ -9,9 +9,12 @@ export type HttpFetch = typeof globalThis.fetch;
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
 const TIMEOUT_MS = 20_000;
+// Cleaned text shorter than this is a page built by JavaScript: there is
+// nothing to extract until someone finds its JSON endpoint.
+export const NEEDS_JS_BELOW_CHARS = 300;
 
 export type FetchResult =
-  | { ok: true; text: string }
+  | { ok: true; text: string; needsJs: boolean }
   | { ok: false; failure: 'not_found' | 'server_error' | 'network_error' };
 
 // Fetches a Watchlist source and returns its cleaned text, or a typed failure.
@@ -37,7 +40,8 @@ export class Fetcher {
     if (type !== 'html') {
       throw new Error(`Source type ${type} is not supported yet`);
     }
-    return { ok: true, text: cleanHtml(await response.text()) };
+    const text = cleanHtml(await response.text());
+    return { ok: true, text, needsJs: text.length < NEEDS_JS_BELOW_CHARS };
   }
 }
 
