@@ -1,9 +1,57 @@
 // What a Student tells us about themselves. Every field is optional, and the
-// Profile is never stored on the server. The frontend keeps its own copy.
+// Profile is never stored on the server. The frontend keeps its own copy and
+// duplicates these fixed lists (there is no shared types package).
+
+// The 28 states and 8 union territories.
+export type IndianState =
+  | 'andhra_pradesh'
+  | 'arunachal_pradesh'
+  | 'assam'
+  | 'bihar'
+  | 'chhattisgarh'
+  | 'goa'
+  | 'gujarat'
+  | 'haryana'
+  | 'himachal_pradesh'
+  | 'jharkhand'
+  | 'karnataka'
+  | 'kerala'
+  | 'madhya_pradesh'
+  | 'maharashtra'
+  | 'manipur'
+  | 'meghalaya'
+  | 'mizoram'
+  | 'nagaland'
+  | 'odisha'
+  | 'punjab'
+  | 'rajasthan'
+  | 'sikkim'
+  | 'tamil_nadu'
+  | 'telangana'
+  | 'tripura'
+  | 'uttar_pradesh'
+  | 'uttarakhand'
+  | 'west_bengal'
+  | 'andaman_and_nicobar_islands'
+  | 'chandigarh'
+  | 'dadra_and_nagar_haveli_and_daman_and_diu'
+  | 'delhi'
+  | 'jammu_and_kashmir'
+  | 'ladakh'
+  | 'lakshadweep'
+  | 'puducherry';
+
+export type ParentOccupation =
+  | 'defence'
+  | 'central_armed_police'
+  | 'construction_worker'
+  | 'beedi_cine_mine_worker'
+  | 'none';
+
 export interface Profile {
   class?: 9 | 10 | 11 | 12;
-  domicileState?: string;
-  schoolState?: string;
+  domicileState?: IndianState;
+  schoolState?: IndianState;
   schoolType?: 'government' | 'aided' | 'private';
   citizenship?: 'indian' | 'other';
   board?: 'cbse' | 'cisce' | 'state' | 'ib' | 'cambridge' | 'other';
@@ -35,6 +83,6 @@ export interface Profile {
   minority?: boolean;
   disability?: boolean;
   singleGirlChild?: boolean;
-  parentOccupation?: string[];
+  parentOccupation?: ParentOccupation[];
   examsQualified?: ('nmms' | 'olympiad' | 'other')[];
 }
