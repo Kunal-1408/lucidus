@@ -118,21 +118,46 @@ export const LLM_FIELDS: Record<
   examsQualified: { op: 'in', changeable: false },
 };
 
-// An LLM value is medium Confidence when its quote is in the text and every
-// value it names is an allowed option; otherwise it is kept, as the model
-// gave it, at low Confidence, which sends the Scholarship to review.
+// An LLM value is medium Confidence when it passes the quote check;
+// otherwise it is kept, as the model gave it, at low Confidence, which
+// sends the Scholarship to review.
 function fromLlmCriterion(c: LlmCriterion, text: string): Criterion {
+  const checked = checkQuoted(c, text);
+  if (checked.ok) return { ...checked.criterion, confidence: 'medium' };
   const { op, changeable } = LLM_FIELDS[c.field];
-  const value = quotedIn(text, c.quote)
-    ? llmValue(c.field, op, c.values)
-    : undefined;
   return {
     field: c.field,
     op,
-    value: value ?? c.values,
+    value: c.values,
     changeable,
     sourceText: c.quote,
-    confidence: value === undefined ? 'low' : 'medium',
+    confidence: 'low',
+  };
+}
+
+export type QuoteCheck =
+  | { ok: true; criterion: Omit<Criterion, 'confidence'> }
+  | { ok: false; problem: string };
+
+// The quote check for a Criterion read off the page, by the LLM or by a
+// reviewer in an Override: its sentence must be in the text and every value
+// it names must be an allowed option. Op and changeability are set by the
+// code (LLM_FIELDS), never by whoever read it.
+export function checkQuoted(c: LlmCriterion, text: string): QuoteCheck {
+  const { op, changeable } = LLM_FIELDS[c.field];
+  if (!quotedIn(text, c.quote)) {
+    return { ok: false, problem: `${c.field}: sentence not in the page text` };
+  }
+  const value = llmValue(c.field, op, c.values);
+  if (value === undefined) {
+    return {
+      ok: false,
+      problem: `${c.field}: values outside the allowed options`,
+    };
+  }
+  return {
+    ok: true,
+    criterion: { field: c.field, op, value, changeable, sourceText: c.quote },
   };
 }
 

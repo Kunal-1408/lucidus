@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -15,6 +14,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model, Types } from 'mongoose';
 import { parseWatchlistEntry } from '../watchlist/watchlist-entry-input.js';
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
+import { isDuplicateKey, rejected } from './admin-errors.js';
 import { AdminTokenGuard } from './admin-token.guard.js';
 
 export type WatchlistEntryView = WatchlistEntry & { id: string };
@@ -32,13 +32,7 @@ export class WatchlistController {
   @Post()
   async add(@Body() body: unknown): Promise<WatchlistEntryView> {
     const parsed = parseWatchlistEntry(body);
-    if (!parsed.ok) {
-      throw new BadRequestException({
-        statusCode: 400,
-        error: 'Bad Request',
-        message: parsed.reasons,
-      });
-    }
+    if (!parsed.ok) throw rejected(parsed.reasons);
     const { url } = parsed.entry;
     const duplicate = () =>
       new ConflictException(`${url} is already on the Watchlist`);
@@ -74,12 +68,4 @@ function toView(
 ): WatchlistEntryView {
   const { _id, __v: _version, ...entry } = doc;
   return { id: _id.toHexString(), ...entry };
-}
-
-function isDuplicateKey(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    (err as { code?: unknown }).code === 11000
-  );
 }

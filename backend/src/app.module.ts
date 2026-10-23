@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { AdminController } from './admin/admin.controller.js';
+import { OverridesController } from './admin/overrides.controller.js';
 import { ReviewController } from './admin/review.controller.js';
 import { WatchlistController } from './admin/watchlist.controller.js';
 import { AppController } from './app.controller.js';
@@ -18,6 +19,12 @@ import {
 import { IngestionService } from './ingestion/ingestion.service.js';
 import { LLM_CLIENT, type LlmClient } from './ingestion/llm.js';
 import { MatchController } from './match/match.controller.js';
+import { Override, OverrideSchema } from './overrides/override.schema.js';
+import {
+  OVERRIDES_FILE,
+  OverrideSeeder,
+  REPO_OVERRIDES_FILE,
+} from './overrides/override-seeder.js';
 import {
   SavedScholarship,
   SavedScholarshipSchema,
@@ -61,6 +68,7 @@ const FRONTEND_DIST = join(
       { name: IngestionRun.name, schema: IngestionRunSchema },
       { name: UniversityPointer.name, schema: UniversityPointerSchema },
       { name: SavedScholarship.name, schema: SavedScholarshipSchema },
+      { name: Override.name, schema: OverrideSchema },
     ]),
     ...(existsSync(FRONTEND_DIST)
       ? [
@@ -76,11 +84,14 @@ const FRONTEND_DIST = join(
     MatchController,
     AdminController,
     WatchlistController,
+    OverridesController,
     ReviewController,
     SavedController,
   ],
   providers: [
     WatchlistSeeder,
+    OverrideSeeder,
+    { provide: OVERRIDES_FILE, useValue: REPO_OVERRIDES_FILE },
     Fetcher,
     IngestionService,
     UniversityPointersService,
