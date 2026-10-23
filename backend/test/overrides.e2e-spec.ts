@@ -95,6 +95,16 @@ describe('Overrides', () => {
     reviewedBy: 'Kunal',
   });
 
+  const replace = (
+    contentHash: string,
+    criteria: { field: string; values: string[]; sourceText: string }[],
+  ) => ({
+    ...approve(contentHash),
+    action: 'replace',
+    criteria,
+    note: 'The page asks for engineering, in its own words.',
+  });
+
   describe('admin endpoints', () => {
     it('need the admin token', async () => {
       await harness.http().get('/api/admin/overrides').expect(401);
@@ -171,6 +181,29 @@ describe('Overrides', () => {
       ]);
     });
 
+    it('rejects an Override written against a hash that is not the current one', async () => {
+      await harness.ingest();
+      const res = await admin.post(approve('a'.repeat(64))).expect(400);
+      expect(res.body.message).toEqual([
+        `contentHash is not the current hash of ${ENGINEERING_NAME} from ${ENGINEERING}`,
+      ]);
+    });
+
+    it('rejects replacement values outside the fixed lists', async () => {
+      await harness.ingest();
+      const res = await admin
+        .post(
+          replace(await currentHash(), [
+            { field: 'gender', values: ['female'], sourceText: GIRLS_SENTENCE },
+            { field: 'stream', values: ['astronomy'], sourceText: ON_PAGE },
+          ]),
+        )
+        .expect(400);
+      expect(res.body.message).toEqual([
+        'criteria[1].values must be allowed options for stream',
+      ]);
+    });
+
     it('allows one Override per Scholarship', async () => {
       await harness.ingest();
       const contentHash = await currentHash();
@@ -216,6 +249,54 @@ describe('Overrides', () => {
       expect(await overrideResult()).toEqual({ lastResult: 'applied' });
     });
 
+    it('applies to the extraction the reviewer saw, without reading the page again', async () => {
+      await harness.ingest();
+      const calls = harness.llmCalls();
+      // Were the page read again, the model would now give another reading.
+      harness.serveLlm(() => ({
+        criteria: [
+          { field: 'fieldOfStudy', values: ['medicine'], quote: NOT_ON_PAGE },
+        ],
+      }));
+
+      await admin.post(approve(await currentHash())).expect(201);
+      const summary = await harness.ingest();
+
+      expect(harness.llmCalls()).toBe(calls);
+      expect(summary.counts).toMatchObject({ unchanged: 1, extracted: 0 });
+      expect(await eligibleFor(ENGINEERING_GIRL)).toEqual([
+        { name: ENGINEERING_NAME, confidence: 'high' },
+      ]);
+    });
+
+    it('is invalid when a Criterion it would make high has values outside the allowed options', async () => {
+      harness.serveLlm(() => ({
+        criteria: [
+          { field: 'fieldOfStudy', values: ['rocketry'], quote: NOT_ON_PAGE },
+        ],
+      }));
+      await harness.ingest();
+      const contentHash = await currentHash();
+      const added = await admin.post(approve(contentHash)).expect(201);
+      await harness.ingest();
+
+      const problems = ['fieldOfStudy: values outside the allowed options'];
+      expect(await eligibleFor(ENGINEERING_GIRL)).toEqual([]);
+      expect(await overrideResult()).toEqual({
+        lastResult: 'invalid',
+        problems,
+      });
+      expect(await report()).toEqual([
+        expect.objectContaining({ reason: 'low confidence' }),
+        expect.objectContaining({
+          reason: 'invalid override',
+          contentHash,
+          overrideId: added.body.id as string,
+          problems,
+        }),
+      ]);
+    });
+
     it('keeps holding while the page stays the same', async () => {
       await harness.ingest();
       await admin.post(approve(await currentHash())).expect(201);
@@ -234,24 +315,18 @@ describe('Overrides', () => {
       const added = await admin.post(approve(await currentHash()));
       await harness.ingest();
 
-      await admin.remove(added.body.id as string).expect(204);
-      await harness.ingest();
+      const calls = harness.llmCalls();
 
+      await admin.remove(added.body.id as string).expect(204);
+      const summary = await harness.ingest();
+
+      expect(harness.llmCalls()).toBe(calls);
+      expect(summary.counts).toMatchObject({ unchanged: 1, extracted: 0 });
       expect(await eligibleFor(ENGINEERING_GIRL)).toEqual([]);
       expect(await report()).toEqual([
         expect.objectContaining({ reason: 'low confidence' }),
       ]);
     });
-  });
-
-  const replace = (
-    contentHash: string,
-    criteria: { field: string; values: string[]; sourceText: string }[],
-  ) => ({
-    ...approve(contentHash),
-    action: 'replace',
-    criteria,
-    note: 'The page asks for engineering, in its own words.',
   });
 
   describe('replacing Criteria', () => {
@@ -282,7 +357,7 @@ describe('Overrides', () => {
       expect(await overrideResult()).toEqual({ lastResult: 'applied' });
     });
 
-    it('is skipped and reported when a sentence is not on the page or a value is not allowed', async () => {
+    it('is skipped and reported when a sentence is not on the page', async () => {
       await harness.ingest();
       const contentHash = await currentHash();
       const added = await admin
@@ -294,16 +369,12 @@ describe('Overrides', () => {
               values: ['engineering'],
               sourceText: NOT_ON_PAGE,
             },
-            { field: 'stream', values: ['astronomy'], sourceText: ON_PAGE },
           ]),
         )
         .expect(201);
       await harness.ingest();
 
-      const problems = [
-        'fieldOfStudy: sentence not in the page text',
-        'stream: values outside the allowed options',
-      ];
+      const problems = ['fieldOfStudy: sentence not in the page text'];
       expect(await eligibleFor(ENGINEERING_GIRL)).toEqual([]);
       expect(await overrideResult()).toEqual({
         lastResult: 'invalid',
@@ -348,9 +419,9 @@ describe('Overrides', () => {
         action: 'approve',
         note: 'Seeded from the repo.',
         reviewedBy: 'Kunal',
-        reviewedAt: DAY_1.toISOString(),
+        reviewedAt: '2026-07-01T10:30:00.000Z',
       };
-      // The second entry in the file lacks required fields.
+      // The second entry lacks required fields, the third its reviewed at.
       expect(await admin.list()).toEqual([seeded]);
 
       await harness.restart();
@@ -359,6 +430,21 @@ describe('Overrides', () => {
   });
 
   describe('when the page changes', () => {
+    it('records nothing on the Override when the changed page fails to extract', async () => {
+      await harness.ingest();
+      await admin.post(approve(await currentHash())).expect(201);
+
+      harness.serve(ENGINEERING, 'llm/engineering-girls-edited.html');
+      harness.serveLlm(() => new Error('LLM down'));
+      const summary = await harness.ingest();
+
+      expect(summary.counts.failed).toBe(1);
+      expect(await overrideResult()).toEqual({
+        lastResult: undefined,
+        problems: undefined,
+      });
+    });
+
     it('lapses: is kept, reported as page changed, and the Scholarship is checked again', async () => {
       await harness.ingest();
       const oldHash = await currentHash();

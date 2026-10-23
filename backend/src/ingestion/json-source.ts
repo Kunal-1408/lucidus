@@ -1,5 +1,7 @@
 // JSON sources: how a parsed JSON value becomes cleaned text for the
 // Extractor, and which of its fields are Criteria in their own right.
+import { isObject } from '../input-checks.js';
+import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import { normaliseValue } from './normalise.js';
 
@@ -57,44 +59,17 @@ export function itemsAt(
   return Array.isArray(value) ? value : undefined;
 }
 
-// A Profile field a JSON source may state as a field of its own, with the op
-// and changeability its Criterion takes (as the matching rule's would).
-const STRUCTURED_FIELDS: Record<
-  string,
-  { op: Criterion['op']; changeable: boolean }
-> = {
-  class: { op: 'in', changeable: true },
-  class10Marks: { op: 'gte', changeable: true },
-  latestMarks: { op: 'gte', changeable: true },
-  incomeBand: { op: 'lte', changeable: false },
-  gender: { op: 'eq', changeable: false },
-  category: { op: 'in', changeable: false },
-  minority: { op: 'eq', changeable: false },
-  disability: { op: 'eq', changeable: false },
-  singleGirlChild: { op: 'eq', changeable: false },
-  citizenship: { op: 'eq', changeable: false },
-  domicileState: { op: 'in', changeable: false },
-  schoolState: { op: 'in', changeable: false },
-  schoolType: { op: 'in', changeable: false },
-  board: { op: 'in', changeable: false },
-  stream: { op: 'in', changeable: false },
-  fieldOfStudy: { op: 'in', changeable: false },
-  destination: { op: 'in', changeable: false },
-  parentOccupation: { op: 'in', changeable: false },
-  examsQualified: { op: 'in', changeable: false },
-};
-
 // Fields whose values are parsed from figures and labels, not slugs.
 const PARSED_FIELDS = ['class', 'class10Marks', 'latestMarks', 'incomeBand'];
 
 // The Criteria an item states as top-level fields named after Profile
-// fields. A value that fits the field's fixed list is high Confidence, like
+// fields (CRITERION_FIELDS). A value that fits the field's fixed list is high Confidence, like
 // a regex match; one that doesn't is dropped. Each Criterion's sentence is
 // the field's line in the item's text.
 export function structuredCriteria(item: unknown): Criterion[] {
   if (!isObject(item)) return [];
   const criteria: Criterion[] = [];
-  for (const [field, { op, changeable }] of Object.entries(STRUCTURED_FIELDS)) {
+  for (const [field, { op, changeable }] of Object.entries(CRITERION_FIELDS)) {
     const given = item[field];
     if (
       !isPrimitive(given) &&
@@ -116,16 +91,14 @@ export function structuredCriteria(item: unknown): Criterion[] {
 }
 
 // A JSON value in the form normalisation reads: "Female" → "female",
-// "Tamil Nadu" → "tamil_nadu", true → "yes", an income of 250000 → "₹250000".
+// "Tamil Nadu" → "tamil_nadu", true → "yes", 250000 → "250000".
 function toRaw(
   field: string,
   value: Primitive | Primitive[],
 ): string | string[] {
   if (Array.isArray(value)) return value.map((v) => toRaw(field, v) as string);
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (typeof value === 'number') {
-    return field === 'incomeBand' ? `₹${value}` : String(value);
-  }
+  if (typeof value === 'number') return String(value);
   const lower = value.trim().toLowerCase();
   return PARSED_FIELDS.includes(field) ? lower : lower.replace(/[\s-]+/g, '_');
 }
@@ -145,8 +118,4 @@ type Primitive = string | number | boolean;
 
 function isPrimitive(value: unknown): value is Primitive {
   return ['string', 'number', 'boolean'].includes(typeof value);
-}
-
-export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

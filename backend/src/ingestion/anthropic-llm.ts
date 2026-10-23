@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Injectable } from '@nestjs/common';
-import { LLM_FIELDS } from './extractor.js';
+import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
 import type { LlmAnswer, LlmClient, LlmRequest } from './llm.js';
 import { FIXED_LISTS } from './normalise.js';
 
@@ -55,7 +55,7 @@ const SCHEMA = {
         additionalProperties: false,
         required: ['field', 'values', 'quote'],
         properties: {
-          field: { type: 'string', enum: Object.keys(LLM_FIELDS) },
+          field: { type: 'string', enum: Object.keys(CRITERION_FIELDS) },
           values: { type: 'array', items: { type: 'string' } },
           quote: { type: 'string' },
         },
@@ -75,9 +75,9 @@ const SCHEMA = {
   },
 };
 
-function prompt(request: LlmRequest): string {
+function userMessage(request: LlmRequest): string {
   const requested = request.fields.map((f) => `- ${f}: ${guideFor(f)}`);
-  const known = Object.keys(LLM_FIELDS).join(', ');
+  const known = Object.keys(CRITERION_FIELDS).join(', ');
   return [
     'Requested fields:',
     requested.length ? requested.join('\n') : '(none)',
@@ -107,7 +107,7 @@ export class AnthropicLlmClient implements LlmClient {
       model: LLM_MODEL,
       max_tokens: 16_000,
       system: SYSTEM,
-      messages: [{ role: 'user', content: prompt(request) }],
+      messages: [{ role: 'user', content: userMessage(request) }],
       output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     });
     if (response.stop_reason !== 'end_turn') {

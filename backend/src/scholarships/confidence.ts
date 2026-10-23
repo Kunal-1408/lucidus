@@ -14,8 +14,14 @@ export function weakestCriterion(criteria: Criterion[]): Criterion | undefined {
   );
 }
 
-// A Scholarship's Confidence is its weakest Criterion's. With no Criteria it
-// is high, and needs review is set for that reason instead.
-export function scholarshipConfidence(criteria: Criterion[]): ConfidenceLevel {
+// A Scholarship's Confidence is its weakest Criterion's, and low when its
+// official URL is missing (it comes from the Watchlist entry, so this should
+// not happen). With no Criteria it is high, and needs review is set for that
+// reason instead.
+export function scholarshipConfidence(
+  criteria: Criterion[],
+  officialUrl: string | undefined,
+): ConfidenceLevel {
+  if (!officialUrl) return 'low';
   return weakestCriterion(criteria)?.confidence ?? 'high';
 }

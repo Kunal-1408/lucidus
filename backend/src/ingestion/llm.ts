@@ -21,14 +21,16 @@ export interface LlmRequest {
 // What the LLM read, each value with the exact sentence it came from. Code,
 // not the model, decides how far to trust it.
 export interface LlmAnswer {
-  criteria: LlmCriterion[];
+  criteria: CriterionReading[];
   extraRequirements: { text: string; quote: string }[];
   // Each as the source wrote it, or null when the text doesn't state one.
   amountText: Quoted | null;
   deadline: Quoted | null;
 }
 
-export interface LlmCriterion {
+// A Criterion as read off the page, by the LLM or by a reviewer writing an
+// Override: the field, its raw values and the sentence they come from.
+export interface CriterionReading {
   field: string;
   // The raw option(s) as the fixed list names them ("sc", "yes"), a class
   // ("11"), a percentage ("60") or a money figure ("Rs. 2.5 lakh").

@@ -1,6 +1,12 @@
-import { LLM_FIELDS } from '../ingestion/extractor.js';
+import { readValue } from '../ingestion/extractor.js';
 import { isObject, oneOf, text } from '../input-checks.js';
-import type { Override, ReplacementCriterion } from './override.schema.js';
+import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
+import {
+  OVERRIDE_ACTIONS,
+  type Override,
+  type OverrideAction,
+  type ReplacementCriterion,
+} from './override.schema.js';
 
 // An Override as the reviewer sends it: everything but what the code sets
 // (reviewed at) and what only Ingestion writes (last result, problems).
@@ -9,17 +15,16 @@ export type OverrideInput = Omit<
   'reviewedAt' | 'lastResult' | 'problems'
 >;
 
-export type ParseResult =
-  { ok: true; override: OverrideInput } | { ok: false; reasons: string[] };
+export type ParseResult<T = OverrideInput> =
+  { ok: true; override: T } | { ok: false; reasons: string[] };
 
-const ACTIONS = ['approve', 'replace'] as const;
-const FIELDS = Object.keys(LLM_FIELDS);
+const FIELDS = Object.keys(CRITERION_FIELDS);
 
-// Checks an Override's shape, collecting every reason it is rejected.
-// Whether replacement Criteria quote the current page and use allowed values
-// is checked by Ingestion against the section's text; an Override failing
-// that is skipped and listed in the Review report. Unknown fields are
-// dropped.
+// Checks an Override's shape, collecting every reason it is rejected;
+// replacement values must be allowed options. Whether replacement Criteria
+// quote the page is checked by Ingestion against the section's text; an
+// Override failing that is skipped and listed in the Review report. Unknown
+// fields are dropped.
 export function parseOverride(body: unknown): ParseResult {
   const raw = isObject(body) ? body : {};
   const reasons: string[] = [];
@@ -27,7 +32,7 @@ export function parseOverride(body: unknown): ParseResult {
   const sourceUrl = text(raw, 'sourceUrl', reasons);
   const schemeName = text(raw, 'schemeName', reasons);
   const contentHash = hash(raw.contentHash, reasons);
-  const action = oneOf(raw, 'action', ACTIONS, reasons);
+  const action = oneOf(raw, 'action', OVERRIDE_ACTIONS, reasons);
   const note = text(raw, 'note', reasons);
   const reviewedBy = text(raw, 'reviewedBy', reasons);
   const criteria = replacementCriteria(raw.criteria, action, reasons);
@@ -47,6 +52,36 @@ export function parseOverride(body: unknown): ParseResult {
   };
 }
 
+// An Override as the repo's overrides file holds it: as sent to the
+// endpoint, plus when it was reviewed (an ISO date-time), so a fresh deploy
+// keeps who reviewed it and when.
+export function parseFiledOverride(body: unknown): ParseResult<Override> {
+  const parsed = parseOverride(body);
+  const reasons = parsed.ok ? [] : [...parsed.reasons];
+  const raw = isObject(body) ? body : {};
+  const reviewedAt = dateTime(raw.reviewedAt, 'reviewedAt', reasons);
+  if (!parsed.ok || reasons.length > 0) return { ok: false, reasons };
+  return {
+    ok: true,
+    override: { ...parsed.override, reviewedAt: reviewedAt! },
+  };
+}
+
+function dateTime(
+  value: unknown,
+  label: string,
+  reasons: string[],
+): Date | undefined {
+  const date = typeof value === 'string' ? new Date(value) : undefined;
+  if (date && !Number.isNaN(date.getTime())) return date;
+  reasons.push(
+    value === undefined
+      ? `${label} is required`
+      : `${label} must be an ISO date-time`,
+  );
+  return undefined;
+}
+
 function hash(value: unknown, reasons: string[]): string | undefined {
   if (typeof value === 'string' && /^[0-9a-f]{64}$/.test(value)) return value;
   reasons.push(
@@ -59,7 +94,7 @@ function hash(value: unknown, reasons: string[]): string | undefined {
 
 function replacementCriteria(
   value: unknown,
-  action: 'approve' | 'replace' | undefined,
+  action: OverrideAction | undefined,
   reasons: string[],
 ): ReplacementCriterion[] | undefined {
   if (action !== 'replace') {
@@ -77,6 +112,9 @@ function replacementCriteria(
     const raw = isObject(item) ? item : {};
     const field = oneOf(raw, 'field', FIELDS, reasons, `${label}.field`);
     const values = rawValues(raw.values, `${label}.values`, reasons);
+    if (field && values && readValue(field, values) === undefined) {
+      reasons.push(`${label}.values must be allowed options for ${field}`);
+    }
     const sourceText = text(raw, 'sourceText', reasons, `${label}.sourceText`);
     return { field: field!, values: values!, sourceText: sourceText! };
   });

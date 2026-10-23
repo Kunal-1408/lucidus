@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Delete,
   Get,
@@ -12,19 +11,21 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { isValidObjectId, Model, Types } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import { CLOCK, type Clock } from '../clock.js';
 import { parseOverride } from '../overrides/override-input.js';
 import { Override } from '../overrides/override.schema.js';
 import { Scholarship } from '../scholarships/scholarship.schema.js';
 import { scholarshipKey } from '../scholarships/scholarship-key.js';
 import { AdminTokenGuard } from './admin-token.guard.js';
-import { isDuplicateKey, rejected } from './admin-errors.js';
+import { rejected } from './admin-errors.js';
+import { insertUnique, type View, withId } from './admin-records.js';
 
-export type OverrideView = Override & { id: string };
+export type OverrideView = View<Override>;
 
 // The reviewer's fixes, sent from Postman. A new Override takes effect on
-// the next Ingestion run, with no redeploy.
+// the next Ingestion run, with no redeploy, and without reading the page
+// again: it applies to the extraction the reviewer saw.
 @Controller('admin/overrides')
 @UseGuards(AdminTokenGuard)
 export class OverridesController {
@@ -41,35 +42,30 @@ export class OverridesController {
     const parsed = parseOverride(body);
     if (!parsed.ok) throw rejected(parsed.reasons);
     const key = scholarshipKey(parsed.override);
-    if (!(await this.scholarships.exists(key))) {
-      throw rejected([
-        `No Scholarship ${key.schemeName} from ${key.sourceUrl}`,
-      ]);
+    const named = `${key.schemeName} from ${key.sourceUrl}`;
+    const scholarship = await this.scholarships
+      .findOne(key, { contentHash: 1 })
+      .lean();
+    if (!scholarship) throw rejected([`No Scholarship ${named}`]);
+    // One written against older text would only lapse on the next run.
+    if (scholarship.contentHash !== parsed.override.contentHash) {
+      throw rejected([`contentHash is not the current hash of ${named}`]);
     }
-    const duplicate = () =>
-      new ConflictException(
-        `${key.schemeName} from ${key.sourceUrl} already has an Override`,
-      );
-    // Checked up front too, since the unique index may still be building.
-    if (await this.overrides.exists(key)) throw duplicate();
-    try {
-      const created = await this.overrides.create({
-        ...parsed.override,
-        reviewedAt: this.clock.now(),
-      });
-      return toView(created.toObject());
-    } catch (err) {
-      throw isDuplicateKey(err) ? duplicate() : err;
-    }
+    return insertUnique(
+      this.overrides,
+      key,
+      { ...parsed.override, reviewedAt: this.clock.now() },
+      `${named} already has an Override`,
+    );
   }
 
   @Get()
   async list(): Promise<OverrideView[]> {
     const overrides = await this.overrides.find().sort({ _id: 1 }).lean();
-    return overrides.map(toView);
+    return overrides.map(withId);
   }
 
-  // The Scholarship is extracted afresh on the next run, without the fix.
+  // The next run restores the Scholarship as extracted, without the fix.
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id') id: string): Promise<void> {
@@ -77,11 +73,4 @@ export class OverridesController {
       isValidObjectId(id) && (await this.overrides.findByIdAndDelete(id));
     if (!removed) throw new NotFoundException(`No Override ${id}`);
   }
-}
-
-function toView(
-  doc: Override & { _id: Types.ObjectId; __v?: number },
-): OverrideView {
-  const { _id, __v: _version, ...override } = doc;
-  return { id: _id.toHexString(), ...override };
 }

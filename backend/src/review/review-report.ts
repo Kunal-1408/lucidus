@@ -1,5 +1,9 @@
 import type { Types } from 'mongoose';
 import type { Override } from '../overrides/override.schema.js';
+import {
+  type ScholarshipKey,
+  scholarshipKey,
+} from '../scholarships/scholarship-key.js';
 import { weakestCriterion } from '../scholarships/confidence.js';
 import type {
   Criterion,
@@ -72,10 +76,31 @@ export function scholarshipEntry(scholarship: StoredScholarship): ReviewEntry {
   return { ...base, reason: 'low confidence', criterion: weakest };
 }
 
+// The entries for these Overrides, in their order, given the listed
+// Scholarships among theirs. An Override whose Scholarship is no longer
+// listed has nothing left to check, so it isn't reported.
+export function overrideEntries(
+  overrides: StoredOverride[],
+  listed: StoredScholarship[],
+): ReviewEntry[] {
+  const byKey = new Map(
+    listed.map((scholarship) => [keyOf(scholarship), scholarship]),
+  );
+  return overrides.flatMap((override) => {
+    const scholarship = byKey.get(keyOf(override));
+    const entry = scholarship && overrideEntry(override, scholarship);
+    return entry ? [entry] : [];
+  });
+}
+
+function keyOf(record: ScholarshipKey): string {
+  return JSON.stringify(scholarshipKey(record));
+}
+
 // What is wrong with an Override for this (listed) Scholarship, if
 // anything. A changed page comes first: problems found against the old text
 // no longer matter.
-export function overrideEntry(
+function overrideEntry(
   override: StoredOverride,
   scholarship: StoredScholarship,
 ): ReviewEntry | undefined {

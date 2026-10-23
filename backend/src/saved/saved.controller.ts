@@ -14,7 +14,11 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model, Types } from 'mongoose';
 import { CLOCK, type Clock, indiaDate } from '../clock.js';
-import { deadlineStatus, type DeadlineStatus } from '../match/matcher.js';
+import {
+  deadlineStatus,
+  type DeadlineStatus,
+  plainExtraRequirements,
+} from '../match/matcher.js';
 import { scholarshipKey } from '../scholarships/scholarship-key.js';
 import { Scholarship, VISIBLE } from '../scholarships/scholarship.schema.js';
 import { CardSnapshot, SavedScholarship } from './saved-scholarship.schema.js';
@@ -158,8 +162,6 @@ function snapshotOf(scholarship: Scholarship): CardSnapshot {
     deadline: scholarship.deadline,
     lastVerified: scholarship.lastVerified.toISOString(),
     confidence: scholarship.confidence,
-    extraRequirements: scholarship.extraRequirements.map(
-      ({ text, sourceText }) => ({ text, sourceText }),
-    ),
+    extraRequirements: plainExtraRequirements(scholarship.extraRequirements),
   };
 }

@@ -1,3 +1,4 @@
+import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import { DATE, MONEY, STATE_NAMES, toClass } from './normalise.js';
 
@@ -18,14 +19,13 @@ export type FieldRule = (sentences: string[]) => Found | undefined;
 const ELIGIBILITY_WORDS =
   /eligib|girls?\b|boys?\b|women|female|\bmale\b|class|grade|standard|income|category|marks|%|studying|school/i;
 
+// Op and changeability come from the field, as for every Criterion.
 function found(
   field: string,
-  op: Criterion['op'],
   raw: string | string[],
   sourceText: string,
-  changeable: boolean,
 ): Found {
-  return { field, op, raw, changeable, sourceText };
+  return { field, raw, sourceText, ...CRITERION_FIELDS[field] };
 }
 
 const FEMALE = /\b(girls?|women|female|daughters?)\b/i;
@@ -36,8 +36,8 @@ const MALE = /\b(boys?|male|sons?)\b/i;
 const genderRule: FieldRule = (sentences) => {
   const female = sentences.find((s) => FEMALE.test(s));
   const male = sentences.find((s) => MALE.test(s));
-  if (female && !male) return found('gender', 'eq', 'female', female, false);
-  if (male && !female) return found('gender', 'eq', 'male', male, false);
+  if (female && !male) return found('gender', 'female', female);
+  if (male && !female) return found('gender', 'male', male);
   return undefined;
 };
 
@@ -69,7 +69,7 @@ const classRule: FieldRule = (sentences) => {
     const labels = [];
     for (let level = widest.from; level <= widest.to; level++)
       labels.push(String(level));
-    return found('class', 'in', labels, widest.sentence, true);
+    return found('class', labels, widest.sentence);
   }
   let best: { level: number; label: string; sentence: string } | undefined;
   for (const sentence of sentences) {
@@ -78,7 +78,7 @@ const classRule: FieldRule = (sentences) => {
       if (!best || level > best.level) best = { level, label, sentence };
     }
   }
-  return best && found('class', 'in', [best.label], best.sentence, true);
+  return best && found('class', [best.label], best.sentence);
 };
 
 // "parental income ... not more than ₹3,50,000/-", "income below Rs.2.5
@@ -92,7 +92,7 @@ const INCOME_LIMIT = new RegExp(
 const incomeRule: FieldRule = (sentences) => {
   for (const sentence of sentences) {
     const m = sentence.match(INCOME_LIMIT);
-    if (m) return found('incomeBand', 'lte', m[1], sentence, false);
+    if (m) return found('incomeBand', m[1], sentence);
   }
   return undefined;
 };
@@ -117,7 +117,7 @@ function marksRule(field: 'class10Marks' | 'latestMarks'): FieldRule {
       if (NAMES_CLASS_10.test(sentence) !== (field === 'class10Marks'))
         continue;
       const m = sentence.match(MIN_PERCENT);
-      if (m) return found(field, 'gte', m[1] ?? m[2] ?? m[3], sentence, true);
+      if (m) return found(field, m[1] ?? m[2] ?? m[3], sentence);
     }
     return undefined;
   };
@@ -135,7 +135,7 @@ const schoolTypeRule: FieldRule = (sentences) => {
       types.push('government');
     if (/\baided\b/i.test(sentence)) types.push('aided');
     if (/\bprivate\b/i.test(sentence)) types.push('private');
-    if (types.length) return found('schoolType', 'in', types, sentence, false);
+    if (types.length) return found('schoolType', types, sentence);
   }
   return undefined;
 };
@@ -145,7 +145,6 @@ const schoolTypeRule: FieldRule = (sentences) => {
 // its value is every option that sentence names.
 interface KeywordField {
   field: string;
-  op: 'eq' | 'in';
   // The sentence must say this before its options count.
   cue?: RegExp;
   // Sentences about relaxations and quotas don't restrict who may apply.
@@ -158,7 +157,6 @@ const STUDENTS = String.raw`(?:[Ss]tudents?|[Cc]andidates?|[Aa]pplicants?|[Cc]hi
 const KEYWORD_FIELDS: KeywordField[] = [
   {
     field: 'category',
-    op: 'in',
     cue: new RegExp(
       String.raw`\b[Bb]elong(?:s|ing)? to\b|\b[Cc]ategor(?:y|ies)\b|\b(?:SC|ST|OBC|EWS)(?:\s*[/,]\s*(?:SC|ST|OBC|EWS))*\s+${STUDENTS}\b|\b[Ss]chedul(?:e|ed) (?:[Cc]astes?|[Tt]ribes?) ${STUDENTS}\b`,
     ),
@@ -172,7 +170,6 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'minority',
-    op: 'eq',
     skip: /reserv|quota/i,
     options: [
       [
@@ -183,7 +180,6 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'disability',
-    op: 'eq',
     options: [
       [
         'yes',
@@ -193,25 +189,21 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'singleGirlChild',
-    op: 'eq',
     options: [['yes', /\b(?:single|only) girl child\b/i]],
   },
   {
     field: 'citizenship',
-    op: 'eq',
     options: [
       ['indian', /\bindian (?:national|citizen)s?\b|\bcitizens? of india\b/i],
     ],
   },
   {
     field: 'domicileState',
-    op: 'in',
     cue: /\bdomicile|\bdomiciled\b|\b(?:permanent )?residents? of\b/i,
     options: STATE_NAMES,
   },
   {
     field: 'stream',
-    op: 'in',
     cue: /\bstreams?\b/i,
     options: [
       ['science', /\bscience\b/i],
@@ -221,7 +213,6 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'board',
-    op: 'in',
     options: [
       ['cbse', /\bCBSE\b/],
       ['cisce', /\bCISCE\b|\bICSE\b/],
@@ -232,7 +223,6 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'parentOccupation',
-    op: 'in',
     options: [
       [
         'defence',
@@ -251,7 +241,6 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'examsQualified',
-    op: 'in',
     cue: /\bqualif/i,
     options: [
       ['nmms', /\bNMMSS?\b|\bnational means[- ]cum[- ]merit\b/i],
@@ -269,8 +258,8 @@ function keywordRule(spec: KeywordField): FieldRule {
         .filter(([, pattern]) => pattern.test(sentence))
         .map(([raw]) => raw);
       if (named.length === 0) continue;
-      const raw = spec.op === 'eq' ? named[0] : named;
-      return found(spec.field, spec.op, raw, sentence, false);
+      const raw = CRITERION_FIELDS[spec.field].op === 'eq' ? named[0] : named;
+      return found(spec.field, raw, sentence);
     }
     return undefined;
   };
