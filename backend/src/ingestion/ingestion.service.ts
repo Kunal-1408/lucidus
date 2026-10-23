@@ -187,13 +187,15 @@ export class IngestionService implements OnApplicationBootstrap {
     );
     if (same.matchedCount > 0) return 'unchanged';
 
-    const { criteria, amountText } = await this.extractor.extract(text);
+    const { criteria, amountText, deadline } =
+      await this.extractor.extract(text);
     const confidence = weakest(criteria);
     const scholarship: Scholarship = {
       name: entry.name,
       provider: entry.provider,
       type: entry.scholarshipType,
       amountText,
+      ...(deadline && { deadline }),
       officialUrl: entry.officialUrl,
       ...key,
       contentHash,
@@ -205,7 +207,12 @@ export class IngestionService implements OnApplicationBootstrap {
       criteria,
       extraRequirements: [],
     };
-    await this.scholarships.updateOne(key, scholarship, { upsert: true });
+    // A deadline the changed page no longer states must not linger.
+    await this.scholarships.updateOne(
+      key,
+      deadline ? scholarship : { $set: scholarship, $unset: { deadline: 1 } },
+      { upsert: true },
+    );
     return 'extracted';
   }
 }

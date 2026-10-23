@@ -1,0 +1,311 @@
+import type { Criterion } from '../scholarships/scholarship.schema.js';
+import { DATE, MONEY, STATE_NAMES, toClass } from './normalise.js';
+
+// What a rule found, before normalisation: the raw value as the source
+// wrote it ("₹3,50,000/-", "IX", "Andhra Pradesh") and its sentence.
+export interface Found {
+  field: string;
+  op: Criterion['op'];
+  raw: string | string[];
+  changeable: boolean;
+  sourceText: string;
+}
+
+export type FieldRule = (sentences: string[]) => Found | undefined;
+
+// The sentence filter: eligibility words, plus every keyword rule's words
+// (see isEligibilitySentence below).
+const ELIGIBILITY_WORDS =
+  /eligib|girls?\b|boys?\b|women|female|\bmale\b|class|grade|standard|income|category|marks|%|studying|school/i;
+
+function found(
+  field: string,
+  op: Criterion['op'],
+  raw: string | string[],
+  sourceText: string,
+  changeable: boolean,
+): Found {
+  return { field, op, raw, changeable, sourceText };
+}
+
+const FEMALE = /\b(girls?|women|female|daughters?)\b/i;
+const MALE = /\b(boys?|male|sons?)\b/i;
+
+// A source naming only girls (or only boys) gets a gender Criterion; one
+// naming both, or neither, gets none.
+const genderRule: FieldRule = (sentences) => {
+  const female = sentences.find((s) => FEMALE.test(s));
+  const male = sentences.find((s) => MALE.test(s));
+  if (female && !male) return found('gender', 'eq', 'female', female, false);
+  if (male && !female) return found('gender', 'eq', 'male', male, false);
+  return undefined;
+};
+
+const CLASS_MENTION =
+  /\b(?:class|grade|std\.?|standard)\s*(9|10|11|12|ix|x|xi|xii)(?:th)?\b/gi;
+const LEVEL = String.raw`(\d{1,2}|ix|x|xi|xii)(?:st|nd|rd|th)?`;
+// "Class 9-12", "classes 9th to 12th", "standard IX to XII".
+const CLASS_RANGE = new RegExp(
+  String.raw`\b(?:class(?:es)?|grades?|std\.?|standards?)\s*${LEVEL}\s*(?:to|-|–)\s*(?:class\s*)?${LEVEL}\b`,
+  'i',
+);
+
+// A stated range of classes wins, the widest if there are several (a narrow
+// one is often a promotion, "from class 9th to class 10th"). Otherwise, when
+// a source names several classes, the highest is the one the Student must be
+// in; the lower ones are earlier qualifications ("Passed class 10").
+const classRule: FieldRule = (sentences) => {
+  let widest: { from: number; to: number; sentence: string } | undefined;
+  for (const sentence of sentences) {
+    const m = sentence.match(CLASS_RANGE);
+    const from = m && toClass(m[1]);
+    const to = m && toClass(m[2]);
+    if (from && to && from < to) {
+      if (!widest || to - from > widest.to - widest.from)
+        widest = { from, to, sentence };
+    }
+  }
+  if (widest) {
+    const labels = [];
+    for (let level = widest.from; level <= widest.to; level++)
+      labels.push(String(level));
+    return found('class', 'in', labels, widest.sentence, true);
+  }
+  let best: { level: number; label: string; sentence: string } | undefined;
+  for (const sentence of sentences) {
+    for (const [, label] of sentence.matchAll(CLASS_MENTION)) {
+      const level = toClass(label) ?? 0;
+      if (!best || level > best.level) best = { level, label, sentence };
+    }
+  }
+  return best && found('class', 'in', [best.label], best.sentence, true);
+};
+
+// "parental income ... not more than ₹3,50,000/-", "income below Rs.2.5
+// lakh": an upper limit on family income.
+const INCOME_LIMIT = new RegExp(
+  String.raw`\bincome\b[^.]{0,80}?\b(?:not more than|not exceeding|does not exceed|should not exceed|not exceed|less than|below|up to|upto|within|under|maximum of|limit of|ceiling of)\b[^.\d₹]{0,40}?` +
+    `(${MONEY.source})`,
+  'i',
+);
+
+const incomeRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const m = sentence.match(INCOME_LIMIT);
+    if (m) return found('incomeBand', 'lte', m[1], sentence, false);
+  }
+  return undefined;
+};
+
+// "minimum of 60% marks", "at least 75%", "80% or above".
+const MIN_PERCENT =
+  /\b(?:minimum(?: of)?|at least|not less than)\s*(\d{2,3}(?:\.\d+)?)\s*%|\b(\d{2,3}(?:\.\d+)?)\s*%\s*(?:marks\s*)?(?:or above|or more|and above)/i;
+// Cut-offs in a selection test, or marks in a class before Class 9, are not
+// marks a Student's Profile records.
+const NOT_PROFILE_MARKS =
+  /\btests?\b|\bMAT\b|\bSAT\b|\b(?:class|grade|std\.?|standard)\s*(?:[1-8]|i{1,3}|iv|vi{0,3})(?:st|nd|rd|th)?\b/i;
+const NAMES_CLASS_10 =
+  /\b(?:class|grade|std\.?|standard)\s*(?:10|x)(?:th)?\b|\bSSC\b|\bmatric/i;
+
+// Marks naming Class 10 check Class 10 marks; any other marks check the
+// latest. A Student can still raise their marks, so both are changeable.
+function marksRule(field: 'class10Marks' | 'latestMarks'): FieldRule {
+  return (sentences) => {
+    for (const sentence of sentences) {
+      if (NOT_PROFILE_MARKS.test(sentence)) continue;
+      if (NAMES_CLASS_10.test(sentence) !== (field === 'class10Marks'))
+        continue;
+      const m = sentence.match(MIN_PERCENT);
+      if (m) return found(field, 'gte', m[1] ?? m[2], sentence, true);
+    }
+    return undefined;
+  };
+}
+
+// "studying ... in a Government, Government-aided and local body school".
+// Only where the Student studies now: "Passed class 10 from a government
+// school" is an earlier qualification.
+const schoolTypeRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    if (!/\bstudying\b/i.test(sentence) || !/\bschools?\b/i.test(sentence))
+      continue;
+    const types = [];
+    if (/\bgovernment\b(?![\s-]*aided)/i.test(sentence))
+      types.push('government');
+    if (/\baided\b/i.test(sentence)) types.push('aided');
+    if (/\bprivate\b/i.test(sentence)) types.push('private');
+    if (types.length) return found('schoolType', 'in', types, sentence, false);
+  }
+  return undefined;
+};
+
+// A field whose values a source names in regular words. The first sentence
+// that both cues the field and names one of its options gives the Criterion;
+// its value is every option that sentence names.
+interface KeywordField {
+  field: string;
+  op: 'eq' | 'in';
+  // The sentence must say this before its options count.
+  cue?: RegExp;
+  // Sentences about relaxations and quotas don't restrict who may apply.
+  skip?: RegExp;
+  options: [raw: string, pattern: RegExp][];
+}
+
+const STUDENTS = String.raw`(?:[Ss]tudents?|[Cc]andidates?|[Aa]pplicants?|[Cc]hildren|[Ww]ards)`;
+
+const KEYWORD_FIELDS: KeywordField[] = [
+  {
+    field: 'category',
+    op: 'in',
+    cue: new RegExp(
+      String.raw`\b[Bb]elong(?:s|ing)? to\b|\b[Cc]ategor(?:y|ies)\b|\b(?:SC|ST|OBC|EWS)(?:\s*[/,]\s*(?:SC|ST|OBC|EWS))*\s+${STUDENTS}\b|\b[Ss]chedul(?:e|ed) (?:[Cc]astes?|[Tt]ribes?) ${STUDENTS}\b`,
+    ),
+    skip: /relax|cut-?off|reserv|quota/i,
+    options: [
+      ['sc', /\bSC\b|\b[Ss]chedul(?:e|ed) [Cc]astes?\b/],
+      ['st', /\bST\b|\b[Ss]chedul(?:e|ed) [Tt]ribes?\b/],
+      ['obc', /\bOBC\b|\b[Oo]ther [Bb]ackward [Cc]lass(?:es)?\b/],
+      ['ews', /\bEWS\b/],
+    ],
+  },
+  {
+    field: 'minority',
+    op: 'eq',
+    skip: /reserv|quota/i,
+    options: [
+      [
+        'yes',
+        /\bminority communit(?:y|ies)\b|\bminorities\b|\bminority students\b/i,
+      ],
+    ],
+  },
+  {
+    field: 'disability',
+    op: 'eq',
+    options: [
+      [
+        'yes',
+        /\b(?:students?|persons?|people|candidates?|children) with (?:benchmark )?disabilit(?:y|ies)\b|\bdifferently[- ]abled\b|\bPwDs?\b|\bdivyang/i,
+      ],
+    ],
+  },
+  {
+    field: 'singleGirlChild',
+    op: 'eq',
+    options: [['yes', /\b(?:single|only) girl child\b/i]],
+  },
+  {
+    field: 'citizenship',
+    op: 'eq',
+    options: [
+      ['indian', /\bindian (?:national|citizen)s?\b|\bcitizens? of india\b/i],
+    ],
+  },
+  {
+    field: 'domicileState',
+    op: 'in',
+    cue: /\bdomicile|\bdomiciled\b|\b(?:permanent )?residents? of\b/i,
+    options: STATE_NAMES,
+  },
+  {
+    field: 'stream',
+    op: 'in',
+    cue: /\bstreams?\b/i,
+    options: [
+      ['science', /\bscience\b/i],
+      ['commerce', /\bcommerce\b/i],
+      ['arts', /\barts\b|\bhumanities\b/i],
+    ],
+  },
+  {
+    field: 'board',
+    op: 'in',
+    options: [
+      ['cbse', /\bCBSE\b/],
+      ['cisce', /\bCISCE\b|\bICSE\b/],
+      ['state', /\bstate boards?\b/i],
+      ['ib', /\bInternational Baccalaureate\b/i],
+      ['cambridge', /\bIGCSE\b|\bCambridge (?:board|international)\b/i],
+    ],
+  },
+  {
+    field: 'parentOccupation',
+    op: 'in',
+    options: [
+      [
+        'defence',
+        /\bex-?servicem[ae]n\b|\bdefence personnel\b|\barmed forces\b/i,
+      ],
+      [
+        'central_armed_police',
+        /\bcentral armed police\b|\bCAPFs?\b|\bAssam Rifles\b/i,
+      ],
+      ['construction_worker', /\bconstruction workers?\b/i],
+      [
+        'beedi_cine_mine_worker',
+        /\b(?:beedi|cine|mine)\b[^.]{0,30}\bworkers?\b/i,
+      ],
+    ],
+  },
+  {
+    field: 'examsQualified',
+    op: 'in',
+    cue: /\bqualif/i,
+    options: [
+      ['nmms', /\bNMMSS?\b|\bnational means[- ]cum[- ]merit\b/i],
+      ['olympiad', /\bolympiads?\b/i],
+    ],
+  },
+];
+
+function keywordRule(spec: KeywordField): FieldRule {
+  return (sentences) => {
+    for (const sentence of sentences) {
+      if (spec.cue && !spec.cue.test(sentence)) continue;
+      if (spec.skip?.test(sentence)) continue;
+      const named = spec.options
+        .filter(([, pattern]) => pattern.test(sentence))
+        .map(([raw]) => raw);
+      if (named.length === 0) continue;
+      const raw = spec.op === 'eq' ? named[0] : named;
+      return found(spec.field, spec.op, raw, sentence, false);
+    }
+    return undefined;
+  };
+}
+
+const DEADLINE_CUE =
+  /\b(?:last date|deadline|closing date|apply (?:by|before)|open till|closes on|on or before|due date)\b/i;
+
+// The sentence stating the last date a Student can apply, if any. Dates for
+// officials ("Institute Verification Open till") are not the deadline.
+export function deadlineSentence(sentences: string[]): string | undefined {
+  return sentences.find(
+    (s) => DEADLINE_CUE.test(s) && !/verification/i.test(s) && DATE.test(s),
+  );
+}
+
+// Every field rule, each finding at most one Criterion.
+export const FIELD_RULES: FieldRule[] = [
+  genderRule,
+  classRule,
+  incomeRule,
+  marksRule('class10Marks'),
+  marksRule('latestMarks'),
+  schoolTypeRule,
+  ...KEYWORD_FIELDS.map(keywordRule),
+];
+
+// A sentence is worth reading if it uses a word some rule looks for.
+const RULE_WORDS = KEYWORD_FIELDS.flatMap((spec) => [
+  ...(spec.cue ? [spec.cue] : []),
+  ...spec.options.map(([, pattern]) => pattern),
+]);
+
+export function isEligibilitySentence(sentence: string): boolean {
+  return (
+    ELIGIBILITY_WORDS.test(sentence) ||
+    RULE_WORDS.some((pattern) => pattern.test(sentence))
+  );
+}

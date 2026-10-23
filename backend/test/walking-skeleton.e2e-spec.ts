@@ -40,6 +40,8 @@ describe('Seed → ingest → match', () => {
         amountText: 'Rs. 30,000 per annum',
         officialUrl: SANTOOR,
         lastVerified: '2026-07-20T09:00:00.000Z',
+        deadline: '2026-10-15',
+        deadlineStatus: 'open',
       }),
     ]);
   });
@@ -54,7 +56,7 @@ describe('Seed → ingest → match', () => {
       expect.objectContaining({
         name: "Santoor Women's Scholarship",
         goals: ['Eligible from next year: watch for the next round'],
-        deadlineStatus: 'not_announced',
+        deadlineStatus: 'open',
       }),
     ]);
   });
