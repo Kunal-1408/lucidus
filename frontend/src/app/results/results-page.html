@@ -30,6 +30,11 @@
     }
     <p class="verified">Last verified {{ card.lastVerified | date: 'd MMM y' }}</p>
     <a [href]="card.officialUrl" target="_blank" rel="noopener">Official site</a>
+    @if (savedIds().has(card.id)) {
+      <a class="saved" routerLink="/saved">Saved</a>
+    } @else {
+      <button type="button" class="save" (click)="save(card)">Save</button>
+    }
   </article>
 </ng-template>
 

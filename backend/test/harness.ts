@@ -41,6 +41,9 @@ export interface Harness {
   // Stops the app mid-flight and starts a fresh one on the same database,
   // like the host sleeping and waking.
   restart: () => Promise<void>;
+  // A collection's model, for seeding state a test can't reach through the
+  // API (e.g. the needs-review flag). Never for asserting.
+  model: <T>(name: string) => Model<T>;
   close: () => Promise<void>;
 }
 
@@ -93,6 +96,7 @@ export async function startApp(options: HarnessOptions): Promise<Harness> {
       web.abandonHeld();
       app = await createApp(web, clock);
     },
+    model: <T>(name: string) => app.get<Model<T>>(getModelToken(name)),
     close: async () => {
       await app.close();
       await mongo.stop();

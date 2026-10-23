@@ -15,6 +15,11 @@ import {
 import { IngestionService } from './ingestion/ingestion.service.js';
 import { MatchController } from './match/match.controller.js';
 import {
+  SavedScholarship,
+  SavedScholarshipSchema,
+} from './saved/saved-scholarship.schema.js';
+import { SavedController } from './saved/saved.controller.js';
+import {
   Scholarship,
   ScholarshipSchema,
 } from './scholarships/scholarship.schema.js';
@@ -44,6 +49,7 @@ const FRONTEND_DIST = join(
       { name: Scholarship.name, schema: ScholarshipSchema },
       { name: WatchlistEntry.name, schema: WatchlistEntrySchema },
       { name: IngestionRun.name, schema: IngestionRunSchema },
+      { name: SavedScholarship.name, schema: SavedScholarshipSchema },
     ]),
     ...(existsSync(FRONTEND_DIST)
       ? [
@@ -54,7 +60,12 @@ const FRONTEND_DIST = join(
         ]
       : []),
   ],
-  controllers: [AppController, MatchController, AdminController],
+  controllers: [
+    AppController,
+    MatchController,
+    AdminController,
+    SavedController,
+  ],
   providers: [
     WatchlistSeeder,
     Fetcher,
