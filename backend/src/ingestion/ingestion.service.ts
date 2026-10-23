@@ -8,11 +8,8 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model, type QueryFilter, Types } from 'mongoose';
 import { CLOCK, type Clock } from '../clock.js';
-import {
-  ConfidenceLevel,
-  Criterion,
-  Scholarship,
-} from '../scholarships/scholarship.schema.js';
+import { scholarshipConfidence } from '../scholarships/confidence.js';
+import { Scholarship } from '../scholarships/scholarship.schema.js';
 import type { ScholarshipKey } from '../scholarships/scholarship-key.js';
 import { UniversityPointersService } from '../universities/university-pointers.service.js';
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
@@ -275,7 +272,7 @@ export class IngestionService implements OnApplicationBootstrap {
     // Structured JSON Criteria (high) replace any extracted one for the same
     // field, so an LLM value there can't lower the Scholarship's Confidence.
     const criteria = withStructured(structured, extraction.criteria);
-    const confidence = weakest(criteria);
+    const confidence = scholarshipConfidence(criteria);
     const scholarship: Scholarship = {
       name: schemeName,
       provider: entry.provider,
@@ -305,13 +302,4 @@ export class IngestionService implements OnApplicationBootstrap {
 
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
-}
-
-const RANK: Record<ConfidenceLevel, number> = { low: 0, medium: 1, high: 2 };
-
-function weakest(criteria: Criterion[]): ConfidenceLevel {
-  return criteria.reduce<ConfidenceLevel>(
-    (lowest, c) => (RANK[c.confidence] < RANK[lowest] ? c.confidence : lowest),
-    'high',
-  );
 }
