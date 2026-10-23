@@ -2,7 +2,7 @@
 
 **What to build:** From a Scholarship's cleaned text, the Extractor finds as many Criteria as it can with rules alone: a sentence filter followed by regex rules, with values normalised onto the fixed lists. Rule-found values are high confidence. Amount text and deadline are found by regex where the text states them.
 
-**Blocked by:** 01
+**Blocked by:** 01,05
 
 **Status:** ready-for-agent
 
