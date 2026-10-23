@@ -18,6 +18,7 @@ import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
 import { EXTRACTOR, type Extractor } from './extractor.js';
 import { Fetcher } from './fetcher.js';
 import { IngestionRun } from './ingestion-run.schema.js';
+import { Section, split } from './splitter.js';
 import {
   RunCounts,
   RunSummary,
@@ -29,8 +30,8 @@ export type StartResult =
   { started: true; runId: string } | { started: false; runId: string };
 
 // Orchestrates Ingestion runs: one at a time, in the background, each
-// fetching every Watchlist source, extracting its Scholarship and upserting
-// it as soon as it is done, while recording a summary as it goes.
+// fetching every Watchlist source, splitting it into one section per
+// Scholarship, extracting each and upserting it as soon as it is done, while recording a summary as it goes.
 @Injectable()
 export class IngestionService implements OnApplicationBootstrap {
   private readonly logger = new Logger(IngestionService.name);
@@ -102,7 +103,10 @@ export class IngestionService implements OnApplicationBootstrap {
     const counts = zeroCounts();
     const sources: SourceOutcome[] = [];
     try {
-      for (const entry of await this.watchlist.find().lean()) {
+      const entries = await this.watchlist.find().lean();
+      await this.retireRemovedSources(entries, counts);
+      await this.runs.updateOne({ _id: id }, { counts });
+      for (const entry of entries) {
         const outcome = await this.ingestSource(entry, counts);
         sources.push(outcome);
         await this.watchlist.updateOne(
@@ -117,6 +121,19 @@ export class IngestionService implements OnApplicationBootstrap {
       this.logger.error(`Ingestion run ${id.toHexString()} failed`, err);
       await this.finish(id, 'failed').catch(() => undefined);
     }
+  }
+
+  // Scholarships whose source was deleted from the Watchlist drop out of
+  // results; like every Scholarship, they are never deleted.
+  private async retireRemovedSources(
+    entries: WatchlistEntry[],
+    counts: RunCounts,
+  ): Promise<void> {
+    const retired = await this.scholarships.updateMany(
+      { sourceUrl: { $nin: entries.map((e) => e.url) }, status: 'active' },
+      { status: 'inactive' },
+    );
+    counts.inactive += retired.modifiedCount;
   }
 
   // University pointers come from WorqNow, not the Watchlist; a country that
@@ -185,18 +202,41 @@ export class IngestionService implements OnApplicationBootstrap {
       return { url, result: 'needs_js' };
     }
 
-    const done = await this.upsertScholarship(entry, fetched.text);
-    counts[done]++;
-    return { url, result: done === 'unchanged' ? 'unchanged' : 'ok' };
+    const sections = split(entry, fetched);
+    if (sections.length === 0) {
+      // A split rule that finds nothing usually means the page was
+      // redesigned: flag it rather than wipe its Scholarships.
+      counts.empty++;
+      return { url, result: 'empty' };
+    }
+    let extracted = 0;
+    for (const section of sections) {
+      const done = await this.upsertScholarship(entry, section);
+      counts[done]++;
+      if (done === 'extracted') extracted++;
+    }
+    // A scheme the source no longer lists drops out of results; a renamed
+    // one goes this way too and comes back above as a new Scholarship.
+    const dropped = await this.scholarships.updateMany(
+      {
+        sourceUrl: url,
+        status: 'active',
+        schemeName: { $nin: sections.map((s) => s.schemeName) },
+      },
+      { status: 'inactive' },
+    );
+    counts.inactive += dropped.modifiedCount;
+    return { url, result: extracted > 0 ? 'ok' : 'unchanged' };
   }
 
-  // Extracts and upserts one Scholarship, unless its content hash shows the
-  // text is the same as last time; then only its last verified date moves.
+  // Extracts and upserts one section's Scholarship, unless its content hash
+  // shows the text is the same as last time; then only its last verified
+  // date moves.
   private async upsertScholarship(
     entry: WatchlistEntry,
-    text: string,
+    { schemeName, text, officialUrl }: Section,
   ): Promise<'unchanged' | 'extracted'> {
-    const key = { sourceUrl: entry.url, schemeName: entry.name };
+    const key = { sourceUrl: entry.url, schemeName };
     const contentHash = sha256(text);
     const same = await this.scholarships.updateOne(
       { ...key, contentHash },
@@ -208,11 +248,11 @@ export class IngestionService implements OnApplicationBootstrap {
     const { criteria, amountText } = await this.extractor.extract(text);
     const confidence = weakest(criteria);
     const scholarship: Scholarship = {
-      name: entry.name,
+      name: schemeName,
       provider: entry.provider,
       type: entry.scholarshipType,
       amountText,
-      officialUrl: entry.officialUrl,
+      officialUrl: officialUrl ?? entry.officialUrl,
       ...key,
       contentHash,
       lastVerified: this.clock.now(),
