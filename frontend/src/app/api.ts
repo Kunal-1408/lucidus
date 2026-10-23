@@ -1,15 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { Profile, profileForMatch } from './profile-fields';
 
 // Request and response types, duplicated from the backend on purpose:
 // there is no shared types package.
 
-// Every field is optional; more fields arrive with the full Profile form.
-export interface Profile {
-  class?: 9 | 10 | 11 | 12;
-  gender?: 'female' | 'male' | 'other';
-}
+export type { Profile } from './profile-fields';
 
 export interface Card {
   id: string;
@@ -39,7 +36,8 @@ export interface MatchResult {
 export class Api {
   private readonly http = inject(HttpClient);
 
+  // The only call that ever carries the Profile off the device.
   match(profile: Profile): Observable<MatchResult> {
-    return this.http.post<MatchResult>('/api/match', profile);
+    return this.http.post<MatchResult>('/api/match', profileForMatch(profile));
   }
 }
