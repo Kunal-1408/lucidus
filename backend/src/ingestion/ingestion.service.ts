@@ -18,6 +18,7 @@ import { UniversityPointersService } from '../universities/university-pointers.s
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
 import { EXTRACTOR, type Extractor } from './extractor.js';
 import { Fetcher } from './fetcher.js';
+import { withStructured } from './json-source.js';
 import { IngestionRun } from './ingestion-run.schema.js';
 import { Section, split } from './splitter.js';
 import {
@@ -239,7 +240,7 @@ export class IngestionService implements OnApplicationBootstrap {
   // date moves.
   private async upsertScholarship(
     entry: WatchlistEntry,
-    { schemeName, text, officialUrl }: Section,
+    { schemeName, text, officialUrl, criteria: structured }: Section,
   ): Promise<'unchanged' | 'extracted'> {
     const key: ScholarshipKey = { sourceUrl: entry.url, schemeName };
     const contentHash = sha256(text);
@@ -250,8 +251,9 @@ export class IngestionService implements OnApplicationBootstrap {
     );
     if (same.matchedCount > 0) return 'unchanged';
 
-    const { criteria, amountText, deadline } =
-      await this.extractor.extract(text);
+    const extraction = await this.extractor.extract(text);
+    const { amountText, deadline } = extraction;
+    const criteria = withStructured(structured, extraction.criteria);
     const confidence = weakest(criteria);
     const scholarship: Scholarship = {
       name: schemeName,
