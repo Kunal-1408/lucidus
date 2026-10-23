@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { AdminController } from './admin/admin.controller.js';
+import { ReviewController } from './admin/review.controller.js';
 import { WatchlistController } from './admin/watchlist.controller.js';
 import { AppController } from './app.controller.js';
 import { CLOCK, systemClock } from './clock.js';
@@ -75,6 +76,7 @@ const FRONTEND_DIST = join(
     MatchController,
     AdminController,
     WatchlistController,
+    ReviewController,
     SavedController,
   ],
   providers: [
