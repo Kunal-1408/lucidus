@@ -18,6 +18,7 @@ import { UniversityPointersService } from '../universities/university-pointers.s
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
 import { EXTRACTOR, type Extractor } from './extractor.js';
 import { Fetcher } from './fetcher.js';
+import { withStructured } from './json-source.js';
 import { IngestionRun } from './ingestion-run.schema.js';
 import { Section, split } from './splitter.js';
 import {
@@ -255,7 +256,7 @@ export class IngestionService implements OnApplicationBootstrap {
   // date moves.
   private async upsertScholarship(
     entry: WatchlistEntry,
-    { schemeName, text, officialUrl }: Section,
+    { schemeName, text, officialUrl, criteria: structured }: Section,
   ): Promise<'unchanged' | 'extracted'> {
     const key: ScholarshipKey = { sourceUrl: entry.url, schemeName };
     const contentHash = sha256(text);
@@ -269,8 +270,11 @@ export class IngestionService implements OnApplicationBootstrap {
     // A failed extraction throws before anything is written: a new
     // Scholarship isn't stored, a changed one keeps its previous version,
     // and with no new hash saved the next run tries again.
-    const { criteria, extraRequirements, amountText, deadline } =
-      await this.extractor.extract(text);
+    const extraction = await this.extractor.extract(text);
+    const { extraRequirements, amountText, deadline } = extraction;
+    // Structured JSON Criteria (high) replace any extracted one for the same
+    // field, so an LLM value there can't lower the Scholarship's Confidence.
+    const criteria = withStructured(structured, extraction.criteria);
     const confidence = weakest(criteria);
     const scholarship: Scholarship = {
       name: schemeName,
