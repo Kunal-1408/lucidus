@@ -36,9 +36,47 @@ label {
 }
 
 select,
+input[type='number'],
 button {
   font: inherit;
   padding: 0.5rem;
+}
+
+.more {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  padding: 0.75rem 1rem;
+}
+
+.more summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.more-fields {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+legend {
+  font-weight: 600;
+}
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
 }
 
 button {
@@ -77,4 +115,47 @@ a {
 
 .amount {
   font-weight: 600;
+}
+
+.goal {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.deadline,
+.missing {
+  font-size: 0.9rem;
+}
+
+.closing-soon {
+  font-weight: 600;
+}
+
+.pointers-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.card.pointer {
+  padding: 0.6rem 1rem;
+}
+
+.card .save,
+.card .remove,
+.card .saved {
+  margin-left: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--page);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.card.snapshot {
+  border-style: dashed;
 }

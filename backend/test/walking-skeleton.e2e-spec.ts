@@ -1,4 +1,4 @@
-import { ADMIN_TOKEN, Harness, startApp } from './harness.js';
+import { Harness, startApp } from './harness.js';
 
 const SANTOOR = 'https://www.santoorscholarships.com/';
 
@@ -24,12 +24,8 @@ describe('Seed → ingest → match', () => {
   });
 
   it('ingests the seeded Watchlist entry', async () => {
-    const res = await harness
-      .http()
-      .post('/api/admin/ingest')
-      .set('x-admin-token', ADMIN_TOKEN)
-      .expect(200);
-    expect(res.body.sources).toEqual([{ url: SANTOOR, result: 'ok' }]);
+    const summary = await harness.ingest();
+    expect(summary.sources).toEqual([{ url: SANTOOR, result: 'ok' }]);
   });
 
   it('matches a Profile whose gender and class pass as Eligible', async () => {
@@ -44,6 +40,23 @@ describe('Seed → ingest → match', () => {
         amountText: 'Rs. 30,000 per annum',
         officialUrl: SANTOOR,
         lastVerified: '2026-07-20T09:00:00.000Z',
+        deadline: '2026-10-15',
+        deadlineStatus: 'open',
+      }),
+    ]);
+  });
+
+  it('shows a Class 11 Student the Class 12 scholarship as a next-class card', async () => {
+    const res = await harness
+      .http()
+      .post('/api/match')
+      .send({ gender: 'female', class: 11 })
+      .expect(200);
+    expect(res.body.withinReach).toEqual([
+      expect.objectContaining({
+        name: "Santoor Women's Scholarship",
+        goals: ['Eligible from next year: watch for the next round'],
+        deadlineStatus: 'open',
       }),
     ]);
   });

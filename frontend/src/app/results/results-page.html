@@ -1,18 +1,78 @@
 <a routerLink="/">← Change my answers</a>
 <h1>Your scholarships</h1>
 
+<ng-template #cardTpl let-card>
+  <article class="card">
+    <h3>{{ card.name }}</h3>
+    <p class="provider">{{ card.provider }}</p>
+    @for (goal of card.goals; track goal) {
+      <p class="goal">{{ goal }}</p>
+    }
+    <p class="amount">{{ card.amountText }}</p>
+    <p class="deadline" [class.closing-soon]="card.deadlineStatus === 'closing_soon'">
+      @switch (card.deadlineStatus) {
+        @case ('open') {
+          Open until {{ card.deadline | date: 'd MMM y' }}
+        }
+        @case ('closing_soon') {
+          Closing soon: {{ card.deadline | date: 'd MMM y' }}
+        }
+        @case ('closed') {
+          This year's round closed {{ card.deadline | date: 'd MMM y' }}
+        }
+        @default {
+          Deadline not announced, check the official site
+        }
+      }
+    </p>
+    @if (card.missing.length) {
+      <p class="missing">Tell us your {{ missingLabels(card) }} to check this one.</p>
+    }
+    <p class="verified">Last verified {{ card.lastVerified | date: 'd MMM y' }}</p>
+    <a [href]="card.officialUrl" target="_blank" rel="noopener">Official site</a>
+    @if (savedIds().has(card.id)) {
+      <a class="saved" routerLink="/saved">Saved</a>
+    } @else {
+      <button type="button" class="save" (click)="save(card)">Save</button>
+    }
+  </article>
+</ng-template>
+
 @if (result(); as r) {
-  <h2>Eligible</h2>
-  @for (card of r.eligible; track card.id) {
-    <article class="card">
-      <h3>{{ card.name }}</h3>
-      <p class="provider">{{ card.provider }}</p>
-      <p class="amount">{{ card.amountText }}</p>
-      <p class="verified">Last verified {{ card.lastVerified | date: 'd MMM y' }}</p>
-      <a [href]="card.officialUrl" target="_blank" rel="noopener">Official site</a>
-    </article>
-  } @empty {
-    <p>No scholarships match every answer yet.</p>
+  <section class="bucket">
+    <h2>Eligible</h2>
+    @for (card of r.eligible; track card.id) {
+      <ng-container *ngTemplateOutlet="cardTpl; context: { $implicit: card }" />
+    } @empty {
+      <p>No scholarships match every answer yet.</p>
+    }
+  </section>
+
+  <section class="bucket">
+    <h2>Within reach</h2>
+    @for (card of r.withinReach; track card.id) {
+      <ng-container *ngTemplateOutlet="cardTpl; context: { $implicit: card }" />
+    } @empty {
+      <p>Nothing within reach right now.</p>
+    }
+  </section>
+
+  <section class="bucket">
+    <h2>Tell us more</h2>
+    @for (card of r.tellUsMore; track card.id) {
+      <ng-container *ngTemplateOutlet="cardTpl; context: { $implicit: card }" />
+    } @empty {
+      <p>No scholarships are waiting on more details.</p>
+    }
+  </section>
+
+  @for (group of r.universityPointers; track group.country) {
+    <section class="pointers">
+      <p class="pointers-label">{{ group.label }}</p>
+      @for (name of group.names; track name) {
+        <article class="card pointer">{{ name }}</article>
+      }
+    </section>
   }
 } @else {
   <p>Checking scholarships…</p>

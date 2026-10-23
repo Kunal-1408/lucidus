@@ -4,15 +4,32 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { AdminController } from './admin/admin.controller.js';
+import { WatchlistController } from './admin/watchlist.controller.js';
 import { AppController } from './app.controller.js';
 import { CLOCK, systemClock } from './clock.js';
+import { EXTRACTOR, ruleExtractor } from './ingestion/extractor.js';
 import { Fetcher, HTTP_FETCH } from './ingestion/fetcher.js';
+import {
+  IngestionRun,
+  IngestionRunSchema,
+} from './ingestion/ingestion-run.schema.js';
 import { IngestionService } from './ingestion/ingestion.service.js';
 import { MatchController } from './match/match.controller.js';
+import {
+  SavedScholarship,
+  SavedScholarshipSchema,
+} from './saved/saved-scholarship.schema.js';
+import { SavedController } from './saved/saved.controller.js';
 import {
   Scholarship,
   ScholarshipSchema,
 } from './scholarships/scholarship.schema.js';
+import {
+  UniversityPointer,
+  UniversityPointerSchema,
+} from './universities/university-pointer.schema.js';
+import { UniversityPointersService } from './universities/university-pointers.service.js';
+import { HttpWorqNowClient, WORQNOW } from './universities/worqnow.js';
 import {
   WatchlistEntry,
   WatchlistEntrySchema,
@@ -38,6 +55,9 @@ const FRONTEND_DIST = join(
     MongooseModule.forFeature([
       { name: Scholarship.name, schema: ScholarshipSchema },
       { name: WatchlistEntry.name, schema: WatchlistEntrySchema },
+      { name: IngestionRun.name, schema: IngestionRunSchema },
+      { name: UniversityPointer.name, schema: UniversityPointerSchema },
+      { name: SavedScholarship.name, schema: SavedScholarshipSchema },
     ]),
     ...(existsSync(FRONTEND_DIST)
       ? [
@@ -48,12 +68,21 @@ const FRONTEND_DIST = join(
         ]
       : []),
   ],
-  controllers: [AppController, MatchController, AdminController],
+  controllers: [
+    AppController,
+    MatchController,
+    AdminController,
+    WatchlistController,
+    SavedController,
+  ],
   providers: [
     WatchlistSeeder,
     Fetcher,
     IngestionService,
+    UniversityPointersService,
+    { provide: WORQNOW, useClass: HttpWorqNowClient },
     { provide: HTTP_FETCH, useValue: globalThis.fetch },
+    { provide: EXTRACTOR, useValue: ruleExtractor },
     { provide: CLOCK, useValue: systemClock },
   ],
 })
