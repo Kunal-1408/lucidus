@@ -148,7 +148,7 @@ function place(
 const CLOSING_SOON_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function deadlineStatus(
+export function deadlineStatus(
   deadline: string | undefined,
   today: string,
 ): DeadlineStatus {

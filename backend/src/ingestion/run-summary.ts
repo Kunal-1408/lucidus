@@ -9,6 +9,8 @@ export const COUNT_NAMES = [
   'inactive', // Scholarships marked inactive
   'failed', // sources left untouched by a fetch or extraction failure
   'needs_js', // sources whose cleaned text was too short to extract from
+  'empty', // many-scholarship sources whose split found no Scholarships
+  'worqnow_failed', // University pointer countries whose WorqNow fetch failed
 ] as const;
 
 export type CountName = (typeof COUNT_NAMES)[number];

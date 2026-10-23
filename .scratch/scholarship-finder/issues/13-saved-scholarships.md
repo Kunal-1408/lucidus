@@ -6,12 +6,16 @@
 
 **Status:** ready-for-agent
 
-- [ ] `POST /api/saved`, `GET /api/saved`, `DELETE /api/saved/:id` keyed by the Visitor ID header
-- [ ] Saving stores a snapshot of the card and its content hash at save time
-- [ ] Active, not under review: live card, with "updated since you saved" when the hash changed
-- [ ] Inactive: snapshot with "No longer listed"
-- [ ] Needs review: snapshot with "Being re-checked" (tests seed the flag directly)
-- [ ] Save button on Results cards; Saved screen lists them and allows removal
-- [ ] Saved items persist across reloads
-- [ ] API-seam tests cover all four card states
+- [x] `POST /api/saved`, `GET /api/saved`, `DELETE /api/saved/:id` keyed by the Visitor ID header
+- [x] Saving stores a snapshot of the card and its content hash at save time
+- [x] Active, not under review: live card, with "updated since you saved" when the hash changed
+- [x] Inactive: snapshot with "No longer listed"
+- [x] Needs review: snapshot with "Being re-checked" (tests seed the flag directly)
+- [x] Save button on Results cards; Saved screen lists them and allows removal
+- [x] Saved items persist across reloads
+- [x] API-seam tests cover all four card states
 - [ ] Deployed to Render; the post-deploy smoke check passes
+
+## Comments
+
+**2026-10-23 (agent):** Built test-first on `feat/13-saved` (`backend/test/saved.e2e-spec.ts`, Seam 1: all four card states plus removal, per-Visitor keying, idempotent save and 400/404 cases). `POST /api/saved` takes `{ scholarshipId }` (the Match card `id`) and returns 201 with the Saved card; saving again returns the existing one. `GET /api/saved` returns `{ id, scholarshipId, savedAt, state, card }[]`, newest first, where `state` is `live | updated | no_longer_listed | being_rechecked` (inactive wins over needs review) and `card` is the live card for the first two and the save-time snapshot otherwise, with `deadlineStatus` worked out on the day of reading. `DELETE /api/saved/:id` answers 204, or 404 for another Visitor's item. Saved items are keyed by source URL plus scheme name, collection `saved_scholarships`. The harness gained `model(name)` for seeding flags like needs review. Frontend: Save button on Results cards, `/saved` screen with badges and Remove, "Saved" link in the header. Left unticked: the Render deploy check.
