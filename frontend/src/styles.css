@@ -139,3 +139,23 @@ a {
 .card.pointer {
   padding: 0.6rem 1rem;
 }
+
+.card .save,
+.card .remove,
+.card .saved {
+  margin-left: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--page);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.card.snapshot {
+  border-style: dashed;
+}
