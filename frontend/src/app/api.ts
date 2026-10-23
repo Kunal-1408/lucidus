@@ -15,8 +15,13 @@ export interface Card {
   amountText: string;
   officialUrl: string;
   deadline?: string;
+  deadlineStatus: 'open' | 'closing_soon' | 'closed' | 'not_announced';
   lastVerified: string;
   confidence: 'high' | 'medium' | 'low';
+  // What would turn a Within reach card Eligible; empty in other buckets.
+  goals: string[];
+  // Profile fields left empty that this scholarship checks.
+  missing: { field: string; label: string }[];
 }
 
 export interface MatchResult {
