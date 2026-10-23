@@ -78,3 +78,17 @@ a {
 .amount {
   font-weight: 600;
 }
+
+.goal {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.deadline,
+.missing {
+  font-size: 0.9rem;
+}
+
+.closing-soon {
+  font-weight: 600;
+}

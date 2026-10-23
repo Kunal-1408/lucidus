@@ -48,6 +48,21 @@ describe('Seed → ingest → match', () => {
     ]);
   });
 
+  it('shows a Class 11 Student the Class 12 scholarship as a next-class card', async () => {
+    const res = await harness
+      .http()
+      .post('/api/match')
+      .send({ gender: 'female', class: 11 })
+      .expect(200);
+    expect(res.body.withinReach).toEqual([
+      expect.objectContaining({
+        name: "Santoor Women's Scholarship",
+        goals: ['Eligible from next year: watch for the next round'],
+        deadlineStatus: 'not_announced',
+      }),
+    ]);
+  });
+
   it.each([
     ['gender', { gender: 'male', class: 12 }],
     ['class', { gender: 'female', class: 11 }],
