@@ -13,6 +13,7 @@ import {
   Criterion,
   Scholarship,
 } from '../scholarships/scholarship.schema.js';
+import { UniversityPointersService } from '../universities/university-pointers.service.js';
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
 import { EXTRACTOR, type Extractor } from './extractor.js';
 import { Fetcher } from './fetcher.js';
@@ -46,6 +47,7 @@ export class IngestionService implements OnApplicationBootstrap {
     private readonly fetcher: Fetcher,
     @Inject(EXTRACTOR) private readonly extractor: Extractor,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly universityPointers: UniversityPointersService,
   ) {}
 
   // A run still marked running at startup was cut off when the host stopped.
@@ -109,11 +111,27 @@ export class IngestionService implements OnApplicationBootstrap {
         );
         await this.runs.updateOne({ _id: id }, { counts, sources });
       }
+      await this.refreshUniversityPointers(id, counts, sources);
       await this.finish(id, 'finished');
     } catch (err) {
       this.logger.error(`Ingestion run ${id.toHexString()} failed`, err);
       await this.finish(id, 'failed').catch(() => undefined);
     }
+  }
+
+  // University pointers come from WorqNow, not the Watchlist; a country that
+  // fails is reported beside the sources but has no Watchlist entry.
+  private async refreshUniversityPointers(
+    id: Types.ObjectId,
+    counts: RunCounts,
+    sources: SourceOutcome[],
+  ) {
+    const failures = await this.universityPointers.refresh();
+    counts.worqnow_failed = failures.length;
+    for (const { country, detail } of failures) {
+      sources.push({ url: `worqnow:${country}`, result: 'failed', detail });
+    }
+    await this.runs.updateOne({ _id: id }, { counts, sources });
   }
 
   private finish(id: Types.ObjectId, state: 'finished' | 'failed') {

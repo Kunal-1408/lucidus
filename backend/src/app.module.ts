@@ -19,6 +19,12 @@ import {
   ScholarshipSchema,
 } from './scholarships/scholarship.schema.js';
 import {
+  UniversityPointer,
+  UniversityPointerSchema,
+} from './universities/university-pointer.schema.js';
+import { UniversityPointersService } from './universities/university-pointers.service.js';
+import { HttpWorqNowClient, WORQNOW } from './universities/worqnow.js';
+import {
   WatchlistEntry,
   WatchlistEntrySchema,
 } from './watchlist/watchlist-entry.schema.js';
@@ -44,6 +50,7 @@ const FRONTEND_DIST = join(
       { name: Scholarship.name, schema: ScholarshipSchema },
       { name: WatchlistEntry.name, schema: WatchlistEntrySchema },
       { name: IngestionRun.name, schema: IngestionRunSchema },
+      { name: UniversityPointer.name, schema: UniversityPointerSchema },
     ]),
     ...(existsSync(FRONTEND_DIST)
       ? [
@@ -59,6 +66,8 @@ const FRONTEND_DIST = join(
     WatchlistSeeder,
     Fetcher,
     IngestionService,
+    UniversityPointersService,
+    { provide: WORQNOW, useClass: HttpWorqNowClient },
     { provide: HTTP_FETCH, useValue: globalThis.fetch },
     { provide: EXTRACTOR, useValue: ruleExtractor },
     { provide: CLOCK, useValue: systemClock },

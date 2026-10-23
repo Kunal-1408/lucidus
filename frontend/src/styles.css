@@ -130,3 +130,12 @@ a {
 .closing-soon {
   font-weight: 600;
 }
+
+.pointers-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.card.pointer {
+  padding: 0.6rem 1rem;
+}

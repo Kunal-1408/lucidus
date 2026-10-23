@@ -60,6 +60,15 @@
       <p>No scholarships are waiting on more details.</p>
     }
   </section>
+
+  @for (group of r.universityPointers; track group.country) {
+    <section class="pointers">
+      <p class="pointers-label">{{ group.label }}</p>
+      @for (name of group.names; track name) {
+        <article class="card pointer">{{ name }}</article>
+      }
+    </section>
+  }
 } @else {
   <p>Checking scholarships…</p>
 }
