@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] NestJS backend and Angular frontend exist as sibling apps with their own manifests, no workspace tooling
 - [x] NestJS serves the built Angular app and the API under `/api` from one service
@@ -16,8 +16,10 @@
 - [x] Results screen shows the card with name, Amount text and a link to the official URL
 - [x] API-seam test harness in place: real Nest app, in-memory MongoDB, fake fetcher serving committed fixtures, pinned clock; one test drives seed → ingest → match
 - [x] A smoke check script hits the deployed URL (Match returns, admin rejects a missing token)
-- [ ] Deployed to Render; the post-deploy smoke check passes
+- [x] Deployed to Render; the post-deploy smoke check passes
 
 ## Comments
 
 **2026-10-23 (agent):** Everything except the deploy is built and verified. Seeded entry is the Santoor Women's Scholarship page (girls, class 12); fixture copy in `backend/test/fixtures/`. `npm test` in `backend/` runs the API-seam test (seed → ingest → match, token checks). Built service run locally against the live page: ingest ok, Match returns the card for female/Class 12 and nothing for male, smoke check passes. Remaining for a human: create the Atlas cluster and the Render service from `render.yaml`, set `MONGODB_URI` and `ADMIN_TOKEN`, then run `node scripts/smoke.mjs <url>`. Ingest is synchronous (200 with a summary) until 05 makes it 202 + run ID.
+
+**2026-10-23 (agent):** Deployed at https://scholarship-finder-hafk.onrender.com. Smoke check passes (page served, Match returns, admin rejects missing and wrong tokens). Match is empty until the first ingest is triggered with the admin token.
