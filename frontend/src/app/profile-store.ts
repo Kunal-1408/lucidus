@@ -1,5 +1,6 @@
 import { effect, Injectable, signal } from '@angular/core';
 import { Profile } from './profile-fields';
+import { migrateProfile } from './profile-rules';
 
 const STORAGE_KEY = 'scholarship-finder.profile';
 
@@ -19,7 +20,7 @@ function load(): Profile {
     const saved = localStorage.getItem(STORAGE_KEY);
     const parsed: unknown = saved ? JSON.parse(saved) : {};
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Profile)
+      ? migrateProfile(parsed as Profile)
       : {};
   } catch {
     return {};

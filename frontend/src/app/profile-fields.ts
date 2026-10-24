@@ -50,6 +50,47 @@ export const STATES = [
   { value: 'puducherry', label: 'Puducherry (UT)' },
 ] as const;
 
+// Each Indian state's ISO 3166-2 region: for a Student living in India, the
+// region they live in is their Home state.
+export const STATE_REGIONS: Record<ValueOf<typeof STATES>, string> = {
+  andhra_pradesh: 'IN-AP',
+  arunachal_pradesh: 'IN-AR',
+  assam: 'IN-AS',
+  bihar: 'IN-BR',
+  chhattisgarh: 'IN-CG',
+  goa: 'IN-GA',
+  gujarat: 'IN-GJ',
+  haryana: 'IN-HR',
+  himachal_pradesh: 'IN-HP',
+  jharkhand: 'IN-JH',
+  karnataka: 'IN-KA',
+  kerala: 'IN-KL',
+  madhya_pradesh: 'IN-MP',
+  maharashtra: 'IN-MH',
+  manipur: 'IN-MN',
+  meghalaya: 'IN-ML',
+  mizoram: 'IN-MZ',
+  nagaland: 'IN-NL',
+  odisha: 'IN-OD',
+  punjab: 'IN-PB',
+  rajasthan: 'IN-RJ',
+  sikkim: 'IN-SK',
+  tamil_nadu: 'IN-TN',
+  telangana: 'IN-TS',
+  tripura: 'IN-TR',
+  uttar_pradesh: 'IN-UP',
+  uttarakhand: 'IN-UK',
+  west_bengal: 'IN-WB',
+  andaman_and_nicobar_islands: 'IN-AN',
+  chandigarh: 'IN-CH',
+  dadra_and_nagar_haveli_and_daman_and_diu: 'IN-DH',
+  delhi: 'IN-DL',
+  jammu_and_kashmir: 'IN-JK',
+  ladakh: 'IN-LA',
+  lakshadweep: 'IN-LD',
+  puducherry: 'IN-PY',
+};
+
 export const GENDERS = [
   { value: 'female', label: 'Female' },
   { value: 'male', label: 'Male' },
@@ -83,9 +124,18 @@ export const SCHOOL_TYPES = [
   { value: 'private', label: 'Private' },
 ] as const;
 
+// An NRI is an Indian citizen living outside India, never a Citizenship.
 export const CITIZENSHIPS = [
-  { value: 'indian', label: 'Indian' },
-  { value: 'other', label: 'Other' },
+  { value: 'indian', label: 'Indian citizen' },
+  { value: 'oci', label: 'OCI card holder' },
+  { value: 'other', label: 'Another nationality' },
+] as const;
+
+// Asked only of a Student living outside India, about that country.
+export const RESIDENCE_STATUSES = [
+  { value: 'citizen', label: 'Citizen of that country' },
+  { value: 'permanent_resident', label: 'Permanent resident' },
+  { value: 'visa', label: 'On a visa' },
 ] as const;
 
 export const BOARDS = [
@@ -143,6 +193,16 @@ type ValueOf<T extends readonly { value: unknown }[]> = T[number]['value'];
 // What a Student tells us about themselves. Every field is optional.
 export interface Profile {
   class?: ValueOf<typeof CLASSES>;
+  // Where the Student lives and who they are: an ISO 3166-1 alpha-2 country
+  // (COUNTRIES in countries.ts) and an ISO 3166-2 region of it; Home state
+  // and Residence status only abroad (in India the region is the Home
+  // state); a Citizenship country only for another nationality.
+  countryOfResidence?: string;
+  region?: string;
+  homeState?: ValueOf<typeof STATES>;
+  residenceStatus?: ValueOf<typeof RESIDENCE_STATUSES>;
+  citizenshipCountry?: string;
+  // Replaced by country of residence and region; kept until ticket 09.
   domicileState?: ValueOf<typeof STATES>;
   schoolState?: ValueOf<typeof STATES>;
   schoolType?: ValueOf<typeof SCHOOL_TYPES>;

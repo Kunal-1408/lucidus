@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { COUNTRIES, REGIONS } from '../countries';
 import {
   BOARDS,
   CATEGORIES,
@@ -12,15 +13,21 @@ import {
   INCOME_BANDS,
   PARENT_OCCUPATIONS,
   Profile,
+  RESIDENCE_STATUSES,
   SCHOOL_TYPES,
   STATES,
   STREAMS,
 } from '../profile-fields';
-import { applyChange, checkAnswer, visibleQuestions } from '../profile-rules';
+import { applyChange, checkAnswer, profileForMatch, visibleQuestions } from '../profile-rules';
 import { ProfileStore } from '../profile-store';
 
 // Profile fields answered by picking one option from a fixed list.
 type ChoiceField =
+  | 'countryOfResidence'
+  | 'region'
+  | 'homeState'
+  | 'residenceStatus'
+  | 'citizenshipCountry'
   | 'domicileState'
   | 'schoolState'
   | 'schoolType'
@@ -57,15 +64,19 @@ export class ProfilePage {
   protected readonly destinations = DESTINATIONS;
   protected readonly parentOccupations = PARENT_OCCUPATIONS;
   protected readonly exams = EXAMS;
+  protected readonly countries = COUNTRIES;
+  protected readonly residenceStatuses = RESIDENCE_STATUSES;
 
   protected readonly profile = this.store.profile;
   protected readonly shown = computed(() => visibleQuestions(this.profile()));
+  // The states or regions of the country the Student lives in.
+  protected readonly regions = computed(
+    () => REGIONS[this.profile().countryOfResidence ?? ''] ?? [],
+  );
   // Why the last answer typed into a marks field was not saved.
   protected readonly marksErrors = signal<Partial<Record<MarksField, string>>>({});
-  // School state defaults to the domicile state until the Student changes it.
-  protected readonly schoolState = computed(
-    () => this.profile().schoolState ?? this.profile().domicileState,
-  );
+  // School state defaults to the Home state until the Student changes it.
+  protected readonly schoolState = computed(() => profileForMatch(this.profile()).schoolState);
 
   protected setClass(value: string) {
     this.update({ class: value ? (Number(value) as Profile['class']) : undefined });
