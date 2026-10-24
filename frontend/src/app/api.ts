@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Profile, profileForMatch } from './profile-fields';
+import { Profile } from './profile-fields';
+import { profileForMatch } from './profile-rules';
 
 // Request and response types, duplicated from the backend on purpose:
 // there is no shared types package.

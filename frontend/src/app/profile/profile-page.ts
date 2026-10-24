@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   BOARDS,
@@ -15,8 +15,8 @@ import {
   SCHOOL_TYPES,
   STATES,
   STREAMS,
-  withoutContradictions,
 } from '../profile-fields';
+import { applyChange, checkAnswer, visibleQuestions } from '../profile-rules';
 import { ProfileStore } from '../profile-store';
 
 // Profile fields answered by picking one option from a fixed list.
@@ -59,6 +59,9 @@ export class ProfilePage {
   protected readonly exams = EXAMS;
 
   protected readonly profile = this.store.profile;
+  protected readonly shown = computed(() => visibleQuestions(this.profile()));
+  // Why the last answer typed into a marks field was not saved.
+  protected readonly marksErrors = signal<Partial<Record<MarksField, string>>>({});
   // School state defaults to the domicile state until the Student changes it.
   protected readonly schoolState = computed(
     () => this.profile().schoolState ?? this.profile().domicileState,
@@ -81,11 +84,13 @@ export class ProfilePage {
     this.update({ [field]: value === '' ? undefined : value === 'yes' });
   }
 
+  // An empty field clears the answer; an answer out of range is not saved and
+  // the field says why.
   protected setMarks(field: MarksField, value: string) {
-    const marks = value.trim() === '' ? NaN : Number(value);
-    this.update({
-      [field]: Number.isFinite(marks) ? Math.min(100, Math.max(0, marks)) : undefined,
-    });
+    const marks = value.trim() === '' ? undefined : Number(value);
+    const error = marks === undefined ? undefined : checkAnswer(field, marks);
+    this.marksErrors.update((errors) => ({ ...errors, [field]: error }));
+    if (!error) this.update({ [field]: marks });
   }
 
   protected isPicked(field: MultiField, value: string): boolean {
@@ -107,6 +112,6 @@ export class ProfilePage {
   }
 
   private update(change: Partial<Record<keyof Profile, unknown>>) {
-    this.store.profile.update((p) => withoutContradictions({ ...p, ...change } as Profile));
+    this.store.profile.update((p) => applyChange(p, change as Partial<Profile>));
   }
 }
