@@ -98,7 +98,9 @@ describe('Indian Profiles keep their results', () => {
         domicileState: 'kerala',
         schoolState: 'kerala',
         gender: 'female',
-        latestMarks: 85,
+        // Was latestMarks: 85, which Board marks replace; for a Class 12
+        // Student their latest marks are the Class 12 result.
+        class12Result: { scale: 'percentage', value: 85 },
         incomeBand: '2l_2_5l',
       }),
     ).toEqual({
@@ -155,8 +157,10 @@ describe('Indian Profiles keep their results', () => {
         gender: 'male',
         category: 'general',
         incomeBand: 'over_8l',
-        latestMarks: 92,
-        boardsUpcoming: true,
+        // Was latestMarks: 92 with boardsUpcoming: true. Board marks replace
+        // latest marks, and a Class 11 Student's last board exam is Class 10;
+        // boards upcoming is no longer asked in Class 11.
+        class10Result: { scale: 'percentage', value: 92 },
         stream: 'science',
       }),
     ).toEqual({
@@ -166,7 +170,7 @@ describe('Indian Profiles keep their results', () => {
     });
   });
 
-  it('a Class 10 ST girl at an aided school in Odisha, 3% short of 60% with boards upcoming', async () => {
+  it('a Class 10 ST girl at an aided school in Odisha with boards upcoming', async () => {
     expect(
       await bucketsFor({
         class: 10,
@@ -176,16 +180,17 @@ describe('Indian Profiles keep their results', () => {
         gender: 'female',
         category: 'st',
         incomeBand: 'under_1l',
-        class10Marks: 57,
+        // Was class10Marks: 57. A Class 10 Student whose boards are upcoming
+        // has no Class 10 result yet, so Board marks don't ask for one.
         boardsUpcoming: true,
       }),
     ).toEqual({
       eligible: [AICTE_PRAGATI],
-      withinReach: {
-        [NMMSS]: ['Score 60% in Class 10 to unlock this'],
-        [LIC_SPECIAL]: ['Score 60% in Class 10 to unlock this'],
-      },
-      tellUsMore: [],
+      // Moved from Within reach ("Score 60% in Class 10 to unlock this") when
+      // class10Marks was replaced: with no Class 10 result to judge, the 60%
+      // Class 10 Criteria are unknown.
+      withinReach: {},
+      tellUsMore: [NMMSS, LIC_SPECIAL],
     });
   });
 });

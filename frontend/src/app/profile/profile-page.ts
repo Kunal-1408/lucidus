@@ -16,7 +16,13 @@ import {
   STATES,
   STREAMS,
 } from '../profile-fields';
-import { applyChange, checkAnswer, visibleQuestions } from '../profile-rules';
+import {
+  applyChange,
+  BoardMarksQuestion,
+  boardMarksLabel,
+  checkAnswer,
+  visibleQuestions,
+} from '../profile-rules';
 import { ProfileStore } from '../profile-store';
 
 // Profile fields answered by picking one option from a fixed list.
@@ -33,7 +39,6 @@ type ChoiceField =
   | 'gender'
   | 'category';
 type YesNoField = 'boardsUpcoming' | 'minority' | 'disability' | 'singleGirlChild';
-type MarksField = 'class10Marks' | 'latestMarks';
 type MultiField = 'parentOccupation' | 'examsQualified';
 
 @Component({
@@ -57,11 +62,15 @@ export class ProfilePage {
   protected readonly destinations = DESTINATIONS;
   protected readonly parentOccupations = PARENT_OCCUPATIONS;
   protected readonly exams = EXAMS;
+  protected readonly boardMarksQuestions: readonly BoardMarksQuestion[] = [
+    'class10Result',
+    'class12Result',
+  ];
 
   protected readonly profile = this.store.profile;
   protected readonly shown = computed(() => visibleQuestions(this.profile()));
-  // Why the last answer typed into a marks field was not saved.
-  protected readonly marksErrors = signal<Partial<Record<MarksField, string>>>({});
+  // Why the last answer typed into a Board marks field was not saved.
+  protected readonly marksErrors = signal<Partial<Record<BoardMarksQuestion, string>>>({});
   // School state defaults to the domicile state until the Student changes it.
   protected readonly schoolState = computed(
     () => this.profile().schoolState ?? this.profile().domicileState,
@@ -84,13 +93,18 @@ export class ProfilePage {
     this.update({ [field]: value === '' ? undefined : value === 'yes' });
   }
 
+  protected marksLabel(question: BoardMarksQuestion): string {
+    return boardMarksLabel(question, this.profile());
+  }
+
   // An empty field clears the answer; an answer out of range is not saved and
-  // the field says why.
-  protected setMarks(field: MarksField, value: string) {
-    const marks = value.trim() === '' ? undefined : Number(value);
-    const error = marks === undefined ? undefined : checkAnswer(field, marks);
-    this.marksErrors.update((errors) => ({ ...errors, [field]: error }));
-    if (!error) this.update({ [field]: marks });
+  // the field says why. Only the percentage scale exists so far.
+  protected setMarks(question: BoardMarksQuestion, value: string) {
+    const result =
+      value.trim() === '' ? undefined : { scale: 'percentage' as const, value: Number(value) };
+    const error = result === undefined ? undefined : checkAnswer(question, result);
+    this.marksErrors.update((errors) => ({ ...errors, [question]: error }));
+    if (!error) this.update({ [question]: result });
   }
 
   protected isPicked(field: MultiField, value: string): boolean {

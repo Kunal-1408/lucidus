@@ -9,6 +9,9 @@ export const CRITERION_FIELDS: Record<
   { op: Criterion['op']; changeable: boolean }
 > = {
   class: { op: 'in', changeable: true },
+  // Board marks: the value is a result on its Result scale.
+  class10Result: { op: 'gte', changeable: true },
+  class12Result: { op: 'gte', changeable: true },
   class10Marks: { op: 'gte', changeable: true },
   latestMarks: { op: 'gte', changeable: true },
   incomeBand: { op: 'lte', changeable: false },
@@ -28,3 +31,12 @@ export const CRITERION_FIELDS: Record<
   parentOccupation: { op: 'in', changeable: false },
   examsQualified: { op: 'in', changeable: false },
 };
+
+// Fields stored Criteria and Overrides may still name, but that extraction
+// no longer produces: Board marks replaced them. Ticket 09 removes them.
+export const LEGACY_FIELDS: readonly string[] = ['class10Marks', 'latestMarks'];
+
+// The fields extraction (rules, the LLM, JSON sources) reads Criteria for.
+export const EXTRACTED_FIELDS = Object.keys(CRITERION_FIELDS).filter(
+  (field) => !LEGACY_FIELDS.includes(field),
+);

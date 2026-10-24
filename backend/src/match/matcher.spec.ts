@@ -266,6 +266,91 @@ describe('Matcher: marks', () => {
   });
 });
 
+describe('Matcher: Board marks', () => {
+  const percent = (value: number) => ({ scale: 'percentage' as const, value });
+  const resultAtLeast = (
+    field: 'class10Result' | 'class12Result',
+    value: number,
+  ) =>
+    scholarship([
+      { field, op: 'gte', value: percent(value), changeable: true },
+    ]);
+
+  it('passes, fails and asks on the result the Criterion names', () => {
+    const profile: Profile = {
+      class: 12,
+      class10Result: percent(70),
+      class12Result: percent(90),
+    };
+    expect(bucketOf(profile, resultAtLeast('class12Result', 80))).toBe(
+      'eligible',
+    );
+    expect(bucketOf(profile, resultAtLeast('class10Result', 80))).toBe(
+      'hidden',
+    );
+    expect(
+      cardFor({ class: 11 }, resultAtLeast('class12Result', 80)).missing,
+    ).toEqual([{ field: 'class12Result', label: 'Class 12 result' }]);
+  });
+
+  it('is unknown for a result on another scale', () => {
+    const onAnotherScale = scholarship([
+      {
+        field: 'class12Result',
+        op: 'gte',
+        value: { scale: 'ib_points', value: 36 },
+        changeable: true,
+      },
+    ]);
+    expect(
+      bucketOf({ class: 12, class12Result: percent(95) }, onAnotherScale),
+    ).toBe('tellUsMore');
+  });
+
+  it('gives a Class 12 Student with boards upcoming a Goal on the expected result', () => {
+    const profile: Profile = {
+      class: 12,
+      boardsUpcoming: true,
+      class12Result: percent(75),
+    };
+    expect(cardFor(profile, resultAtLeast('class12Result', 80)).goals).toEqual([
+      'Score 80% in Class 12 to unlock this',
+    ]);
+    expect(bucketOf(profile, resultAtLeast('class12Result', 81))).toBe(
+      'hidden',
+    );
+  });
+
+  it('gives a Class 10 Student with boards upcoming a Goal on the Class 10 result', () => {
+    const profile: Profile = {
+      class: 10,
+      boardsUpcoming: true,
+      class10Result: percent(57),
+    };
+    expect(cardFor(profile, resultAtLeast('class10Result', 60)).goals).toEqual([
+      'Score 60% in Class 10 to unlock this',
+    ]);
+  });
+
+  it('gives no Goal on a result whose boards are already taken', () => {
+    const done: Profile = {
+      class: 12,
+      boardsUpcoming: false,
+      class12Result: percent(78),
+    };
+    expect(bucketOf(done, resultAtLeast('class12Result', 80))).toBe('hidden');
+    // A Class 12 Student's upcoming boards are Class 12's, not Class 10's.
+    const class10Behind: Profile = {
+      class: 12,
+      boardsUpcoming: true,
+      class10Result: percent(58),
+    };
+    expect(bucketOf(class10Behind, resultAtLeast('class10Result', 60))).toBe(
+      'hidden',
+    );
+  });
+});
+
 const NEXT_YEAR = 'Eligible from next year: watch for the next round';
 const UG_GOAL = 'Get admitted to an undergraduate course to unlock this';
 

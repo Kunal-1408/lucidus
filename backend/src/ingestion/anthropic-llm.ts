@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Injectable } from '@nestjs/common';
-import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
+import { EXTRACTED_FIELDS } from '../scholarships/criterion-fields.js';
 import type { LlmAnswer, LlmClient, LlmRequest } from './llm.js';
 import { FIXED_LISTS } from './normalise.js';
 
@@ -10,9 +10,10 @@ export const LLM_MODEL = 'claude-haiku-5-5';
 const FIELD_GUIDE: Record<string, string> = {
   class:
     'the class the Student must be in now: one value per class, each "9", "10", "11" or "12"',
-  class10Marks: 'the minimum Class 10 board marks, one percentage such as "60"',
-  latestMarks:
-    'the minimum marks in the latest exam (not Class 10), one percentage such as "75"',
+  class10Result:
+    'the minimum Class 10 board exam result, one percentage such as "60"',
+  class12Result:
+    'the minimum Class 12 board exam result, one percentage such as "75"',
   incomeBand:
     'the upper limit on annual family income, one figure as the text writes it, such as "Rs. 2.5 lakh"',
   minority: '"yes" when only minority-community students may apply',
@@ -32,6 +33,7 @@ Rules:
 - Every value comes with a quote: one sentence copied exactly, character for character, from the text, that states it. A value whose quote is not in the text is discarded.
 - criteria: one entry per requested field the text restricts, using only the values allowed for that field. Leave a field out when the text doesn't restrict it.
 - extraRequirements: conditions on who may apply that none of the profile fields listed can answer (for example "top 1% in your board", "not receiving another scholarship", "born after 2010"). Write each as a short phrase for the Student. Documents to submit are not requirements.
+- Marks: only a Class 10 or Class 12 board exam result is a criterion. Marks required in any other year (for example Class 7 or Class 8) are extraRequirements.
 - amountText: what the Scholarship pays, copied as the text words it (for example "full tuition" or "₹10,000 per month"), with its quote; null when the text doesn't say or it wasn't asked for.
 - deadline: the last date a Student can apply, copied exactly as the text writes the date, with its quote; null when the text doesn't say or it wasn't asked for.`;
 
@@ -55,7 +57,7 @@ const SCHEMA = {
         additionalProperties: false,
         required: ['field', 'values', 'quote'],
         properties: {
-          field: { type: 'string', enum: Object.keys(CRITERION_FIELDS) },
+          field: { type: 'string', enum: EXTRACTED_FIELDS },
           values: { type: 'array', items: { type: 'string' } },
           quote: { type: 'string' },
         },
@@ -77,7 +79,7 @@ const SCHEMA = {
 
 function userMessage(request: LlmRequest): string {
   const requested = request.fields.map((f) => `- ${f}: ${guideFor(f)}`);
-  const known = Object.keys(CRITERION_FIELDS).join(', ');
+  const known = EXTRACTED_FIELDS.join(', ');
   return [
     'Requested fields:',
     requested.length ? requested.join('\n') : '(none)',

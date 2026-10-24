@@ -29,9 +29,9 @@ describe('Match request Profile validation', () => {
       schoolType: 'government',
       citizenship: 'indian',
       board: 'state',
-      class10Marks: 92.5,
-      latestMarks: 88,
       boardsUpcoming: true,
+      class10Result: { scale: 'percentage', value: 92.5 },
+      class12Result: { scale: 'percentage', value: 88 },
       stream: 'science',
       fieldOfStudy: 'engineering',
       destination: 'india',
@@ -113,6 +113,51 @@ describe('Match request Profile validation', () => {
       'Class 10 marks in Class 9',
       { class: 9, class10Marks: 80 },
       'class10Marks is not asked in Class 9',
+    ],
+    // Board marks: a result on its scale's range, only where the grid asks it.
+    [
+      'a Class 12 result over 100%',
+      { class12Result: { scale: 'percentage', value: 105 } },
+      'class12Result.value must be from 0 to 100',
+    ],
+    [
+      'a Class 10 result with no scale',
+      { class10Result: { value: 80 } },
+      'class10Result.scale is required',
+    ],
+    [
+      'a Class 10 result that is a bare number',
+      { class10Result: 80 },
+      'class10Result must be a result with a scale and a value',
+    ],
+    [
+      'a Class 10 result in Class 9',
+      { class: 9, class10Result: { scale: 'percentage', value: 80 } },
+      'class10Result is only asked from Class 10, once Class 10 boards are done',
+    ],
+    [
+      'a Class 10 result while Class 10 boards are upcoming',
+      {
+        class: 10,
+        boardsUpcoming: true,
+        class10Result: { scale: 'percentage', value: 80 },
+      },
+      'class10Result is only asked from Class 10, once Class 10 boards are done',
+    ],
+    [
+      'a Class 12 result in Class 11',
+      { class: 11, class12Result: { scale: 'percentage', value: 80 } },
+      'class12Result is only asked in Class 12',
+    ],
+    [
+      'boards upcoming in Class 11',
+      { class: 11, boardsUpcoming: true },
+      'boardsUpcoming is only asked in Class 10 or 12',
+    ],
+    [
+      'boards upcoming with no class',
+      { boardsUpcoming: false },
+      'boardsUpcoming is only asked in Class 10 or 12',
     ],
   ])('answers 400 for %s, naming the field', async (_, profile, reason) => {
     const res = await matchWith(profile).expect(400);
