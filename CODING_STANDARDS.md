@@ -1,6 +1,6 @@
 # Coding standards
 
-Judgement calls for the reviewer. Anything `npm run check` enforces (format, lint, types, tests) is left to the tooling. `GLOSSARY.md`, `docs/adr/` and the spec's Testing Decisions (`.scratch/scholarship-finder/spec.md`) are standards too; this file covers what they don't.
+Judgement calls for the reviewer. Anything `npm run check` enforces (format, lint, types, tests) is left to the tooling. `GLOSSARY.md`, `docs/adr/` and the Testing Decisions of the feature's spec (`.scratch/<feature>/spec.md`) are standards too; this file covers what they don't.
 
 ## Names speak the domain
 
@@ -17,6 +17,10 @@ Whatever an endpoint accepts must be something the rest of the system can handle
 ## Replacing stored data leaves no gap
 
 Code that replaces a stored set (a country's University pointers, a source's Scholarships) writes the new records before removing the old ones. If a write fails partway through, the old data is still there. Delete-then-insert loses everything when the insert fails.
+
+## New rules reach stored data
+
+A change to extraction, a Criterion field or the Profile says what happens to the Scholarships already stored. Ingestion reuses the stored extraction while a page's content hash is unchanged (`upsertScholarship` in `backend/src/ingestion/ingestion.service.ts`), so a new rule reaches live data only through a forced re-extraction. Tests that ingest fresh fixtures never show the gap; the change either re-extracts what it affects or names the gap and the ticket that closes it.
 
 ## Each concept has one home
 
