@@ -5,7 +5,7 @@ A proof of concept for Lucidus AI: a school student describes themselves, sees s
 ## People
 
 **Student**:
-A school student in Class 9–12 using the app. The only kind of user; university students and graduates are out of scope.
+A school student in Class 9–12 (or the equivalent grade abroad) using the app, living in India or in any other country. The only kind of user; university students and graduates are out of scope.
 _Avoid_: User, applicant, candidate
 
 **Visitor**:
@@ -16,8 +16,36 @@ _Avoid_: Account, session
 What a Student tells us about themselves. Every field is optional.
 _Avoid_: Form, details
 
+**Country of residence**:
+The country a Student lives in now, and within it the state or region.
+_Avoid_: Location, nationality
+
+**Home state**:
+The Indian state a Student's family belongs to (domicile). For a Student in India it is the state they live in; a Student abroad may have one or none.
+_Avoid_: Native state, origin
+
+**Citizenship**:
+Indian citizen, OCI card holder, or another nationality. An NRI is an Indian citizen whose country of residence is not India, never a citizenship of its own.
+_Avoid_: Nationality status, NRI (as a citizenship)
+
+**Residence status**:
+Whether a Student living outside India is a citizen of that country, a permanent resident, or there on a visa.
+_Avoid_: Immigration status, fee status, PR
+
+**Board marks**:
+A Student's result in a board exam taken at the end of Class 10 or Class 12, or the foreign equivalent (GCSE/IGCSE, A-level, IB Diploma), given on that exam's own scale. Marks from any other year are never asked.
+_Avoid_: Latest marks, previous-year marks, grades
+
+**Result scale**:
+The scale a result is given on: percentage, CGPA out of 10, GPA out of 4, IB points out of 45 or A-level grades. Results on different scales are never compared.
+_Avoid_: Grading system, conversion
+
+**Field of study group**:
+One of a few broad groups (Engineering, Medicine and health, Natural sciences, and so on) that every subject a Student can pick belongs to. Criteria name groups; a subject the Student types in belongs to the group Other.
+_Avoid_: Course, stream, subject (for the group)
+
 **Core fields**:
-The few Profile fields asked up front: class, domicile state, gender, category, income band and marks. Every other field is asked only through a Prompt.
+The Profile fields asked up front: class, country of residence and its state or region, home state, citizenship, board, Board marks, gender, category, family income, field of study and where the Student wants to study. Every other field is asked only through a Prompt.
 
 ## Scholarships
 
