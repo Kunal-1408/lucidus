@@ -7,7 +7,7 @@
   <label>
     Class
     <select (change)="setClass($any($event.target).value)">
-      <option value="">Not saying</option>
+      <option value="">N.A</option>
       @for (c of classes; track c.value) {
         <option [value]="c.value" [selected]="profile().class === c.value">{{ c.label }}</option>
       }
@@ -17,7 +17,7 @@
   <label>
     State you live in (domicile)
     <select (change)="setChoice('domicileState', $any($event.target).value)">
-      <option value="">Not saying</option>
+      <option value="">N.A</option>
       @for (s of states; track s.value) {
         <option [value]="s.value" [selected]="profile().domicileState === s.value">
           {{ s.label }}
@@ -29,7 +29,7 @@
   <label>
     Gender
     <select (change)="setChoice('gender', $any($event.target).value)">
-      <option value="">Not saying</option>
+      <option value="">N.A</option>
       @for (g of genders; track g.value) {
         <option [value]="g.value" [selected]="profile().gender === g.value">{{ g.label }}</option>
       }
@@ -39,7 +39,7 @@
   <label>
     Category
     <select (change)="setChoice('category', $any($event.target).value)">
-      <option value="">Not saying</option>
+      <option value="">N.A</option>
       @for (c of categories; track c.value) {
         <option [value]="c.value" [selected]="profile().category === c.value">{{ c.label }}</option>
       }
@@ -49,7 +49,7 @@
   <label>
     Family income per year
     <select (change)="setChoice('incomeBand', $any($event.target).value)">
-      <option value="">Not saying</option>
+      <option value="">N.A</option>
       @for (b of incomeBands; track b.value) {
         <option [value]="b.value" [selected]="profile().incomeBand === b.value">
           {{ b.label }}
@@ -91,7 +91,7 @@
       <label>
         Are your board exams still upcoming?
         <select (change)="setYesNo('boardsUpcoming', $any($event.target).value)">
-          <option value="" [selected]="yesNo('boardsUpcoming') === ''">Not saying</option>
+          <option value="" [selected]="yesNo('boardsUpcoming') === ''">N.A</option>
           <option value="yes" [selected]="yesNo('boardsUpcoming') === 'yes'">Yes</option>
           <option value="no" [selected]="yesNo('boardsUpcoming') === 'no'">No</option>
         </select>
@@ -100,7 +100,7 @@
       <label>
         Board
         <select (change)="setChoice('board', $any($event.target).value)">
-          <option value="">Not saying</option>
+          <option value="">N.A</option>
           @for (b of boards; track b.value) {
             <option [value]="b.value" [selected]="profile().board === b.value">
               {{ b.label }}
@@ -112,7 +112,7 @@
       <label>
         Stream (Class 11 and 12)
         <select (change)="setChoice('stream', $any($event.target).value)">
-          <option value="">Not saying</option>
+          <option value="">N.A</option>
           @for (s of streams; track s.value) {
             <option [value]="s.value" [selected]="profile().stream === s.value">
               {{ s.label }}
@@ -124,7 +124,7 @@
       <label>
         School type
         <select (change)="setChoice('schoolType', $any($event.target).value)">
-          <option value="">Not saying</option>
+          <option value="">N.A</option>
           @for (t of schoolTypes; track t.value) {
             <option [value]="t.value" [selected]="profile().schoolType === t.value">
               {{ t.label }}
@@ -136,7 +136,7 @@
       <label>
         State your school is in
         <select (change)="setChoice('schoolState', $any($event.target).value)">
-          <option value="">Not saying</option>
+          <option value="">N.A</option>
           @for (s of states; track s.value) {
             <option [value]="s.value" [selected]="schoolState() === s.value">{{ s.label }}</option>
           }
@@ -146,7 +146,7 @@
       <label>
         Citizenship
         <select (change)="setChoice('citizenship', $any($event.target).value)">
-          <option value="">Not saying</option>
+          <option value="">N.A</option>
           @for (c of citizenships; track c.value) {
             <option [value]="c.value" [selected]="profile().citizenship === c.value">
               {{ c.label }}
@@ -158,7 +158,7 @@
       <label>
         Do you belong to a religious or linguistic minority?
         <select (change)="setYesNo('minority', $any($event.target).value)">
-          <option value="" [selected]="yesNo('minority') === ''">Not saying</option>
+          <option value="" [selected]="yesNo('minority') === ''">N.A</option>
           <option value="yes" [selected]="yesNo('minority') === 'yes'">Yes</option>
           <option value="no" [selected]="yesNo('minority') === 'no'">No</option>
         </select>
@@ -167,7 +167,7 @@
       <label>
         Do you have a disability?
         <select (change)="setYesNo('disability', $any($event.target).value)">
-          <option value="" [selected]="yesNo('disability') === ''">Not saying</option>
+          <option value="" [selected]="yesNo('disability') === ''">N.A</option>
           <option value="yes" [selected]="yesNo('disability') === 'yes'">Yes</option>
           <option value="no" [selected]="yesNo('disability') === 'no'">No</option>
         </select>
@@ -177,7 +177,7 @@
         <label>
           Are you a single girl child?
           <select (change)="setYesNo('singleGirlChild', $any($event.target).value)">
-            <option value="" [selected]="yesNo('singleGirlChild') === ''">Not saying</option>
+            <option value="" [selected]="yesNo('singleGirlChild') === ''">N.A</option>
             <option value="yes" [selected]="yesNo('singleGirlChild') === 'yes'">Yes</option>
             <option value="no" [selected]="yesNo('singleGirlChild') === 'no'">No</option>
           </select>
@@ -215,7 +215,7 @@
       <label>
         What do you want to study?
         <select (change)="setChoice('fieldOfStudy', $any($event.target).value)">
-          <option value="">Not saying</option>
+          <option value="">N.A</option>
           @for (f of fieldsOfStudy; track f.value) {
             <option [value]="f.value" [selected]="profile().fieldOfStudy === f.value">
               {{ f.label }}
@@ -227,7 +227,7 @@
       <label>
         Where do you want to study?
         <select (change)="setChoice('destination', $any($event.target).value)">
-          <option value="">Not saying</option>
+          <option value="">N.A</option>
           @for (d of destinations; track d.value) {
             <option [value]="d.value" [selected]="profile().destination === d.value">
               {{ d.label }}

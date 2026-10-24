@@ -42,7 +42,7 @@ One pass over the watchlist that fetches each source, skips unchanged ones, extr
 _Avoid_: Crawl, scrape, sync
 
 **Criterion**:
-One eligibility rule of a scholarship, comparing one Profile field against a value, together with the exact sentence it came from.
+One eligibility rule of a scholarship, comparing one Profile field against a value, together with the exact sentence it came from. A condition for keeping a scholarship once awarded (renewal) is not a Criterion, nor is how places are shared out between groups.
 _Avoid_: Requirement, condition, filter
 
 **Extra requirement**:

@@ -50,6 +50,26 @@
     "holds": "one"
   },
   {
+    "url": "https://scholarships.gov.in/public/schemeGuidelines/CSSS_GUIDLINES_07022024_updated.pdf",
+    "type": "pdf",
+    "region": "india",
+    "name": "PM-USP Central Sector Scheme of Scholarship for College and University Students",
+    "provider": "Department of Higher Education, Ministry of Education",
+    "scholarshipType": "government",
+    "officialUrl": "https://scholarships.gov.in/All-Scholarships",
+    "holds": "one"
+  },
+  {
+    "url": "https://scholarships.gov.in/public/schemeGuidelines/Guidelines_ISHAN%20UDAY_2324.pdf",
+    "type": "pdf",
+    "region": "india",
+    "name": "Ishan Uday Special Scholarship Scheme for North Eastern Region",
+    "provider": "University Grants Commission",
+    "scholarshipType": "government",
+    "officialUrl": "https://scholarships.gov.in/All-Scholarships",
+    "holds": "one"
+  },
+  {
     "url": "https://socialjustice.gov.in/schemes/25",
     "type": "html",
     "region": "india",
