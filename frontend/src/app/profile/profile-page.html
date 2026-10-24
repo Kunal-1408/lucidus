@@ -1,5 +1,5 @@
 <h1>Find scholarships</h1>
-<p>
+<p class="lede">
   Tell us a little about yourself. Every question is optional, and your answers stay on this device.
 </p>
 
@@ -186,30 +186,34 @@
 
       <fieldset>
         <legend>Parents' occupation</legend>
-        @for (o of parentOccupations; track o.value) {
-          <label class="check">
-            <input
-              type="checkbox"
-              [checked]="isPicked('parentOccupation', o.value)"
-              (change)="togglePicked('parentOccupation', o.value, $any($event.target).checked)"
-            />
-            {{ o.label }}
-          </label>
-        }
+        <div class="checks">
+          @for (o of parentOccupations; track o.value) {
+            <label class="check">
+              <input
+                type="checkbox"
+                [checked]="isPicked('parentOccupation', o.value)"
+                (change)="togglePicked('parentOccupation', o.value, $any($event.target).checked)"
+              />
+              {{ o.label }}
+            </label>
+          }
+        </div>
       </fieldset>
 
       <fieldset>
         <legend>Exams you have qualified</legend>
-        @for (e of exams; track e.value) {
-          <label class="check">
-            <input
-              type="checkbox"
-              [checked]="isPicked('examsQualified', e.value)"
-              (change)="togglePicked('examsQualified', e.value, $any($event.target).checked)"
-            />
-            {{ e.label }}
-          </label>
-        }
+        <div class="checks">
+          @for (e of exams; track e.value) {
+            <label class="check">
+              <input
+                type="checkbox"
+                [checked]="isPicked('examsQualified', e.value)"
+                (change)="togglePicked('examsQualified', e.value, $any($event.target).checked)"
+              />
+              {{ e.label }}
+            </label>
+          }
+        </div>
       </fieldset>
 
       <label>

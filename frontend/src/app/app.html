@@ -1,6 +1,10 @@
 <header>
-  <a routerLink="/">Scholarship Finder</a>
-  <nav><a routerLink="/saved">Saved</a></nav>
+  <div class="bar">
+    <a class="brand" routerLink="/">Scholarship Finder</a>
+    <nav>
+      <a routerLink="/saved" routerLinkActive="active">Saved</a>
+    </nav>
+  </div>
 </header>
 <main>
   <router-outlet />
