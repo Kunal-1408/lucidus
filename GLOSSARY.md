@@ -45,7 +45,7 @@ One of a few broad groups (Engineering, Medicine and health, Natural sciences, a
 _Avoid_: Course, stream, subject (for the group)
 
 **Core fields**:
-The Profile fields asked up front: class, country of residence and its state or region, home state, citizenship, board, Board marks, gender, category, family income, field of study and where the Student wants to study. Every other field is asked only through a Prompt.
+The Profile fields asked up front: class, country of residence and its state or region, home state, citizenship, board, Board marks and whether board exams are still upcoming, gender, category, family income, field of study and where the Student wants to study. Every other field is asked only through a Prompt.
 
 ## Scholarships
 

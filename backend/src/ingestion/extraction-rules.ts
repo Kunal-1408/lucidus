@@ -1,5 +1,8 @@
 import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
-import type { Criterion } from '../scholarships/scholarship.schema.js';
+import type {
+  Criterion,
+  ExtraRequirement,
+} from '../scholarships/scholarship.schema.js';
 import { DATE, MONEY, STATE_NAMES, toClass } from './normalise.js';
 
 // What a rule found, before normalisation: the raw value as the source
@@ -106,26 +109,82 @@ const incomeRule: FieldRule = (sentences) => {
 // marks".
 const MIN_PERCENT =
   /\b(?:minimum(?: of)?|at least|not less than)\s*(\d{2,3}(?:\.\d+)?)\s*%|\b(\d{2,3}(?:\.\d+)?)\s*%\s*(?:marks\s*)?(?:or above|or more|and above)|\b(?:secur|scor|obtain)(?:e|ed|es|ing)\s+(?:an? )?(?:aggregate of\s*)?(\d{2,3}(?:\.\d+)?)\s*%/i;
-// Cut-offs in a selection test, or marks in a class before Class 9, are not
-// marks a Student's Profile records.
-const NOT_PROFILE_MARKS =
-  /\btests?\b|\bMAT\b|\bSAT\b|\b(?:class|grade|std\.?|standard)\s*(?:[1-8]|i{1,3}|iv|vi{0,3})(?:st|nd|rd|th)?\b/i;
-const NAMES_CLASS_10 =
-  /\b(?:class|grade|std\.?|standard)\s*(?:10|x)(?:th)?\b|\bSSC\b|\bmatric/i;
+// Cut-offs in a selection test are not marks a Student's Profile records.
+const TEST_CUT_OFF = /\btests?\b|\bMAT\b|\bSAT\b/i;
+// "Class 10th", "class XII", "Std. 8"; "SSC" and "matriculation" are Class
+// 10, "HSC", "Higher Secondary", "Senior Secondary" and "10+2" Class 12.
+const YEAR_MENTION = new RegExp(
+  String.raw`\b(?:class|grade|std\.?|standard)\s*(\d{1,2}|[ivx]+)(?:st|nd|rd|th)?\b|(\bSSC\b|\bmatric\w*)|(\bHSC\b|\bhigher secondary\b|\bsenior secondary\b|\b10\s*\+\s*2\b)`,
+  'gi',
+);
+const ROMAN_YEAR: Record<string, number> = {
+  i: 1,
+  ii: 2,
+  iii: 3,
+  iv: 4,
+  v: 5,
+  vi: 6,
+  vii: 7,
+  viii: 8,
+  ix: 9,
+  x: 10,
+  xi: 11,
+  xii: 12,
+};
 
-// Marks naming Class 10 check Class 10 marks; any other marks check the
-// latest. A Student can still raise their marks, so both are changeable.
-function marksRule(field: 'class10Marks' | 'latestMarks'): FieldRule {
+// The year of the exam a marks threshold is for: the first year named after
+// the percentage ("75% in Class 10"), else the last one before it ("passed
+// Class XII with 80%"). Undefined when the sentence names no year.
+function marksYear(sentence: string, percentAt: number): number | undefined {
+  const mentions = [...sentence.matchAll(YEAR_MENTION)].map((m) => ({
+    at: m.index,
+    year: m[2]
+      ? 10
+      : m[3]
+        ? 12
+        : (ROMAN_YEAR[m[1].toLowerCase()] ?? Number(m[1])),
+  }));
+  const after = mentions.find((m) => m.at > percentAt);
+  return (after ?? mentions.filter((m) => m.at < percentAt).pop())?.year;
+}
+
+interface MarksThreshold {
+  percent: string;
+  year: number;
+  sentence: string;
+}
+
+// Every sentence stating a minimum percentage for a named year.
+function marksThresholds(sentences: string[]): MarksThreshold[] {
+  return sentences.flatMap((sentence) => {
+    if (TEST_CUT_OFF.test(sentence)) return [];
+    const m = sentence.match(MIN_PERCENT);
+    if (!m) return [];
+    const year = marksYear(sentence, m.index ?? 0);
+    return year ? [{ percent: m[1] ?? m[2] ?? m[3], year, sentence }] : [];
+  });
+}
+
+// Board marks: a percentage for the Class 10 or Class 12 board exam. A
+// Student can still raise their marks, so both are changeable. Marks naming
+// no year are left to the LLM.
+function boardMarksRule(field: 'class10Result' | 'class12Result'): FieldRule {
+  const year = field === 'class10Result' ? 10 : 12;
   return (sentences) => {
-    for (const sentence of sentences) {
-      if (NOT_PROFILE_MARKS.test(sentence)) continue;
-      if (NAMES_CLASS_10.test(sentence) !== (field === 'class10Marks'))
-        continue;
-      const m = sentence.match(MIN_PERCENT);
-      if (m) return found(field, m[1] ?? m[2] ?? m[3], sentence);
-    }
-    return undefined;
+    const threshold = marksThresholds(sentences).find((t) => t.year === year);
+    return threshold && found(field, threshold.percent, threshold.sentence);
   };
+}
+
+// Marks for any other year (NMMS's Class 7 or 8) are never asked, so they
+// are shown as Extra requirements rather than matched on the wrong result.
+export function otherYearMarks(sentences: string[]): ExtraRequirement[] {
+  return marksThresholds(sentences)
+    .filter((t) => t.year !== 10 && t.year !== 12)
+    .map((t) => ({
+      text: `At least ${t.percent}% marks in Class ${t.year}`,
+      sourceText: t.sentence,
+    }));
 }
 
 // "studying ... in a Government, Government-aided and local body school".
@@ -320,8 +379,8 @@ export const FIELD_RULES: FieldRule[] = [
   genderRule,
   classRule,
   incomeRule,
-  marksRule('class10Marks'),
-  marksRule('latestMarks'),
+  boardMarksRule('class10Result'),
+  boardMarksRule('class12Result'),
   schoolTypeRule,
   ...KEYWORD_FIELDS.map(keywordRule),
 ];

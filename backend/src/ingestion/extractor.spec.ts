@@ -40,18 +40,29 @@ describe('Extractor rules on a myScheme page (NMMSS)', () => {
     });
   });
 
-  it('finds the marks that name Class 10, skipping test cut-offs and earlier classes', () => {
+  it('finds the Board marks that name Class 10, skipping test cut-offs and earlier classes', () => {
     const marks = extractByRules(nmmss).criteria.filter((c) =>
-      c.field.endsWith('Marks'),
+      c.field.endsWith('Result'),
     );
     expect(marks).toEqual([
       {
-        field: 'class10Marks',
+        field: 'class10Result',
         op: 'gte',
-        value: 60,
+        value: { scale: 'percentage', value: 60 },
         changeable: true,
         sourceText: expect.stringContaining('60% marks in Class 10th'),
         confidence: 'high',
+      },
+    ]);
+  });
+
+  it('shows the Class 8 marks rule as an Extra requirement', () => {
+    expect(extractByRules(nmmss).extraRequirements).toEqual([
+      {
+        text: 'At least 55% marks in Class 8',
+        sourceText: expect.stringContaining(
+          '55% mark or equivalent grade in the Class 8th',
+        ),
       },
     ]);
   });
@@ -142,17 +153,64 @@ describe('Normalisation onto the fixed lists', () => {
   });
 
   it.each([
-    ['Applicants must have secured 60% marks in Class 10.', 'class10Marks', 60],
-    ['Students should have scored 75% marks in Class 12.', 'latestMarks', 75],
     [
-      'Candidates who obtained 80% in the previous examination are eligible.',
-      'latestMarks',
+      'Applicants must have secured 60% marks in Class 10.',
+      'class10Result',
+      60,
+    ],
+    ['Students should have scored 75% marks in Class 12.', 'class12Result', 75],
+    [
+      'Students who have passed Class XII with a minimum of 80% marks are eligible.',
+      'class12Result',
       80,
     ],
-  ])('reads the marks in "%s" as %s', (text, field, percent) => {
-    expect(criterion(text, field)?.value).toBe(percent);
-    const other = field === 'class10Marks' ? 'latestMarks' : 'class10Marks';
+    [
+      'Students of Class 11 who secured 75% in Class 10 board examination may apply.',
+      'class10Result',
+      75,
+    ],
+    [
+      'Candidates must have passed the Higher Secondary examination with at least 60% marks.',
+      'class12Result',
+      60,
+    ],
+  ])('reads the Board marks in "%s" as %s', (text, field, percent) => {
+    expect(criterion(text, field)?.value).toEqual({
+      scale: 'percentage',
+      value: percent,
+    });
+    const other = field === 'class10Result' ? 'class12Result' : 'class10Result';
     expect(criterion(text, other)).toBeUndefined();
+  });
+
+  it.each([
+    [
+      'Students must have scored at least 55% marks in Class VII.',
+      'At least 55% marks in Class 7',
+    ],
+    [
+      'Students studying in Class 11 with a minimum of 65% marks in Class 9 are eligible.',
+      'At least 65% marks in Class 9',
+    ],
+  ])(
+    'shows the marks for another year in "%s" as an Extra requirement',
+    (text, requirement) => {
+      const extraction = extractByRules(text);
+      expect(
+        extraction.criteria.filter((c) => c.field.endsWith('Result')),
+      ).toEqual([]);
+      expect(extraction.extraRequirements).toEqual([
+        { text: requirement, sourceText: text },
+      ]);
+    },
+  );
+
+  it('leaves marks that name no year to the LLM', () => {
+    const extraction = extractByRules(
+      'Candidates who obtained 80% in the previous examination are eligible.',
+    );
+    expect(extraction.criteria).toEqual([]);
+    expect(extraction.extraRequirements).toEqual([]);
   });
 
   it.each([
