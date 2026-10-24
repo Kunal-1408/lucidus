@@ -1,6 +1,8 @@
 import {
   CRITERION_FIELDS,
   EXTRACTED_FIELDS,
+  isBoardMarksField,
+  isLegacyMarksField,
 } from '../scholarships/criterion-fields.js';
 import type {
   Criterion,
@@ -180,7 +182,7 @@ export function readValue(field: string, values: string[]): unknown {
 
 // The model and reviewers write a percentage with its sign ("60%").
 function tidyReadValue(field: string, raw: string): string {
-  return field.endsWith('Marks') || field.endsWith('Result')
+  return isBoardMarksField(field) || isLegacyMarksField(field)
     ? raw.replace(/\s*%$/, '')
     : raw;
 }

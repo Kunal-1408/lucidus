@@ -6,6 +6,11 @@ import {
   oneOf,
   yesNo,
 } from '../input-checks.js';
+import {
+  BOARD_MARKS_FIELDS,
+  LEGACY_MARKS_FIELDS,
+} from '../scholarships/criterion-fields.js';
+import { INDIA } from './countries.js';
 import { INCOME_BANDS } from './matcher.js';
 import type { BoardResult, Profile, ResultScale } from './profile.js';
 
@@ -13,7 +18,7 @@ export type ProfileParseResult =
   { ok: true; profile: Profile } | { ok: false; reasons: string[] };
 
 const CLASSES = [9, 10, 11, 12] as const;
-const MARKS_FIELDS = ['class10Marks', 'latestMarks'] as const;
+// Every answer the form takes as yes or no, boards upcoming included.
 const YES_NO_FIELDS = [
   'boardsUpcoming',
   'minority',
@@ -58,7 +63,7 @@ export function parseProfile(body: unknown): ProfileParseResult {
       reasons.push(`class must be one of ${CLASSES.join(', ')}`);
     }
   }
-  for (const field of MARKS_FIELDS) {
+  for (const field of LEGACY_MARKS_FIELDS) {
     if (field in raw) keep(field, numberBetween(raw, field, 0, 100, reasons));
   }
   for (const field of YES_NO_FIELDS) {
@@ -114,7 +119,6 @@ function contradictions(raw: Record<string, unknown>): string[] {
 // Citizenship country, fixed lists for Home state and Residence status.
 const COUNTRY_FIELDS = ['countryOfResidence', 'citizenshipCountry'] as const;
 const RESIDENCE_ONE_OF_FIELDS = ['homeState', 'residenceStatus'] as const;
-const INDIA = 'IN';
 
 function residenceAnswers(
   raw: Record<string, unknown>,
@@ -123,18 +127,18 @@ function residenceAnswers(
   const answers: [string, unknown][] = [];
   for (const field of COUNTRY_FIELDS) {
     if (!(field in raw)) continue;
-    if (FIXED_LISTS[field].includes(raw[field] as string)) {
-      answers.push([field, raw[field]]);
-    } else {
-      reasons.push(`${field} must be an ISO 3166-1 alpha-2 country code`);
-    }
+    const notAllowed = `${field} must be an ISO 3166-1 alpha-2 country code`;
+    answers.push([
+      field,
+      oneOf(raw, field, FIXED_LISTS[field], reasons, field, notAllowed),
+    ]);
   }
   if ('region' in raw) {
-    if (FIXED_LISTS.region.includes(raw.region as string)) {
-      answers.push(['region', raw.region]);
-    } else {
-      reasons.push('region must be an ISO 3166-2 region code');
-    }
+    const notAllowed = 'region must be an ISO 3166-2 region code';
+    answers.push([
+      'region',
+      oneOf(raw, 'region', FIXED_LISTS.region, reasons, 'region', notAllowed),
+    ]);
   }
   for (const field of RESIDENCE_ONE_OF_FIELDS) {
     if (field in raw)
@@ -177,8 +181,8 @@ function residenceContradictions(raw: Record<string, unknown>): string[] {
   return reasons;
 }
 
-// Board marks: each result a value inside its Result scale's range.
-const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'] as const;
+// Board marks: each result a value inside its Result scale's range
+// (frontend copy: RESULT_SCALE_RANGES in frontend/src/app/profile-rules.ts).
 const RESULT_SCALE_RANGES: Record<ResultScale, [min: number, max: number]> = {
   percentage: [0, 100],
 };

@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { COUNTRIES, REGIONS } from '../countries';
 import {
+  BoardResult,
   BOARDS,
   CATEGORIES,
   CITIZENSHIPS,
@@ -20,6 +21,7 @@ import {
 } from '../profile-fields';
 import {
   applyChange,
+  BOARD_MARKS_FIELDS,
   BoardMarksQuestion,
   boardMarksLabel,
   checkAnswer,
@@ -72,10 +74,8 @@ export class ProfilePage {
   protected readonly exams = EXAMS;
   protected readonly countries = COUNTRIES;
   protected readonly residenceStatuses = RESIDENCE_STATUSES;
-  protected readonly boardMarksQuestions: readonly BoardMarksQuestion[] = [
-    'class10Result',
-    'class12Result',
-  ];
+  protected readonly boardMarksQuestions = BOARD_MARKS_FIELDS;
+  protected readonly boardMarksLabel = boardMarksLabel;
 
   protected readonly profile = this.store.profile;
   protected readonly shown = computed(() => visibleQuestions(this.profile()));
@@ -85,7 +85,8 @@ export class ProfilePage {
   );
   // Why the last answer typed into a Board marks field was not saved.
   protected readonly marksErrors = signal<Partial<Record<BoardMarksQuestion, string>>>({});
-  // School state defaults to the Home state until the Student changes it.
+  // School state defaults to the Home state of a Student in India until the
+  // Student changes it; abroad there is no default.
   protected readonly schoolState = computed(() => profileForMatch(this.profile()).schoolState);
 
   protected setClass(value: string) {
@@ -105,15 +106,11 @@ export class ProfilePage {
     this.update({ [field]: value === '' ? undefined : value === 'yes' });
   }
 
-  protected marksLabel(question: BoardMarksQuestion): string {
-    return boardMarksLabel(question, this.profile());
-  }
-
   // An empty field clears the answer; an answer out of range is not saved and
   // the field says why. Only the percentage scale exists so far.
   protected setMarks(question: BoardMarksQuestion, value: string) {
-    const result =
-      value.trim() === '' ? undefined : { scale: 'percentage' as const, value: Number(value) };
+    const result: BoardResult | undefined =
+      value.trim() === '' ? undefined : { scale: 'percentage', value: Number(value) };
     const error = result === undefined ? undefined : checkAnswer(question, result);
     this.marksErrors.update((errors) => ({ ...errors, [question]: error }));
     if (!error) this.update({ [question]: result });

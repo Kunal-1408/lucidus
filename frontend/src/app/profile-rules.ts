@@ -2,7 +2,7 @@
 // clears, and the range each answer must fall in. The profile page only
 // renders what these return. The backend applies the same rules to a Match
 // request in backend/src/match/profile-input.ts.
-import { REGIONS } from './countries';
+import { INDIA, REGIONS } from './countries';
 import { BoardResult, Profile, RESULT_SCALES, STATE_REGIONS, STATES } from './profile-fields';
 
 export type Question = keyof Profile;
@@ -68,7 +68,10 @@ function boardMarksHidden(profile: Profile): Question[] {
   }
 }
 
-export type BoardMarksQuestion = 'class10Result' | 'class12Result';
+// The Board marks fields (backend copy: BOARD_MARKS_FIELDS in
+// backend/src/scholarships/criterion-fields.ts).
+export const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'] as const;
+export type BoardMarksQuestion = (typeof BOARD_MARKS_FIELDS)[number];
 
 // How a Board marks question is put to the Student: a Class 12 Student whose
 // boards are upcoming gives the result they expect.
@@ -88,14 +91,18 @@ export function applyChange(profile: Profile, change: Partial<Profile>): Profile
 // Why an answer can't be saved, or undefined when it can. An invalid answer
 // is refused, never adjusted to fit.
 export function checkAnswer(question: Question, answer: unknown): string | undefined {
-  if (question === 'class10Result' || question === 'class12Result') {
+  if ((BOARD_MARKS_FIELDS as readonly Question[]).includes(question)) {
     return checkBoardResult(answer);
   }
   return undefined;
 }
 
-// The range of each Result scale, with what to tell a Student outside it.
-const SCALE_RANGES: Record<BoardResult['scale'], { min: number; max: number; message: string }> = {
+// The range of each Result scale, with what to tell a Student outside it
+// (backend copy: RESULT_SCALE_RANGES in backend/src/match/profile-input.ts).
+const RESULT_SCALE_RANGES: Record<
+  BoardResult['scale'],
+  { min: number; max: number; message: string }
+> = {
   percentage: { min: 0, max: 100, message: 'Enter a percentage from 0 to 100.' },
 };
 
@@ -103,7 +110,7 @@ function checkBoardResult(answer: unknown): string | undefined {
   const { scale, value } = (answer ?? {}) as Partial<Record<keyof BoardResult, unknown>>;
   const known = RESULT_SCALES.some((option) => option.value === scale);
   if (!known) return 'Pick the scale your result is given on.';
-  const range = SCALE_RANGES[scale as BoardResult['scale']];
+  const range = RESULT_SCALE_RANGES[scale as BoardResult['scale']];
   return typeof value === 'number' && value >= range.min && value <= range.max
     ? undefined
     : range.message;
@@ -130,10 +137,12 @@ function withBoardMarks(saved: Record<string, unknown>): Record<string, unknown>
 
 // The Profile as sent inside a Match request: answers to questions it no
 // longer asks dropped (a saved Profile may predate a rule), and school state
-// falling back to the domicile state.
+// falling back to the Home state of a Student in India (or who gives no
+// country). Abroad the Student's school is not in India, so there is none.
 export function profileForMatch(profile: Profile): Profile {
   const sent = withoutUnasked(withResidenceClears(profile, {}));
-  const homeState = sent.domicileState ?? homeStateOf(sent);
+  const abroad = sent.countryOfResidence !== undefined && sent.countryOfResidence !== INDIA;
+  const homeState = abroad ? undefined : (sent.domicileState ?? homeStateOf(sent));
   if (homeState !== undefined) sent.schoolState ??= homeState;
   return sent;
 }
@@ -142,7 +151,6 @@ export function profileForMatch(profile: Profile): Profile {
 // country; Home state and Residence status are asked only abroad (in India,
 // the region is the Home state); the Citizenship country only of another
 // nationality; category of everyone but another nationality.
-const INDIA = 'IN';
 
 function unaskedForResidence(profile: Profile): Question[] {
   const unasked: Question[] = [];

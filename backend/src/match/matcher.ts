@@ -4,6 +4,11 @@ import type {
   ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
 import {
+  type BoardMarksField,
+  isBoardMarksField,
+} from '../scholarships/criterion-fields.js';
+import { INDIA } from './countries.js';
+import {
   type BoardResult,
   type IndianState,
   type Profile,
@@ -228,32 +233,26 @@ function goalFor(criterion: Criterion, profile: Profile): string | undefined {
   return undefined;
 }
 
-const BOARD_MARKS_YEAR = { class10Result: 10, class12Result: 12 } as const;
-type BoardMarksField = keyof typeof BOARD_MARKS_YEAR;
-
-function isBoardMarksField(field: string): field is BoardMarksField {
-  return field in BOARD_MARKS_YEAR;
-}
-
 // Today's marks rule on Board marks: a percentage shortfall of at most 5 is
-// a Goal while the boards for that result are still upcoming (a Class 12
-// Student's upcoming boards are Class 12's; their Class 10 result is final).
+// a Goal while the boards for that result are still upcoming. Only a Class
+// 12 result can be: a Class 12 Student's upcoming boards are Class 12's
+// (their Class 10 result is final), and a Class 10 Student with boards
+// upcoming gives no Class 10 result (the Board marks grid).
 function boardMarksGoal(
   criterion: Criterion,
   profile: Profile,
 ): string | undefined {
   const field = criterion.field as BoardMarksField;
-  const year = BOARD_MARKS_YEAR[field];
   const target = asBoardResult(criterion.value);
   const answer = profile[field];
-  if (criterion.op !== 'gte' || !target || !answer) return undefined;
-  if (profile.boardsUpcoming !== true || profile.class !== year)
-    return undefined;
+  if (field !== 'class12Result' || criterion.op !== 'gte') return undefined;
+  if (!target || !answer) return undefined;
+  if (profile.boardsUpcoming !== true || profile.class !== 12) return undefined;
   if (target.scale !== 'percentage' || answer.scale !== 'percentage')
     return undefined;
   if (target.value > 100 || target.value - answer.value > MAX_MARKS_GAP)
     return undefined;
-  return `Score ${target.value}% in Class ${year} to unlock this`;
+  return `Score ${target.value}% in Class 12 to unlock this`;
 }
 
 // A Board marks result, or undefined when the value isn't one.
@@ -275,7 +274,10 @@ function compareBoardResult(threshold: unknown, answer: unknown): Outcome {
 }
 
 // Income bands in rupees. A Student's income lies somewhere inside their
-// band; a threshold on a band edge still decides.
+// band; a threshold on a band edge still decides. The keys are also the
+// bands a Match request may send (profile-input.ts): they stay beside their
+// ranges rather than in FIXED_LISTS, which holds the values Criteria are
+// written in, and an income Criterion holds rupees, not a band.
 export const INCOME_BANDS: Record<string, [number, number]> = {
   under_1l: [0, 100_000],
   '1l_2l': [100_000, 200_000],
@@ -300,14 +302,14 @@ function derivedAnswer(profile: Profile, field: string): unknown {
   if (field === 'citizenshipCountry') {
     return (
       profile.citizenshipCountry ??
-      (profile.citizenship === 'indian' ? 'IN' : undefined)
+      (profile.citizenship === 'indian' ? INDIA : undefined)
     );
   }
   return (profile as Record<string, unknown>)[field];
 }
 
 function homeStateInIndia(profile: Profile): IndianState | undefined {
-  if (profile.countryOfResidence !== 'IN') return undefined;
+  if (profile.countryOfResidence !== INDIA) return undefined;
   return (Object.keys(STATE_REGIONS) as IndianState[]).find(
     (state) => STATE_REGIONS[state] === profile.region,
   );

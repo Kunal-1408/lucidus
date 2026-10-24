@@ -39,12 +39,28 @@ export const CRITERION_FIELDS: Record<
   examsQualified: { op: 'in', changeable: false },
 };
 
+// The Board marks fields: each holds a result on its Result scale (frontend
+// copy: BOARD_MARKS_FIELDS in frontend/src/app/profile-rules.ts).
+export const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'] as const;
+export type BoardMarksField = (typeof BOARD_MARKS_FIELDS)[number];
+
+export function isBoardMarksField(field: string): field is BoardMarksField {
+  return (BOARD_MARKS_FIELDS as readonly string[]).includes(field);
+}
+
+// The percentage marks fields Board marks replaced, still read for stored
+// Criteria and Overrides until ticket 09 removes them.
+export const LEGACY_MARKS_FIELDS = ['class10Marks', 'latestMarks'] as const;
+
+export function isLegacyMarksField(field: string): boolean {
+  return (LEGACY_MARKS_FIELDS as readonly string[]).includes(field);
+}
+
 // Fields stored Criteria and Overrides may still name, but that extraction
 // no longer produces: Board marks replaced the marks fields, Home state the
 // domicile state. Ticket 09 removes them.
 export const LEGACY_FIELDS: readonly string[] = [
-  'class10Marks',
-  'latestMarks',
+  ...LEGACY_MARKS_FIELDS,
   'domicileState',
 ];
 

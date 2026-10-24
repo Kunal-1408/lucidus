@@ -2,6 +2,7 @@
 // Extractor, and which of its fields are Criteria in their own right.
 import { isObject } from '../input-checks.js';
 import {
+  BOARD_MARKS_FIELDS,
   CRITERION_FIELDS,
   EXTRACTED_FIELDS,
 } from '../scholarships/criterion-fields.js';
@@ -63,7 +64,7 @@ export function itemsAt(
 }
 
 // Fields whose values are parsed from figures and labels, not slugs.
-const PARSED_FIELDS = ['class', 'class10Result', 'class12Result', 'incomeBand'];
+const PARSED_FIELDS = ['class', ...BOARD_MARKS_FIELDS, 'incomeBand'];
 
 // The Criteria an item states as top-level fields named after Profile
 // fields (CRITERION_FIELDS). A value that fits the field's fixed list is high Confidence, like
