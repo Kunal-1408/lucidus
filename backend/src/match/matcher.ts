@@ -217,7 +217,7 @@ function goalFor(criterion: Criterion, profile: Profile): string | undefined {
 
 // Income bands in rupees. A Student's income lies somewhere inside their
 // band; a threshold on a band edge still decides.
-const INCOME_BANDS: Record<string, [number, number]> = {
+export const INCOME_BANDS: Record<string, [number, number]> = {
   under_1l: [0, 100_000],
   '1l_2l': [100_000, 200_000],
   '2l_2_5l': [200_000, 250_000],

@@ -163,25 +163,3 @@ export interface Profile {
   parentOccupation?: ValueOf<typeof PARENT_OCCUPATIONS>[];
   examsQualified?: ValueOf<typeof EXAMS>[];
 }
-
-// Drops answers the rest of the Profile rules out: single girl child only applies
-// to a female Student, a stream only to Class 11 and 12, Class 10 board marks not
-// to Class 9.
-export function withoutContradictions(profile: Profile): Profile {
-  const kept: Profile = { ...profile };
-  if (kept.gender !== 'female') delete kept.singleGirlChild;
-  if (kept.class === 9 || kept.class === 10) delete kept.stream;
-  if (kept.class === 9) delete kept.class10Marks;
-  return kept;
-}
-
-// The Profile as sent inside a Match request: contradicting answers dropped and
-// school state falling back to the domicile state.
-export function profileForMatch(profile: Profile): Profile {
-  const sent = withoutContradictions(profile);
-  sent.schoolState ??= sent.domicileState;
-  for (const key of Object.keys(sent) as (keyof Profile)[]) {
-    if (sent[key] === undefined) delete sent[key];
-  }
-  return sent;
-}

@@ -94,6 +94,18 @@ form > label,
   font-weight: 500;
 }
 
+/* Why an answer was not saved, under its field. */
+.field-error {
+  grid-column: 2;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--amber);
+}
+
+input[aria-invalid='true'] {
+  border-color: var(--amber);
+}
+
 form > label:first-of-type {
   border-top: 1px solid var(--line);
 }
@@ -237,6 +249,10 @@ button[type='submit']:hover {
   form > label,
   .more-fields > label {
     grid-template-columns: 1fr;
+  }
+
+  .field-error {
+    grid-column: 1;
   }
 }
 

@@ -67,11 +67,15 @@
       step="0.1"
       inputmode="decimal"
       [value]="profile().latestMarks ?? ''"
+      [attr.aria-invalid]="marksErrors().latestMarks ? true : null"
       (change)="setMarks('latestMarks', $any($event.target).value)"
     />
+    @if (marksErrors().latestMarks; as error) {
+      <span class="field-error" role="alert">{{ error }}</span>
+    }
   </label>
 
-  @if (profile().class !== 9) {
+  @if (shown().has('class10Marks')) {
     <label>
       Class 10 board marks (%)
       <input
@@ -81,8 +85,12 @@
         step="0.1"
         inputmode="decimal"
         [value]="profile().class10Marks ?? ''"
+        [attr.aria-invalid]="marksErrors().class10Marks ? true : null"
         (change)="setMarks('class10Marks', $any($event.target).value)"
       />
+      @if (marksErrors().class10Marks; as error) {
+        <span class="field-error" role="alert">{{ error }}</span>
+      }
     </label>
   }
 
@@ -135,7 +143,7 @@
         </select>
       </label>
 
-      @if (profile().class !== 9 && profile().class !== 10) {
+      @if (shown().has('stream')) {
         <label>
           Stream (Class 11 and 12)
           <select (change)="setChoice('stream', $any($event.target).value)">
@@ -201,7 +209,7 @@
         </select>
       </label>
 
-      @if (profile().gender === 'female') {
+      @if (shown().has('singleGirlChild')) {
         <label>
           Are you a single girl child?
           <select (change)="setYesNo('singleGirlChild', $any($event.target).value)">
