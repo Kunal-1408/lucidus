@@ -3,11 +3,13 @@
 // every value a Criterion can hold is one the form can send. The frontend
 // keeps its own copy of the fixed lists (there is no shared types package),
 // so this test reads them straight from frontend/src/app/profile-fields.ts.
+import * as formPlaces from '../../../frontend/src/app/countries.js';
 import * as form from '../../../frontend/src/app/profile-fields.js';
 import { readValue } from '../ingestion/extractor.js';
 import { FIXED_LISTS } from '../ingestion/normalise.js';
+import { COUNTRIES, REGIONS } from '../match/countries.js';
 import { match } from '../match/matcher.js';
-import type { Profile } from '../match/profile.js';
+import { type Profile, STATE_REGIONS } from '../match/profile.js';
 import { CRITERION_FIELDS } from './criterion-fields.js';
 
 type FormOption = { value: string | number };
@@ -15,6 +17,12 @@ type FormOption = { value: string | number };
 // Each Profile field the form offers a fixed list for, with that list.
 const FORM_LISTS: Record<string, readonly FormOption[]> = {
   class: form.CLASSES,
+  countryOfResidence: formPlaces.COUNTRIES,
+  // The form offers the regions of the country picked; together, all of them.
+  region: Object.values(formPlaces.REGIONS).flat(),
+  homeState: form.STATES,
+  residenceStatus: form.RESIDENCE_STATUSES,
+  citizenshipCountry: formPlaces.COUNTRIES,
   domicileState: form.STATES,
   schoolState: form.STATES,
   schoolType: form.SCHOOL_TYPES,
@@ -193,6 +201,27 @@ describe('Form ↔ Criteria contract', () => {
     it('holds a limit in rupees', () => {
       expect(readValue('incomeBand', ['250000'])).toBe(250_000);
       expect(readValue('incomeBand', ['Rs. 2.5 lakh'])).toBe(250_000);
+    });
+  });
+
+  describe('countries and regions', () => {
+    it('the form and the backend hold the same countries and regions', () => {
+      expect(formPlaces.COUNTRIES).toEqual(COUNTRIES);
+      expect(formPlaces.REGIONS).toEqual(REGIONS);
+    });
+
+    it('the form and the backend place each Indian state in the same region of India', () => {
+      expect(form.STATE_REGIONS).toEqual(STATE_REGIONS);
+      const indianRegions = REGIONS.IN.map((region) => region.value);
+      expect(Object.values(STATE_REGIONS).sort()).toEqual(
+        [...indianRegions].sort(),
+      );
+    });
+
+    it('reads a code as the LLM or a reviewer may write it', () => {
+      expect(readValue('countryOfResidence', ['ae'])).toEqual(['AE']);
+      expect(readValue('region', ['ca-on'])).toEqual(['CA-ON']);
+      expect(readValue('citizenshipCountry', ['XX'])).toBeUndefined();
     });
   });
 });

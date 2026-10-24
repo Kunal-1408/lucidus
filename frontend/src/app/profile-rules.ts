@@ -2,12 +2,18 @@
 // clears, and the range each answer must fall in. The profile page only
 // renders what these return. The backend applies the same rules to a Match
 // request in backend/src/match/profile-input.ts.
-import { BoardResult, Profile, RESULT_SCALES } from './profile-fields';
+import { REGIONS } from './countries';
+import { BoardResult, Profile, RESULT_SCALES, STATE_REGIONS, STATES } from './profile-fields';
 
 export type Question = keyof Profile;
 
 const QUESTIONS: readonly Question[] = [
   'class',
+  'countryOfResidence',
+  'region',
+  'homeState',
+  'residenceStatus',
+  'citizenshipCountry',
   'domicileState',
   'schoolState',
   'schoolType',
@@ -37,6 +43,7 @@ export function visibleQuestions(profile: Profile): ReadonlySet<Question> {
   const hidden = new Set<Question>(boardMarksHidden(profile));
   if (profile.gender !== 'female') hidden.add('singleGirlChild');
   if (profile.class === 9 || profile.class === 10) hidden.add('stream');
+  for (const question of unaskedForResidence(profile)) hidden.add(question);
   return new Set(QUESTIONS.filter((question) => !hidden.has(question)));
 }
 
@@ -75,7 +82,7 @@ export function boardMarksLabel(question: BoardMarksQuestion, profile: Profile):
 // The Profile after a change: the changed answers applied, and every answer
 // to a question the new Profile no longer asks cleared.
 export function applyChange(profile: Profile, change: Partial<Profile>): Profile {
-  return withoutUnasked({ ...profile, ...change });
+  return withoutUnasked(withResidenceClears(profile, change));
 }
 
 // Why an answer can't be saved, or undefined when it can. An invalid answer
@@ -104,7 +111,7 @@ function checkBoardResult(answer: unknown): string | undefined {
 
 // A Profile saved by an earlier version of the form, in today's shape.
 export function migrateSavedProfile(saved: Record<string, unknown>): Profile {
-  return withBoardMarks(saved) as Profile;
+  return withHomeState(withBoardMarks(saved)) as Profile;
 }
 
 // Latest exam marks meant a different year for each class, so they are
@@ -125,9 +132,63 @@ function withBoardMarks(saved: Record<string, unknown>): Record<string, unknown>
 // longer asks dropped (a saved Profile may predate a rule), and school state
 // falling back to the domicile state.
 export function profileForMatch(profile: Profile): Profile {
-  const sent = withoutUnasked(profile);
-  if (sent.domicileState !== undefined) sent.schoolState ??= sent.domicileState;
+  const sent = withoutUnasked(withResidenceClears(profile, {}));
+  const homeState = sent.domicileState ?? homeStateOf(sent);
+  if (homeState !== undefined) sent.schoolState ??= homeState;
   return sent;
+}
+
+// Where the Student lives and their Citizenship: the state or region needs a
+// country; Home state and Residence status are asked only abroad (in India,
+// the region is the Home state); the Citizenship country only of another
+// nationality; category of everyone but another nationality.
+const INDIA = 'IN';
+
+function unaskedForResidence(profile: Profile): Question[] {
+  const unasked: Question[] = [];
+  const country = profile.countryOfResidence;
+  if (country === undefined) unasked.push('region');
+  if (country === undefined || country === INDIA) unasked.push('homeState', 'residenceStatus');
+  if (profile.citizenship !== 'other') unasked.push('citizenshipCountry');
+  else unasked.push('category');
+  return unasked;
+}
+
+// A change of country clears the answers given about the old one, unless the
+// change gives them again; a region is kept only when it is one of the
+// country's.
+function withResidenceClears(profile: Profile, change: Partial<Profile>): Profile {
+  const next: Profile = { ...profile, ...change };
+  if ('countryOfResidence' in change && change.countryOfResidence !== profile.countryOfResidence) {
+    for (const question of ['region', 'homeState', 'residenceStatus'] as const) {
+      if (!(question in change)) delete next[question];
+    }
+  }
+  if (next.region !== undefined && !isRegionOf(next.region, next.countryOfResidence)) {
+    delete next.region;
+  }
+  return next;
+}
+
+function isRegionOf(region: string, country: string | undefined): boolean {
+  return country !== undefined && (REGIONS[country] ?? []).some((r) => r.value === region);
+}
+
+// The Home state: the region for a Student in India, the answer abroad.
+function homeStateOf(profile: Profile): Profile['homeState'] {
+  if (profile.countryOfResidence !== INDIA) return profile.homeState;
+  return STATES.find((state) => STATE_REGIONS[state.value] === profile.region)?.value;
+}
+
+// A saved domicile state becomes India and the matching region, which makes
+// it the Home state again; one that is no Indian state, or given beside a
+// country, is dropped.
+function withHomeState(saved: Record<string, unknown>): Record<string, unknown> {
+  const { domicileState, ...migrated } = saved;
+  if (domicileState === undefined || migrated['countryOfResidence'] !== undefined) return migrated;
+  const state = STATES.find((s) => s.value === domicileState);
+  if (state === undefined) return migrated;
+  return { countryOfResidence: INDIA, region: STATE_REGIONS[state.value], ...migrated };
 }
 
 // Clearing one answer can hide another question in turn, so this repeats

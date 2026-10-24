@@ -1,9 +1,11 @@
+import { Profile } from './profile-fields';
 import {
   applyChange,
   boardMarksLabel,
   checkAnswer,
   migrateSavedProfile,
   profileForMatch,
+  Question,
   visibleQuestions,
 } from './profile-rules';
 
@@ -167,5 +169,141 @@ describe('Board marks', () => {
       class: 11,
       class10Result: percent(70),
     });
+  });
+});
+
+// Country of residence, region, Home state, Residence status and Citizenship.
+describe('where the Student lives and their Citizenship', () => {
+  const asked = (profile: Profile, question: Question) => visibleQuestions(profile).has(question);
+
+  it('asks the state or region only once a country is picked', () => {
+    expect(asked({}, 'region')).toBe(false);
+    expect(asked({ countryOfResidence: 'AE' }, 'region')).toBe(true);
+  });
+
+  it('asks Home state and Residence status only of a Student living outside India', () => {
+    for (const question of ['homeState', 'residenceStatus'] as const) {
+      expect(asked({}, question)).toBe(false);
+      expect(asked({ countryOfResidence: 'IN' }, question)).toBe(false);
+      expect(asked({ countryOfResidence: 'AE' }, question)).toBe(true);
+    }
+  });
+
+  it('asks the Citizenship country only of another nationality', () => {
+    expect(asked({}, 'citizenshipCountry')).toBe(false);
+    expect(asked({ citizenship: 'indian' }, 'citizenshipCountry')).toBe(false);
+    expect(asked({ citizenship: 'oci' }, 'citizenshipCountry')).toBe(false);
+    expect(asked({ citizenship: 'other' }, 'citizenshipCountry')).toBe(true);
+  });
+
+  it('asks category of Indian citizens and OCI card holders, not of another nationality', () => {
+    expect(asked({}, 'category')).toBe(true);
+    expect(asked({ citizenship: 'indian' }, 'category')).toBe(true);
+    expect(asked({ citizenship: 'oci' }, 'category')).toBe(true);
+    expect(asked({ citizenship: 'other' }, 'category')).toBe(false);
+  });
+
+  it('clears region, Home state and Residence status when the country changes', () => {
+    const abroad: Profile = {
+      countryOfResidence: 'AE',
+      region: 'AE-DU',
+      homeState: 'kerala',
+      residenceStatus: 'visa',
+      gender: 'female',
+    };
+    expect(applyChange(abroad, { countryOfResidence: 'GB' })).toEqual({
+      countryOfResidence: 'GB',
+      gender: 'female',
+    });
+    expect(applyChange(abroad, { countryOfResidence: 'IN' })).toEqual({
+      countryOfResidence: 'IN',
+      gender: 'female',
+    });
+    expect(applyChange(abroad, { countryOfResidence: undefined })).toEqual({ gender: 'female' });
+  });
+
+  it('keeps the answers that depend on the country when something else changes', () => {
+    const abroad: Profile = { countryOfResidence: 'AE', region: 'AE-DU', homeState: 'kerala' };
+    expect(applyChange(abroad, { residenceStatus: 'permanent_resident' })).toEqual({
+      ...abroad,
+      residenceStatus: 'permanent_resident',
+    });
+    expect(applyChange(abroad, { countryOfResidence: 'AE' })).toEqual(abroad);
+  });
+
+  it('never keeps a region from another country, or one that does not exist', () => {
+    expect(applyChange({ countryOfResidence: 'IN' }, { region: 'AE-DU' })).toEqual({
+      countryOfResidence: 'IN',
+    });
+    expect(applyChange({ countryOfResidence: 'IN' }, { region: 'IN-XX' })).toEqual({
+      countryOfResidence: 'IN',
+    });
+    expect(applyChange({ countryOfResidence: 'IN' }, { region: 'IN-KL' })).toEqual({
+      countryOfResidence: 'IN',
+      region: 'IN-KL',
+    });
+  });
+
+  it('clears category when Citizenship moves to another nationality', () => {
+    expect(
+      applyChange({ citizenship: 'indian', category: 'sc' }, { citizenship: 'other' }),
+    ).toEqual({ citizenship: 'other' });
+    expect(applyChange({ citizenship: 'indian', category: 'sc' }, { citizenship: 'oci' })).toEqual({
+      citizenship: 'oci',
+      category: 'sc',
+    });
+  });
+
+  it('clears the Citizenship country when Citizenship leaves another nationality', () => {
+    expect(
+      applyChange({ citizenship: 'other', citizenshipCountry: 'GB' }, { citizenship: 'oci' }),
+    ).toEqual({ citizenship: 'oci' });
+  });
+
+  it('sends the Home state as the school state fallback, wherever the Student lives', () => {
+    expect(profileForMatch({ countryOfResidence: 'IN', region: 'IN-KL' })).toEqual({
+      countryOfResidence: 'IN',
+      region: 'IN-KL',
+      schoolState: 'kerala',
+    });
+    expect(profileForMatch({ countryOfResidence: 'AE', homeState: 'goa' })).toEqual({
+      countryOfResidence: 'AE',
+      homeState: 'goa',
+      schoolState: 'goa',
+    });
+  });
+});
+
+describe('migrateSavedProfile: Home state', () => {
+  it('turns a saved domicile state into India and its region, so the same Home state', () => {
+    expect(migrateSavedProfile({ domicileState: 'kerala', gender: 'female' })).toEqual({
+      countryOfResidence: 'IN',
+      region: 'IN-KL',
+      gender: 'female',
+    });
+    expect(migrateSavedProfile({ domicileState: 'odisha' })).toEqual({
+      countryOfResidence: 'IN',
+      region: 'IN-OD',
+    });
+  });
+
+  it('keeps a country already given and drops the domicile state', () => {
+    expect(migrateSavedProfile({ countryOfResidence: 'AE', domicileState: 'kerala' })).toEqual({
+      countryOfResidence: 'AE',
+    });
+  });
+
+  it('drops a domicile state that is no Indian state', () => {
+    expect(migrateSavedProfile({ domicileState: 'atlantis' })).toEqual({});
+  });
+
+  it('keeps Citizenship as it was: Indian stays Indian, other stays other with no country', () => {
+    expect(migrateSavedProfile({ citizenship: 'indian' })).toEqual({ citizenship: 'indian' });
+    expect(migrateSavedProfile({ citizenship: 'other' })).toEqual({ citizenship: 'other' });
+  });
+
+  it('leaves a Profile without old answers as it is', () => {
+    const profile = { countryOfResidence: 'GB', region: 'GB-ENG', class: 11 };
+    expect(migrateSavedProfile(profile)).toEqual(profile);
   });
 });

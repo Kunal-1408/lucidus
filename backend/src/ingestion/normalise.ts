@@ -1,5 +1,6 @@
 // Normalisation: turns the raw values the rules (and, later, the LLM) find
 // into the exact values the Matcher compares against the Profile.
+import { COUNTRIES, REGIONS } from '../match/countries.js';
 import type { IndianState, Profile } from '../match/profile.js';
 
 const LAKH = 100_000;
@@ -102,12 +103,23 @@ export const STATE_NAMES: [IndianState, RegExp][] = STATES.map(
   },
 );
 
+// Every ISO 3166-1 alpha-2 country and ISO 3166-2 region code.
+export const COUNTRY_CODES = COUNTRIES.map((country) => country.value);
+export const REGION_CODES = Object.values(REGIONS).flatMap((regions) =>
+  regions.map((region) => region.value),
+);
+
 // The fixed lists, as the Profile stores them.
 export const FIXED_LISTS: Record<string, readonly string[]> = {
+  countryOfResidence: COUNTRY_CODES,
+  region: REGION_CODES,
+  homeState: STATES,
+  residenceStatus: ['citizen', 'permanent_resident', 'visa'],
+  citizenshipCountry: COUNTRY_CODES,
   domicileState: STATES,
   schoolState: STATES,
   schoolType: ['government', 'aided', 'private'],
-  citizenship: ['indian', 'other'],
+  citizenship: ['indian', 'oci', 'other'],
   board: [
     'cbse',
     'cisce',
@@ -154,6 +166,8 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
 type ArrayElement<T> = T extends readonly (infer E)[] ? E : never;
 
 const YES_NO_FIELDS = ['minority', 'disability', 'singleGirlChild'];
+// Fields holding ISO codes, which a source or the LLM may write in any case.
+const ISO_CODE_FIELDS = ['countryOfResidence', 'region', 'citizenshipCountry'];
 
 // The value a Criterion stores for a raw value a rule found, or undefined
 // when it falls outside the field's fixed list (the Criterion is dropped).
@@ -183,6 +197,10 @@ export function normaliseValue(
   }
   if (field === 'class10Result' || field === 'class12Result') {
     return toBoardResult(raw);
+  }
+  if (ISO_CODE_FIELDS.includes(field)) {
+    const codes = asList(raw).map((code) => code.trim().toUpperCase());
+    return oneOf(codes, FIXED_LISTS[field], op);
   }
   if (YES_NO_FIELDS.includes(field)) {
     if (raw === 'yes') return true;

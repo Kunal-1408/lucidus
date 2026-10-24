@@ -15,16 +15,84 @@
   </label>
 
   <label>
-    State you live in (domicile)
-    <select (change)="setChoice('domicileState', $any($event.target).value)">
+    Country you live in
+    <select (change)="setChoice('countryOfResidence', $any($event.target).value)">
       <option value="">N.A</option>
-      @for (s of states; track s.value) {
-        <option [value]="s.value" [selected]="profile().domicileState === s.value">
-          {{ s.label }}
+      @for (c of countries; track c.value) {
+        <option [value]="c.value" [selected]="profile().countryOfResidence === c.value">
+          {{ c.label }}
         </option>
       }
     </select>
   </label>
+
+  @if (shown().has('region') && regions().length) {
+    <label>
+      State or region you live in
+      <select (change)="setChoice('region', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (r of regions(); track r.value) {
+          <option [value]="r.value" [selected]="profile().region === r.value">
+            {{ r.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (shown().has('homeState')) {
+    <label>
+      Home state in India, if you have one
+      <select (change)="setChoice('homeState', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (s of states; track s.value) {
+          <option [value]="s.value" [selected]="profile().homeState === s.value">
+            {{ s.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (shown().has('residenceStatus')) {
+    <label>
+      Residence status in that country
+      <select (change)="setChoice('residenceStatus', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (r of residenceStatuses; track r.value) {
+          <option [value]="r.value" [selected]="profile().residenceStatus === r.value">
+            {{ r.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  <label>
+    Citizenship
+    <select (change)="setChoice('citizenship', $any($event.target).value)">
+      <option value="">N.A</option>
+      @for (c of citizenships; track c.value) {
+        <option [value]="c.value" [selected]="profile().citizenship === c.value">
+          {{ c.label }}
+        </option>
+      }
+    </select>
+  </label>
+
+  @if (shown().has('citizenshipCountry')) {
+    <label>
+      Country of citizenship
+      <select (change)="setChoice('citizenshipCountry', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (c of countries; track c.value) {
+          <option [value]="c.value" [selected]="profile().citizenshipCountry === c.value">
+            {{ c.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
 
   <label>
     Board
@@ -80,15 +148,19 @@
     </select>
   </label>
 
-  <label>
-    Category
-    <select (change)="setChoice('category', $any($event.target).value)">
-      <option value="">N.A</option>
-      @for (c of categories; track c.value) {
-        <option [value]="c.value" [selected]="profile().category === c.value">{{ c.label }}</option>
-      }
-    </select>
-  </label>
+  @if (shown().has('category')) {
+    <label>
+      Category
+      <select (change)="setChoice('category', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (c of categories; track c.value) {
+          <option [value]="c.value" [selected]="profile().category === c.value">
+            {{ c.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
 
   <label>
     Family income per year
@@ -162,18 +234,6 @@
           <option value="">N.A</option>
           @for (s of states; track s.value) {
             <option [value]="s.value" [selected]="schoolState() === s.value">{{ s.label }}</option>
-          }
-        </select>
-      </label>
-
-      <label>
-        Citizenship
-        <select (change)="setChoice('citizenship', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (c of citizenships; track c.value) {
-            <option [value]="c.value" [selected]="profile().citizenship === c.value">
-              {{ c.label }}
-            </option>
           }
         </select>
       </label>

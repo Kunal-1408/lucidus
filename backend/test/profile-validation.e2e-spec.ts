@@ -176,4 +176,114 @@ describe('Match request Profile validation', () => {
     const res = await matchWith([1, 2]).expect(400);
     expect(res.body.message).toEqual(['The Profile must be an object']);
   });
+
+  // Country of residence, region, Home state, Residence status and
+  // Citizenship.
+  describe('where the Student lives and their Citizenship', () => {
+    it.each([
+      [
+        'an Indian citizen living in Kerala',
+        {
+          countryOfResidence: 'IN',
+          region: 'IN-KL',
+          citizenship: 'indian',
+          category: 'obc',
+        },
+      ],
+      [
+        'an OCI card holder in Dubai with a Home state',
+        {
+          countryOfResidence: 'AE',
+          region: 'AE-DU',
+          homeState: 'kerala',
+          residenceStatus: 'visa',
+          citizenship: 'oci',
+          category: 'general',
+        },
+      ],
+      [
+        'a British citizen in London',
+        {
+          countryOfResidence: 'GB',
+          region: 'GB-ENG',
+          residenceStatus: 'citizen',
+          citizenship: 'other',
+          citizenshipCountry: 'GB',
+        },
+      ],
+    ])('matches %s', async (_, profile) => {
+      await matchWith(profile).expect(200);
+    });
+
+    it.each([
+      [
+        'a country that is no ISO code',
+        { countryOfResidence: 'UK' },
+        'countryOfResidence must be an ISO 3166-1 alpha-2 country code',
+      ],
+      [
+        'a region that is no ISO code',
+        { countryOfResidence: 'IN', region: 'IN-XX' },
+        'region must be an ISO 3166-2 region code',
+      ],
+      [
+        'a region without a country',
+        { region: 'IN-KL' },
+        'region is only asked when countryOfResidence is given',
+      ],
+      [
+        'a region of another country',
+        { countryOfResidence: 'IN', region: 'AE-DU' },
+        'region must be a region of countryOfResidence',
+      ],
+      [
+        'a Home state for a Student in India',
+        { countryOfResidence: 'IN', homeState: 'kerala' },
+        'homeState is only asked when countryOfResidence is not IN',
+      ],
+      [
+        'a Home state without a country',
+        { homeState: 'kerala' },
+        'homeState is only asked when countryOfResidence is not IN',
+      ],
+      [
+        'an unknown Home state',
+        { countryOfResidence: 'AE', homeState: 'atlantis' },
+        expect.stringMatching(/^homeState must be one of andhra_pradesh, /),
+      ],
+      [
+        'a Residence status for a Student in India',
+        { countryOfResidence: 'IN', residenceStatus: 'citizen' },
+        'residenceStatus is only asked when countryOfResidence is not IN',
+      ],
+      [
+        'an unknown Residence status',
+        { countryOfResidence: 'AE', residenceStatus: 'tourist' },
+        'residenceStatus must be one of citizen, permanent_resident, visa',
+      ],
+      [
+        'an unknown Citizenship',
+        { citizenship: 'nri' },
+        'citizenship must be one of indian, oci, other',
+      ],
+      [
+        'a Citizenship country for an Indian citizen',
+        { citizenship: 'indian', citizenshipCountry: 'GB' },
+        'citizenshipCountry is only asked when citizenship is other',
+      ],
+      [
+        'a Citizenship country that is no ISO code',
+        { citizenship: 'other', citizenshipCountry: 'XX' },
+        'citizenshipCountry must be an ISO 3166-1 alpha-2 country code',
+      ],
+      [
+        'a category for another nationality',
+        { citizenship: 'other', category: 'sc' },
+        'category is only asked when citizenship is indian or oci',
+      ],
+    ])('answers 400 for %s, naming the field', async (_, profile, reason) => {
+      const res = await matchWith(profile).expect(400);
+      expect(res.body.message).toEqual([reason]);
+    });
+  });
 });
