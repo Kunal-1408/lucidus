@@ -3,7 +3,12 @@ import type {
   Criterion,
   ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
-import { type IndianState, type Profile, STATE_REGIONS } from './profile.js';
+import {
+  type BoardResult,
+  type IndianState,
+  type Profile,
+  STATE_REGIONS,
+} from './profile.js';
 
 // The slice of a Scholarship the Matcher needs. Only active Scholarships
 // not needing review are matched; the others are skipped.
@@ -77,6 +82,8 @@ const FIELD_LABELS: Record<string, string> = {
   board: 'board',
   class10Marks: 'Class 10 marks',
   latestMarks: 'latest marks',
+  class10Result: 'Class 10 result',
+  class12Result: 'Class 12 result',
   boardsUpcoming: 'whether your boards are upcoming',
   stream: 'stream',
   fieldOfStudy: 'intended field of study',
@@ -197,6 +204,7 @@ const UG_GOAL = 'Get admitted to an undergraduate course to unlock this';
 function goalFor(criterion: Criterion, profile: Profile): string | undefined {
   if (!criterion.changeable) return undefined;
   const { field, op, value } = criterion;
+  if (isBoardMarksField(field)) return boardMarksGoal(criterion, profile);
   if (
     (field === 'latestMarks' || field === 'class10Marks') &&
     op === 'gte' &&
@@ -218,6 +226,52 @@ function goalFor(criterion: Criterion, profile: Profile): string | undefined {
       return UG_GOAL;
   }
   return undefined;
+}
+
+const BOARD_MARKS_YEAR = { class10Result: 10, class12Result: 12 } as const;
+type BoardMarksField = keyof typeof BOARD_MARKS_YEAR;
+
+function isBoardMarksField(field: string): field is BoardMarksField {
+  return field in BOARD_MARKS_YEAR;
+}
+
+// Today's marks rule on Board marks: a percentage shortfall of at most 5 is
+// a Goal while the boards for that result are still upcoming (a Class 12
+// Student's upcoming boards are Class 12's; their Class 10 result is final).
+function boardMarksGoal(
+  criterion: Criterion,
+  profile: Profile,
+): string | undefined {
+  const field = criterion.field as BoardMarksField;
+  const year = BOARD_MARKS_YEAR[field];
+  const target = asBoardResult(criterion.value);
+  const answer = profile[field];
+  if (criterion.op !== 'gte' || !target || !answer) return undefined;
+  if (profile.boardsUpcoming !== true || profile.class !== year)
+    return undefined;
+  if (target.scale !== 'percentage' || answer.scale !== 'percentage')
+    return undefined;
+  if (target.value > 100 || target.value - answer.value > MAX_MARKS_GAP)
+    return undefined;
+  return `Score ${target.value}% in Class ${year} to unlock this`;
+}
+
+// A Board marks result, or undefined when the value isn't one.
+function asBoardResult(value: unknown): BoardResult | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { scale, value: number } = value as Record<string, unknown>;
+  return typeof scale === 'string' && typeof number === 'number'
+    ? { scale: scale as BoardResult['scale'], value: number }
+    : undefined;
+}
+
+// A result passes a threshold on its own scale; on another scale it can't be
+// judged, since results are never converted.
+function compareBoardResult(threshold: unknown, answer: unknown): Outcome {
+  const target = asBoardResult(threshold);
+  const result = asBoardResult(answer);
+  if (!target || !result || target.scale !== result.scale) return 'unknown';
+  return result.value >= target.value ? 'pass' : 'fail';
 }
 
 // Income bands in rupees. A Student's income lies somewhere inside their
@@ -274,6 +328,9 @@ function evaluate(criterion: Criterion, profile: Profile): Outcome {
 
 function compare(criterion: Criterion, answer: unknown): Outcome {
   const { op, value } = criterion;
+  if (isBoardMarksField(criterion.field) && op === 'gte') {
+    return compareBoardResult(value, answer);
+  }
   if (criterion.field === 'incomeBand' && (op === 'lte' || op === 'gte')) {
     return compareIncome(op, Number(value), String(answer));
   }

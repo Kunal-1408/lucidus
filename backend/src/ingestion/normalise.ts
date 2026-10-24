@@ -120,7 +120,15 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
   schoolState: STATES,
   schoolType: ['government', 'aided', 'private'],
   citizenship: ['indian', 'oci', 'other'],
-  board: ['cbse', 'cisce', 'state', 'ib', 'cambridge', 'other'],
+  board: [
+    'cbse',
+    'cisce',
+    'state',
+    'cambridge',
+    'ib',
+    'us_high_school',
+    'other',
+  ],
   stream: ['science', 'commerce', 'arts', 'not_chosen'],
   fieldOfStudy: [
     'engineering',
@@ -187,6 +195,9 @@ export function normaliseValue(
   if (field === 'class10Marks' || field === 'latestMarks') {
     return toPercent(raw);
   }
+  if (field === 'class10Result' || field === 'class12Result') {
+    return toBoardResult(raw);
+  }
   if (ISO_CODE_FIELDS.includes(field)) {
     const codes = asList(raw).map((code) => code.trim().toUpperCase());
     return oneOf(codes, FIXED_LISTS[field], op);
@@ -203,6 +214,14 @@ export function normaliseValue(
 function toPercent(raw: string | string[]): number | undefined {
   const value = typeof raw === 'string' ? Number(raw) : NaN;
   return value > 0 && value <= 100 ? value : undefined;
+}
+
+// A Board marks threshold. Sources so far state percentages only.
+function toBoardResult(
+  raw: string | string[],
+): { scale: 'percentage'; value: number } | undefined {
+  const value = toPercent(raw);
+  return value === undefined ? undefined : { scale: 'percentage', value };
 }
 
 function oneOf(

@@ -1,8 +1,9 @@
 import { Profile } from './profile-fields';
 import {
   applyChange,
+  boardMarksLabel,
   checkAnswer,
-  migrateProfile,
+  migrateSavedProfile,
   profileForMatch,
   Question,
   visibleQuestions,
@@ -23,15 +24,9 @@ describe('visibleQuestions', () => {
     expect(visibleQuestions({}).has('stream')).toBe(true);
   });
 
-  it('hides Class 10 board marks from a Class 9 Student', () => {
-    expect(visibleQuestions({ class: 9 }).has('class10Marks')).toBe(false);
-    expect(visibleQuestions({ class: 10 }).has('class10Marks')).toBe(true);
-    expect(visibleQuestions({}).has('class10Marks')).toBe(true);
-  });
-
   it('asks every other question of every Student', () => {
     const shown = visibleQuestions({ class: 9, gender: 'male' });
-    for (const question of ['class', 'gender', 'latestMarks', 'board', 'citizenship'] as const) {
+    for (const question of ['class', 'gender', 'board', 'citizenship'] as const) {
       expect(shown.has(question)).toBe(true);
     }
   });
@@ -58,10 +53,6 @@ describe('applyChange', () => {
     expect(applyChange({ class: 11, stream: 'science' }, { class: 10 })).toEqual({ class: 10 });
   });
 
-  it('clears Class 10 board marks when class moves to Class 9', () => {
-    expect(applyChange({ class: 10, class10Marks: 80 }, { class: 9 })).toEqual({ class: 9 });
-  });
-
   it('drops an answer set back to nothing', () => {
     expect(applyChange({ board: 'cbse', gender: 'male' }, { board: undefined })).toEqual({
       gender: 'male',
@@ -70,16 +61,6 @@ describe('applyChange', () => {
 });
 
 describe('checkAnswer', () => {
-  it.each([0, 55.5, 100])('accepts marks of %s', (marks) => {
-    expect(checkAnswer('class10Marks', marks)).toBeUndefined();
-    expect(checkAnswer('latestMarks', marks)).toBeUndefined();
-  });
-
-  it.each([-1, 100.1, 105, NaN])('refuses marks of %s rather than clamping them', (marks) => {
-    expect(checkAnswer('class10Marks', marks)).toBe('Enter a percentage from 0 to 100.');
-    expect(checkAnswer('latestMarks', marks)).toBe('Enter a percentage from 0 to 100.');
-  });
-
   it('has no range for a fixed-list answer', () => {
     expect(checkAnswer('gender', 'female')).toBeUndefined();
   });
@@ -93,7 +74,101 @@ describe('profileForMatch', () => {
   });
 
   it('drops answers a saved Profile kept from before a rule existed', () => {
-    expect(profileForMatch({ class: 9, class10Marks: 80, stream: 'arts' })).toEqual({ class: 9 });
+    expect(profileForMatch({ class: 9, class10Result: percent(80), stream: 'arts' })).toEqual({
+      class: 9,
+    });
+  });
+});
+
+// Board marks: which results are asked, how they are labelled, the answers a
+// change clears, the range each scale allows and what a saved Profile keeps.
+const percent = (value: number) => ({ scale: 'percentage' as const, value });
+
+describe('Board marks', () => {
+  const asked = (profile: Parameters<typeof visibleQuestions>[0]) => {
+    const shown = visibleQuestions(profile);
+    return {
+      class10Result: shown.has('class10Result'),
+      class12Result: shown.has('class12Result'),
+      boardsUpcoming: shown.has('boardsUpcoming'),
+    };
+  };
+
+  it.each([
+    ['Class 9', { class: 9 }, false, false, false],
+    ['Class 10, boards upcoming', { class: 10, boardsUpcoming: true }, false, false, true],
+    ['Class 10, boards done', { class: 10, boardsUpcoming: false }, true, false, true],
+    ['Class 11', { class: 11 }, true, false, false],
+    ['Class 12, boards upcoming', { class: 12, boardsUpcoming: true }, true, true, true],
+    ['Class 12, boards done', { class: 12, boardsUpcoming: false }, true, true, true],
+    ['class not given', {}, true, true, false],
+  ] as const)(
+    'follows the grid for %s',
+    (_, profile, class10Result, class12Result, boardsUpcoming) => {
+      expect(asked(profile)).toEqual({ class10Result, class12Result, boardsUpcoming });
+    },
+  );
+
+  it('labels the Class 12 result as expected while boards are upcoming', () => {
+    expect(boardMarksLabel('class12Result', { class: 12, boardsUpcoming: true })).toBe(
+      'Expected Class 12 result (pre-boards or predicted)',
+    );
+    expect(boardMarksLabel('class12Result', { class: 12, boardsUpcoming: false })).toBe(
+      'Class 12 board result',
+    );
+    expect(boardMarksLabel('class10Result', { class: 11 })).toBe('Class 10 board result');
+  });
+
+  it('clears the results and boards-upcoming answer a new class rules out', () => {
+    expect(
+      applyChange(
+        { class: 12, boardsUpcoming: true, class10Result: percent(80), class12Result: percent(75) },
+        { class: 11 },
+      ),
+    ).toEqual({ class: 11, class10Result: percent(80) });
+    expect(applyChange({ class: 11, class10Result: percent(80) }, { class: 9 })).toEqual({
+      class: 9,
+    });
+  });
+
+  it('clears the Class 10 result when a Class 10 Student says boards are upcoming', () => {
+    expect(
+      applyChange(
+        { class: 10, boardsUpcoming: false, class10Result: percent(80) },
+        {
+          boardsUpcoming: true,
+        },
+      ),
+    ).toEqual({ class: 10, boardsUpcoming: true });
+  });
+
+  it.each([0, 55.5, 100])('accepts a percentage of %s', (value) => {
+    expect(checkAnswer('class10Result', percent(value))).toBeUndefined();
+    expect(checkAnswer('class12Result', percent(value))).toBeUndefined();
+  });
+
+  it.each([-1, 100.1, 105, NaN])('refuses a percentage of %s rather than clamping it', (value) => {
+    expect(checkAnswer('class10Result', percent(value))).toBe('Enter a percentage from 0 to 100.');
+    expect(checkAnswer('class12Result', percent(value))).toBe('Enter a percentage from 0 to 100.');
+  });
+
+  it('refuses a result on a scale it does not know', () => {
+    expect(checkAnswer('class12Result', { scale: 'stanine', value: 7 })).toBe(
+      'Pick the scale your result is given on.',
+    );
+  });
+
+  it('drops latest exam marks from a saved Profile and keeps Class 10 marks as the Class 10 result', () => {
+    expect(
+      migrateSavedProfile({ class: 12, latestMarks: 85, class10Marks: 91, gender: 'female' }),
+    ).toEqual({ class: 12, class10Result: percent(91), gender: 'female' });
+  });
+
+  it('leaves a saved Profile with nothing to migrate as it is', () => {
+    expect(migrateSavedProfile({ class: 11, class10Result: percent(70) })).toEqual({
+      class: 11,
+      class10Result: percent(70),
+    });
   });
 });
 
@@ -199,36 +274,36 @@ describe('where the Student lives and their Citizenship', () => {
   });
 });
 
-describe('migrateProfile', () => {
+describe('migrateSavedProfile: Home state', () => {
   it('turns a saved domicile state into India and its region, so the same Home state', () => {
-    expect(migrateProfile({ domicileState: 'kerala', gender: 'female' })).toEqual({
+    expect(migrateSavedProfile({ domicileState: 'kerala', gender: 'female' })).toEqual({
       countryOfResidence: 'IN',
       region: 'IN-KL',
       gender: 'female',
     });
-    expect(migrateProfile({ domicileState: 'odisha' })).toEqual({
+    expect(migrateSavedProfile({ domicileState: 'odisha' })).toEqual({
       countryOfResidence: 'IN',
       region: 'IN-OD',
     });
   });
 
   it('keeps a country already given and drops the domicile state', () => {
-    expect(migrateProfile({ countryOfResidence: 'AE', domicileState: 'kerala' })).toEqual({
+    expect(migrateSavedProfile({ countryOfResidence: 'AE', domicileState: 'kerala' })).toEqual({
       countryOfResidence: 'AE',
     });
   });
 
   it('drops a domicile state that is no Indian state', () => {
-    expect(migrateProfile({ domicileState: 'atlantis' } as unknown as Profile)).toEqual({});
+    expect(migrateSavedProfile({ domicileState: 'atlantis' })).toEqual({});
   });
 
   it('keeps Citizenship as it was: Indian stays Indian, other stays other with no country', () => {
-    expect(migrateProfile({ citizenship: 'indian' })).toEqual({ citizenship: 'indian' });
-    expect(migrateProfile({ citizenship: 'other' })).toEqual({ citizenship: 'other' });
+    expect(migrateSavedProfile({ citizenship: 'indian' })).toEqual({ citizenship: 'indian' });
+    expect(migrateSavedProfile({ citizenship: 'other' })).toEqual({ citizenship: 'other' });
   });
 
   it('leaves a Profile without old answers as it is', () => {
-    const profile: Profile = { countryOfResidence: 'GB', region: 'GB-ENG', class: 11 };
-    expect(migrateProfile(profile)).toEqual(profile);
+    const profile = { countryOfResidence: 'GB', region: 'GB-ENG', class: 11 };
+    expect(migrateSavedProfile(profile)).toEqual(profile);
   });
 });

@@ -142,10 +142,15 @@ export const BOARDS = [
   { value: 'cbse', label: 'CBSE' },
   { value: 'cisce', label: 'CISCE (ICSE / ISC)' },
   { value: 'state', label: 'State board' },
+  { value: 'cambridge', label: 'Cambridge/UK' },
   { value: 'ib', label: 'IB' },
-  { value: 'cambridge', label: 'Cambridge' },
+  { value: 'us_high_school', label: 'US high school' },
   { value: 'other', label: 'Other' },
 ] as const;
+
+// The scales a Board marks result can be given on. Results on different
+// scales are never compared.
+export const RESULT_SCALES = [{ value: 'percentage', label: 'Percentage' }] as const;
 
 export const STREAMS = [
   { value: 'science', label: 'Science' },
@@ -190,6 +195,14 @@ export const EXAMS = [
 
 type ValueOf<T extends readonly { value: unknown }[]> = T[number]['value'];
 
+export type ResultScale = ValueOf<typeof RESULT_SCALES>;
+
+// A Board marks result: a value on its Result scale.
+export interface BoardResult {
+  scale: ResultScale;
+  value: number;
+}
+
 // What a Student tells us about themselves. Every field is optional.
 export interface Profile {
   class?: ValueOf<typeof CLASSES>;
@@ -209,9 +222,9 @@ export interface Profile {
   schoolType?: ValueOf<typeof SCHOOL_TYPES>;
   citizenship?: ValueOf<typeof CITIZENSHIPS>;
   board?: ValueOf<typeof BOARDS>;
-  class10Marks?: number;
-  latestMarks?: number;
   boardsUpcoming?: boolean;
+  class10Result?: BoardResult;
+  class12Result?: BoardResult;
   stream?: ValueOf<typeof STREAMS>;
   fieldOfStudy?: ValueOf<typeof FIELDS_OF_STUDY>;
   destination?: ValueOf<typeof DESTINATIONS>;

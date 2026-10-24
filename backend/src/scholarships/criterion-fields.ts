@@ -9,6 +9,9 @@ export const CRITERION_FIELDS: Record<
   { op: Criterion['op']; changeable: boolean }
 > = {
   class: { op: 'in', changeable: true },
+  // Board marks: the value is a result on its Result scale.
+  class10Result: { op: 'gte', changeable: true },
+  class12Result: { op: 'gte', changeable: true },
   class10Marks: { op: 'gte', changeable: true },
   latestMarks: { op: 'gte', changeable: true },
   incomeBand: { op: 'lte', changeable: false },
@@ -24,7 +27,7 @@ export const CRITERION_FIELDS: Record<
   residenceStatus: { op: 'in', changeable: false },
   citizenshipCountry: { op: 'in', changeable: false },
   // Replaced by homeState: only Criteria stored before it existed use it,
-  // and extraction no longer writes it (see REPLACED_FIELDS).
+  // and extraction no longer writes it (see LEGACY_FIELDS).
   domicileState: { op: 'in', changeable: false },
   schoolState: { op: 'in', changeable: false },
   schoolType: { op: 'in', changeable: false },
@@ -36,6 +39,16 @@ export const CRITERION_FIELDS: Record<
   examsQualified: { op: 'in', changeable: false },
 };
 
-// Fields a Criterion stored earlier may still check, but which extraction
-// no longer asks for: the Matcher still judges them, the LLM is not asked.
-export const REPLACED_FIELDS: readonly string[] = ['domicileState'];
+// Fields stored Criteria and Overrides may still name, but that extraction
+// no longer produces: Board marks replaced the marks fields, Home state the
+// domicile state. Ticket 09 removes them.
+export const LEGACY_FIELDS: readonly string[] = [
+  'class10Marks',
+  'latestMarks',
+  'domicileState',
+];
+
+// The fields extraction (rules, the LLM, JSON sources) reads Criteria for.
+export const EXTRACTED_FIELDS = Object.keys(CRITERION_FIELDS).filter(
+  (field) => !LEGACY_FIELDS.includes(field),
+);

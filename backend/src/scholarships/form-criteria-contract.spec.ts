@@ -39,13 +39,19 @@ const FORM_LISTS: Record<string, readonly FormOption[]> = {
 };
 // Fields the form asks as a yes / no question.
 const YES_NO_FIELDS = ['minority', 'disability', 'singleGirlChild'];
-// Fields the form asks as a percentage.
-const MARKS_FIELDS = ['class10Marks', 'latestMarks'];
+// Board marks: fields the form asks as a result on a Result scale.
+const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'];
 
 // Values deliberately on one side only, each with the reason.
 const FORM_ONLY_FIELDS: Record<string, string> = {
   boardsUpcoming:
     'not a condition a Scholarship sets: it only lets a marks shortfall become a Goal',
+};
+const CRITERION_ONLY_FIELDS: Record<string, string> = {
+  class10Marks:
+    'replaced by Board marks; kept readable for stored Criteria and Overrides until ticket 09, never extracted',
+  latestMarks:
+    'replaced by Board marks; kept readable for stored Criteria and Overrides until ticket 09, never extracted',
 };
 const CRITERION_ONLY_VALUES: Record<string, Record<string, string>> = {
   parentOccupation: {
@@ -71,14 +77,19 @@ describe('Form ↔ Criteria contract', () => {
   const formFields = [
     ...Object.keys(FORM_LISTS),
     ...YES_NO_FIELDS,
-    ...MARKS_FIELDS,
+    ...BOARD_MARKS_FIELDS,
   ];
 
-  it('the form asks about every field a Criterion can check', () => {
+  it('the form asks about every field a Criterion can check, or it is listed with a reason', () => {
     const unasked = Object.keys(CRITERION_FIELDS).filter(
-      (field) => !formFields.includes(field),
+      (field) =>
+        !formFields.includes(field) && !(field in CRITERION_ONLY_FIELDS),
     );
     expect(unasked).toEqual([]);
+    for (const field of Object.keys(CRITERION_ONLY_FIELDS)) {
+      expect(formFields).not.toContain(field);
+      expect(CRITERION_FIELDS).toHaveProperty(field);
+    }
   });
 
   it('every field the form asks about is one a Criterion can check, or listed with a reason', () => {
@@ -132,12 +143,20 @@ describe('Form ↔ Criteria contract', () => {
     });
   });
 
-  describe.each(MARKS_FIELDS)('%s', (field) => {
+  describe.each(BOARD_MARKS_FIELDS)('%s', (field) => {
+    const percent = (value: number) => ({ scale: 'percentage', value });
+
     it('holds a percentage from 0 to 100, as the form takes', () => {
-      expect(readValue(field, ['85'])).toBe(85);
-      expect(readValue(field, ['60%'])).toBe(60);
-      expect(readValue(field, ['100'])).toBe(100);
+      expect(readValue(field, ['85'])).toEqual(percent(85));
+      expect(readValue(field, ['60%'])).toEqual(percent(60));
+      expect(readValue(field, ['100'])).toEqual(percent(100));
       expect(readValue(field, ['101'])).toBeUndefined();
+    });
+
+    it('holds only Result scales the form can send', () => {
+      const scales = form.RESULT_SCALES.map((option) => option.value);
+      const value = readValue(field, ['85']) as { scale: string };
+      expect(scales).toContain(value.scale);
     });
   });
 

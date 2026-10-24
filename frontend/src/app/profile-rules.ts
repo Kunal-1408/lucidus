@@ -3,7 +3,7 @@
 // renders what these return. The backend applies the same rules to a Match
 // request in backend/src/match/profile-input.ts.
 import { REGIONS } from './countries';
-import { Profile, STATE_REGIONS, STATES } from './profile-fields';
+import { BoardResult, Profile, RESULT_SCALES, STATE_REGIONS, STATES } from './profile-fields';
 
 export type Question = keyof Profile;
 
@@ -19,9 +19,9 @@ const QUESTIONS: readonly Question[] = [
   'schoolType',
   'citizenship',
   'board',
-  'class10Marks',
-  'latestMarks',
   'boardsUpcoming',
+  'class10Result',
+  'class12Result',
   'stream',
   'fieldOfStudy',
   'destination',
@@ -36,15 +36,47 @@ const QUESTIONS: readonly Question[] = [
 ];
 
 // The questions asked of a Student with this Profile: single girl child only
-// of a female Student, a stream only from Class 11, Class 10 board marks not
-// in Class 9. A question whose deciding answer is not given is asked.
+// of a female Student, a stream only from Class 11, and Board marks by the
+// grid (see boardMarksHidden). A question whose deciding answer is not given
+// is asked.
 export function visibleQuestions(profile: Profile): ReadonlySet<Question> {
-  const hidden = new Set<Question>();
+  const hidden = new Set<Question>(boardMarksHidden(profile));
   if (profile.gender !== 'female') hidden.add('singleGirlChild');
   if (profile.class === 9 || profile.class === 10) hidden.add('stream');
-  if (profile.class === 9) hidden.add('class10Marks');
   for (const question of unaskedForResidence(profile)) hidden.add(question);
   return new Set(QUESTIONS.filter((question) => !hidden.has(question)));
+}
+
+// The Board marks grid: the results a Student's class has sat or is about to
+// sit, and the boards-upcoming question only in a class that ends in a board
+// exam. Class 10 gets its result once boards are done; a Student who gives
+// no class is asked both results and never about boards.
+function boardMarksHidden(profile: Profile): Question[] {
+  switch (profile.class) {
+    case 9:
+      return ['class10Result', 'class12Result', 'boardsUpcoming'];
+    case 10:
+      return profile.boardsUpcoming === true
+        ? ['class10Result', 'class12Result']
+        : ['class12Result'];
+    case 11:
+      return ['class12Result', 'boardsUpcoming'];
+    case 12:
+      return [];
+    default:
+      return ['boardsUpcoming'];
+  }
+}
+
+export type BoardMarksQuestion = 'class10Result' | 'class12Result';
+
+// How a Board marks question is put to the Student: a Class 12 Student whose
+// boards are upcoming gives the result they expect.
+export function boardMarksLabel(question: BoardMarksQuestion, profile: Profile): string {
+  if (question === 'class10Result') return 'Class 10 board result';
+  return profile.class === 12 && profile.boardsUpcoming === true
+    ? 'Expected Class 12 result (pre-boards or predicted)'
+    : 'Class 12 board result';
 }
 
 // The Profile after a change: the changed answers applied, and every answer
@@ -53,15 +85,47 @@ export function applyChange(profile: Profile, change: Partial<Profile>): Profile
   return withoutUnasked(withResidenceClears(profile, change));
 }
 
-const PERCENTAGE = 'Enter a percentage from 0 to 100.';
-
 // Why an answer can't be saved, or undefined when it can. An invalid answer
 // is refused, never adjusted to fit.
 export function checkAnswer(question: Question, answer: unknown): string | undefined {
-  if (question === 'class10Marks' || question === 'latestMarks') {
-    return typeof answer === 'number' && answer >= 0 && answer <= 100 ? undefined : PERCENTAGE;
+  if (question === 'class10Result' || question === 'class12Result') {
+    return checkBoardResult(answer);
   }
   return undefined;
+}
+
+// The range of each Result scale, with what to tell a Student outside it.
+const SCALE_RANGES: Record<BoardResult['scale'], { min: number; max: number; message: string }> = {
+  percentage: { min: 0, max: 100, message: 'Enter a percentage from 0 to 100.' },
+};
+
+function checkBoardResult(answer: unknown): string | undefined {
+  const { scale, value } = (answer ?? {}) as Partial<Record<keyof BoardResult, unknown>>;
+  const known = RESULT_SCALES.some((option) => option.value === scale);
+  if (!known) return 'Pick the scale your result is given on.';
+  const range = SCALE_RANGES[scale as BoardResult['scale']];
+  return typeof value === 'number' && value >= range.min && value <= range.max
+    ? undefined
+    : range.message;
+}
+
+// A Profile saved by an earlier version of the form, in today's shape.
+export function migrateSavedProfile(saved: Record<string, unknown>): Profile {
+  return withHomeState(withBoardMarks(saved)) as Profile;
+}
+
+// Latest exam marks meant a different year for each class, so they are
+// dropped rather than guessed into a board year; Class 10 marks were always
+// a Class 10 percentage.
+function withBoardMarks(saved: Record<string, unknown>): Record<string, unknown> {
+  const migrated = { ...saved };
+  const class10Marks = migrated['class10Marks'];
+  if (typeof class10Marks === 'number' && migrated['class10Result'] === undefined) {
+    migrated['class10Result'] = { scale: 'percentage', value: class10Marks };
+  }
+  delete migrated['class10Marks'];
+  delete migrated['latestMarks'];
+  return migrated;
 }
 
 // The Profile as sent inside a Match request: answers to questions it no
@@ -72,12 +136,6 @@ export function profileForMatch(profile: Profile): Profile {
   const homeState = sent.domicileState ?? homeStateOf(sent);
   if (homeState !== undefined) sent.schoolState ??= homeState;
   return sent;
-}
-
-// A saved Profile in today's shape. A domicile state becomes India and the
-// matching region, which makes it the Home state again.
-export function migrateProfile(saved: Profile): Profile {
-  return migrateDomicile(saved);
 }
 
 // Where the Student lives and their Citizenship: the state or region needs a
@@ -122,9 +180,12 @@ function homeStateOf(profile: Profile): Profile['homeState'] {
   return STATES.find((state) => STATE_REGIONS[state.value] === profile.region)?.value;
 }
 
-function migrateDomicile(saved: Profile): Profile {
+// A saved domicile state becomes India and the matching region, which makes
+// it the Home state again; one that is no Indian state, or given beside a
+// country, is dropped.
+function withHomeState(saved: Record<string, unknown>): Record<string, unknown> {
   const { domicileState, ...migrated } = saved;
-  if (domicileState === undefined || migrated.countryOfResidence !== undefined) return migrated;
+  if (domicileState === undefined || migrated['countryOfResidence'] !== undefined) return migrated;
   const state = STATES.find((s) => s.value === domicileState);
   if (state === undefined) return migrated;
   return { countryOfResidence: INDIA, region: STATE_REGIONS[state.value], ...migrated };
