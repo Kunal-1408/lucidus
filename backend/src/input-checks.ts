@@ -25,12 +25,16 @@ export function text(
   return value.trim();
 }
 
+// A value from a fixed list. A long list (every country code) is better
+// named than spelled out, so the caller may give the reason a value outside
+// it gets instead.
 export function oneOf<T extends string>(
   raw: Record<string, unknown>,
   field: string,
   allowed: readonly T[],
   reasons: string[],
   label = field,
+  notAllowed = `${label} must be one of ${allowed.join(', ')}`,
 ): T | undefined {
   const value = raw[field];
   if (
@@ -39,11 +43,7 @@ export function oneOf<T extends string>(
   ) {
     return value as T;
   }
-  reasons.push(
-    value === undefined
-      ? `${label} is required`
-      : `${label} must be one of ${allowed.join(', ')}`,
-  );
+  reasons.push(value === undefined ? `${label} is required` : notAllowed);
   return undefined;
 }
 

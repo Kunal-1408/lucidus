@@ -1,10 +1,14 @@
-import { COUNTRIES, REGIONS } from '../match/countries.js';
-import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
+import { COUNTRIES, INDIA, REGIONS } from '../match/countries.js';
+import {
+  BOARD_MARKS_FIELDS,
+  type BoardMarksField,
+  CRITERION_FIELDS,
+} from '../scholarships/criterion-fields.js';
 import type {
   Criterion,
   ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
-import { DATE, MONEY, STATE_NAMES, toClass } from './normalise.js';
+import { DATE, escape, MONEY, STATE_NAMES, toClass } from './normalise.js';
 
 // What a rule found, before normalisation: the raw value as the source
 // wrote it ("₹3,50,000/-", "IX", "Andhra Pradesh") and its sentence.
@@ -159,17 +163,18 @@ interface MarksThreshold {
 function marksThresholds(sentences: string[]): MarksThreshold[] {
   return sentences.flatMap((sentence) => {
     if (TEST_CUT_OFF.test(sentence)) return [];
-    const m = sentence.match(MIN_PERCENT);
-    if (!m) return [];
-    const year = marksYear(sentence, m.index ?? 0);
-    return year ? [{ percent: m[1] ?? m[2] ?? m[3], year, sentence }] : [];
+    const minimum = sentence.match(MIN_PERCENT);
+    if (!minimum) return [];
+    const year = marksYear(sentence, minimum.index ?? 0);
+    const percent = minimum[1] ?? minimum[2] ?? minimum[3];
+    return year ? [{ percent, year, sentence }] : [];
   });
 }
 
 // Board marks: a percentage for the Class 10 or Class 12 board exam. A
 // Student can still raise their marks, so both are changeable. Marks naming
 // no year are left to the LLM.
-function boardMarksRule(field: 'class10Result' | 'class12Result'): FieldRule {
+function boardMarksRule(field: BoardMarksField): FieldRule {
   const year = field === 'class10Result' ? 10 : 12;
   return (sentences) => {
     const threshold = marksThresholds(sentences).find((t) => t.year === year);
@@ -402,8 +407,6 @@ function placeNames(places: [code: string, names: string[]][]): PlaceName[] {
     .sort((a, b) => b[2].length - a[2].length);
 }
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 const COUNTRY_NAMES = placeNames(
   COUNTRIES.map((c) => [
     c.value,
@@ -449,7 +452,7 @@ function placesIn(sentence: string) {
   const plain = sentence.replace(OCI, ' ');
   const regions = namedPlaces(plain, REGION_NAMES);
   const countries = namedPlaces(regions.rest, COUNTRY_NAMES).codes.filter(
-    (code) => code !== 'IN',
+    (code) => code !== INDIA,
   );
   return { plain, regions: regions.codes, countries };
 }
@@ -535,8 +538,7 @@ export const FIELD_RULES: FieldRule[] = [
   genderRule,
   classRule,
   incomeRule,
-  boardMarksRule('class10Result'),
-  boardMarksRule('class12Result'),
+  ...BOARD_MARKS_FIELDS.map(boardMarksRule),
   schoolTypeRule,
   ...KEYWORD_FIELDS.map(keywordRule),
   ...RESIDENCE_RULES,

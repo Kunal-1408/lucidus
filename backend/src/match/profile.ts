@@ -49,7 +49,8 @@ export type ParentOccupation =
   | 'none';
 
 // Each Indian state's ISO 3166-2 region: for a Student living in India, the
-// region they live in is their Home state.
+// region they live in is their Home state (frontend copy: STATE_REGIONS in
+// frontend/src/app/profile-fields.ts).
 export const STATE_REGIONS: Record<IndianState, string> = {
   andhra_pradesh: 'IN-AP',
   arunachal_pradesh: 'IN-AR',
@@ -89,9 +90,11 @@ export const STATE_REGIONS: Record<IndianState, string> = {
   puducherry: 'IN-PY',
 };
 
+// Frontend copy: RESIDENCE_STATUSES in frontend/src/app/profile-fields.ts.
 export type ResidenceStatus = 'citizen' | 'permanent_resident' | 'visa';
 
-// An NRI is an Indian citizen living outside India, never a Citizenship.
+// An NRI is an Indian citizen living outside India, never a Citizenship
+// (frontend copy: CITIZENSHIPS in frontend/src/app/profile-fields.ts).
 export type Citizenship = 'indian' | 'oci' | 'other';
 
 // The scales a Board marks result can be given on (frontend copy:
@@ -100,7 +103,8 @@ export type Citizenship = 'indian' | 'oci' | 'other';
 export type ResultScale = 'percentage';
 
 // A Board marks result: a value on its Result scale. A Criterion on a Board
-// marks field holds its threshold in the same shape.
+// marks field holds its threshold in the same shape (frontend copy:
+// BoardResult in frontend/src/app/profile-fields.ts).
 export interface BoardResult {
   scale: ResultScale;
   value: number;

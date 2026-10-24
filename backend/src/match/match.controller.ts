@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { rejected } from '../admin/admin-errors.js';
+import { rejected } from '../http-errors.js';
 import { CLOCK, type Clock, indiaDate } from '../clock.js';
 import { Scholarship, VISIBLE } from '../scholarships/scholarship.schema.js';
 import {

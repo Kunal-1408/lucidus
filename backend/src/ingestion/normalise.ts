@@ -1,7 +1,11 @@
 // Normalisation: turns the raw values the rules (and, later, the LLM) find
 // into the exact values the Matcher compares against the Profile.
 import { COUNTRIES, REGIONS } from '../match/countries.js';
-import type { IndianState, Profile } from '../match/profile.js';
+import type { BoardResult, IndianState, Profile } from '../match/profile.js';
+import {
+  isBoardMarksField,
+  isLegacyMarksField,
+} from '../scholarships/criterion-fields.js';
 
 const LAKH = 100_000;
 const CRORE = 10_000_000;
@@ -81,7 +85,8 @@ const STATES: IndianState[] = [
   'puducherry',
 ];
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// A text with every regex special character escaped, to match it literally.
+export const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // "tamil nadu" → /\btamil\s+nadu\b/, with "and" also matching "&".
 const namePattern = (name: string) =>
   name
@@ -165,7 +170,9 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
 
 type ArrayElement<T> = T extends readonly (infer E)[] ? E : never;
 
-const YES_NO_FIELDS = ['minority', 'disability', 'singleGirlChild'];
+// Criterion fields a source states as yes or no. Boards upcoming is a yes /
+// no answer too, but never a Criterion.
+const YES_NO_CRITERION_FIELDS = ['minority', 'disability', 'singleGirlChild'];
 // Fields holding ISO codes, which a source or the LLM may write in any case.
 const ISO_CODE_FIELDS = ['countryOfResidence', 'region', 'citizenshipCountry'];
 
@@ -192,17 +199,17 @@ export function normaliseValue(
     ].sort((a, b) => a - b);
     return levels.length ? levels : undefined;
   }
-  if (field === 'class10Marks' || field === 'latestMarks') {
+  if (isLegacyMarksField(field)) {
     return toPercent(raw);
   }
-  if (field === 'class10Result' || field === 'class12Result') {
+  if (isBoardMarksField(field)) {
     return toBoardResult(raw);
   }
   if (ISO_CODE_FIELDS.includes(field)) {
     const codes = asList(raw).map((code) => code.trim().toUpperCase());
     return oneOf(codes, FIXED_LISTS[field], op);
   }
-  if (YES_NO_FIELDS.includes(field)) {
+  if (YES_NO_CRITERION_FIELDS.includes(field)) {
     if (raw === 'yes') return true;
     return raw === 'no' ? false : undefined;
   }
@@ -217,9 +224,7 @@ function toPercent(raw: string | string[]): number | undefined {
 }
 
 // A Board marks threshold. Sources so far state percentages only.
-function toBoardResult(
-  raw: string | string[],
-): { scale: 'percentage'; value: number } | undefined {
+function toBoardResult(raw: string | string[]): BoardResult | undefined {
   const value = toPercent(raw);
   return value === undefined ? undefined : { scale: 'percentage', value };
 }

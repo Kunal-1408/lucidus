@@ -70,7 +70,9 @@ describe('Indian Profiles keep their results', () => {
       })
       .expect(201);
     await harness.ingest();
-  });
+    // Six sources ingested on a fresh app: under full-suite load this can
+    // outlast the default hook timeout, closing the client mid-setup.
+  }, 300_000);
 
   afterAll(() => harness.close());
 
@@ -91,67 +93,84 @@ describe('Indian Profiles keep their results', () => {
     };
   }
 
+  // Each Profile goes in both shapes: the old one, with a domicile and a
+  // school state, and the one the form sends now, with India and the
+  // state's ISO region (the school state falling back to that Home state).
+  // Both must land in the same buckets.
+  async function expectBuckets(
+    profile: object,
+    home: { state: string; region: string },
+    expected: Buckets,
+  ) {
+    const old = { domicileState: home.state, schoolState: home.state };
+    expect(await bucketsFor({ ...profile, ...old })).toEqual(expected);
+    const now = {
+      countryOfResidence: 'IN',
+      region: home.region,
+      schoolState: home.state,
+    };
+    expect(await bucketsFor({ ...profile, ...now })).toEqual(expected);
+  }
+
   it('a Class 12 girl in Kerala with 85% and income of ₹2–2.5 lakh', async () => {
-    expect(
-      await bucketsFor({
+    await expectBuckets(
+      {
         class: 12,
-        domicileState: 'kerala',
-        schoolState: 'kerala',
         gender: 'female',
         // Was latestMarks: 85, which Board marks replace; for a Class 12
         // Student their latest marks are the Class 12 result.
         class12Result: { scale: 'percentage', value: 85 },
         incomeBand: '2l_2_5l',
-      }),
-    ).toEqual({
-      // The state page says "Class 12 with Science", which names no stream.
-      eligible: [AICTE_PRAGATI, LIC_GENERAL, SANTOOR, STATE_SCIENCE],
-      withinReach: {},
-      tellUsMore: [NMMSS],
-    });
+      },
+      { state: 'kerala', region: 'IN-KL' },
+      {
+        // The state page says "Class 12 with Science", which names no stream.
+        eligible: [AICTE_PRAGATI, LIC_GENERAL, SANTOOR, STATE_SCIENCE],
+        withinReach: {},
+        tellUsMore: [NMMSS],
+      },
+    );
   });
 
   it('a Class 10 SC girl in Bihar with income under ₹1 lakh', async () => {
-    expect(
-      await bucketsFor({
+    await expectBuckets(
+      {
         class: 10,
-        domicileState: 'bihar',
-        schoolState: 'bihar',
         gender: 'female',
         category: 'sc',
         incomeBand: 'under_1l',
-      }),
-    ).toEqual({
-      eligible: [AICTE_PRAGATI],
-      withinReach: { [STATE_PRAGATI]: [NEXT_CLASS] },
-      tellUsMore: [NMMSS, LIC_SPECIAL],
-    });
+      },
+      { state: 'bihar', region: 'IN-BR' },
+      {
+        eligible: [AICTE_PRAGATI],
+        withinReach: { [STATE_PRAGATI]: [NEXT_CLASS] },
+        tellUsMore: [NMMSS, LIC_SPECIAL],
+      },
+    );
   });
 
   it('a Class 9 OBC boy at a government school in Tamil Nadu with income of ₹1–2 lakh', async () => {
-    expect(
-      await bucketsFor({
+    await expectBuckets(
+      {
         class: 9,
-        domicileState: 'tamil_nadu',
-        schoolState: 'tamil_nadu',
         schoolType: 'government',
         gender: 'male',
         category: 'obc',
         incomeBand: '1l_2l',
-      }),
-    ).toEqual({
-      eligible: [STATE_MERIT],
-      withinReach: { [LIC_SPECIAL]: [NEXT_CLASS] },
-      tellUsMore: [],
-    });
+      },
+      { state: 'tamil_nadu', region: 'IN-TN' },
+      {
+        eligible: [STATE_MERIT],
+        withinReach: { [LIC_SPECIAL]: [NEXT_CLASS] },
+        tellUsMore: [],
+      },
+    );
   });
 
   it('a Class 11 science boy at a private school in Maharashtra with income over ₹8 lakh', async () => {
-    expect(
-      await bucketsFor({
+    await expectBuckets(
+      {
         class: 11,
-        domicileState: 'maharashtra',
-        schoolState: 'maharashtra',
         schoolType: 'private',
         board: 'cbse',
         gender: 'male',
@@ -162,20 +181,20 @@ describe('Indian Profiles keep their results', () => {
         // boards upcoming is no longer asked in Class 11.
         class10Result: { scale: 'percentage', value: 92 },
         stream: 'science',
-      }),
-    ).toEqual({
-      eligible: [],
-      withinReach: { [STATE_SCIENCE]: [NEXT_CLASS] },
-      tellUsMore: [],
-    });
+      },
+      { state: 'maharashtra', region: 'IN-MH' },
+      {
+        eligible: [],
+        withinReach: { [STATE_SCIENCE]: [NEXT_CLASS] },
+        tellUsMore: [],
+      },
+    );
   });
 
   it('a Class 10 ST girl at an aided school in Odisha with boards upcoming', async () => {
-    expect(
-      await bucketsFor({
+    await expectBuckets(
+      {
         class: 10,
-        domicileState: 'odisha',
-        schoolState: 'odisha',
         schoolType: 'aided',
         gender: 'female',
         category: 'st',
@@ -183,14 +202,16 @@ describe('Indian Profiles keep their results', () => {
         // Was class10Marks: 57. A Class 10 Student whose boards are upcoming
         // has no Class 10 result yet, so Board marks don't ask for one.
         boardsUpcoming: true,
-      }),
-    ).toEqual({
-      eligible: [AICTE_PRAGATI],
-      // Moved from Within reach ("Score 60% in Class 10 to unlock this") when
-      // class10Marks was replaced: with no Class 10 result to judge, the 60%
-      // Class 10 Criteria are unknown.
-      withinReach: {},
-      tellUsMore: [NMMSS, LIC_SPECIAL],
-    });
+      },
+      { state: 'odisha', region: 'IN-OD' },
+      {
+        eligible: [AICTE_PRAGATI],
+        // Moved from Within reach ("Score 60% in Class 10 to unlock this") when
+        // class10Marks was replaced: with no Class 10 result to judge, the 60%
+        // Class 10 Criteria are unknown.
+        withinReach: {},
+        tellUsMore: [NMMSS, LIC_SPECIAL],
+      },
+    );
   });
 });

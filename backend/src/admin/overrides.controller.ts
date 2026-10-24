@@ -18,7 +18,7 @@ import { Override } from '../overrides/override.schema.js';
 import { Scholarship } from '../scholarships/scholarship.schema.js';
 import { scholarshipKey } from '../scholarships/scholarship-key.js';
 import { AdminTokenGuard } from './admin-token.guard.js';
-import { rejected } from './admin-errors.js';
+import { rejected } from '../http-errors.js';
 import { insertUnique, type View, withId } from './admin-records.js';
 
 export type OverrideView = View<Override>;

@@ -260,16 +260,18 @@ describe('where the Student lives and their Citizenship', () => {
     ).toEqual({ citizenship: 'oci' });
   });
 
-  it('sends the Home state as the school state fallback, wherever the Student lives', () => {
+  it('sends the Home state as the school state fallback for a Student in India', () => {
     expect(profileForMatch({ countryOfResidence: 'IN', region: 'IN-KL' })).toEqual({
       countryOfResidence: 'IN',
       region: 'IN-KL',
       schoolState: 'kerala',
     });
+  });
+
+  it('sends no school state fallback for a Student abroad, whose school is not in India', () => {
     expect(profileForMatch({ countryOfResidence: 'AE', homeState: 'goa' })).toEqual({
       countryOfResidence: 'AE',
       homeState: 'goa',
-      schoolState: 'goa',
     });
   });
 });

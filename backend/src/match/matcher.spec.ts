@@ -321,17 +321,6 @@ describe('Matcher: Board marks', () => {
     );
   });
 
-  it('gives a Class 10 Student with boards upcoming a Goal on the Class 10 result', () => {
-    const profile: Profile = {
-      class: 10,
-      boardsUpcoming: true,
-      class10Result: percent(57),
-    };
-    expect(cardFor(profile, resultAtLeast('class10Result', 60)).goals).toEqual([
-      'Score 60% in Class 10 to unlock this',
-    ]);
-  });
-
   it('gives no Goal on a result whose boards are already taken', () => {
     const done: Profile = {
       class: 12,

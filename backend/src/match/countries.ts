@@ -5,6 +5,10 @@
 // (duplicated on purpose; the Form-Criteria contract test checks the two
 // copies match).
 
+// India's country code (frontend copy: INDIA in
+// frontend/src/app/countries.ts).
+export const INDIA = 'IN';
+
 export interface Place {
   value: string;
   label: string;
