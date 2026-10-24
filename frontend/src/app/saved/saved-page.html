@@ -1,61 +1,71 @@
-<a routerLink="/results">&larr; Back to my results</a>
+<a class="back" routerLink="/results">&larr; Back to my results</a>
 <h1>Saved scholarships</h1>
 
 @if (items(); as list) {
-  @for (item of list; track item.id) {
-    <article
-      class="card"
-      [class.snapshot]="item.state === 'no_longer_listed' || item.state === 'being_rechecked'"
-    >
-      @switch (item.state) {
-        @case ('updated') {
-          <p class="badge">Updated since you saved</p>
-        }
-        @case ('no_longer_listed') {
-          <p class="badge">No longer listed</p>
-        }
-        @case ('being_rechecked') {
-          <p class="badge">Being re-checked</p>
-        }
-      }
-      <h3>{{ item.card.name }}</h3>
-      <p class="provider">{{ item.card.provider }}</p>
-      <p class="amount">{{ item.card.amountText }}</p>
-      <p class="deadline" [class.closing-soon]="item.card.deadlineStatus === 'closing_soon'">
-        @switch (item.card.deadlineStatus) {
-          @case ('open') {
-            Open until {{ item.card.deadline | date: 'd MMM y' }}
+  <ul class="results">
+    @for (item of list; track item.id) {
+      <li
+        class="result"
+        [class.snapshot]="item.state === 'no_longer_listed' || item.state === 'being_rechecked'"
+      >
+        @switch (item.state) {
+          @case ('updated') {
+            <p class="badge">Updated since you saved</p>
           }
-          @case ('closing_soon') {
-            Closing soon: {{ item.card.deadline | date: 'd MMM y' }}
+          @case ('no_longer_listed') {
+            <p class="badge">No longer listed</p>
           }
-          @case ('closed') {
-            This year's round closed {{ item.card.deadline | date: 'd MMM y' }}
-          }
-          @default {
-            Deadline not announced, check the official site
+          @case ('being_rechecked') {
+            <p class="badge">Being re-checked</p>
           }
         }
-      </p>
-      @if (item.card.confidence === 'medium') {
-        <p class="verify">Verify on the official site</p>
-      }
-      @if (item.card.extraRequirements.length) {
-        <p class="extra">Also requires: {{ extraRequirementTexts(item.card) }}</p>
-      }
-      @if (item.state === 'no_longer_listed' || item.state === 'being_rechecked') {
-        <p class="verified">
-          As it looked when you saved it on {{ item.savedAt | date: 'd MMM y' }}
+        <p class="provider">{{ item.card.provider }}</p>
+        <h3>
+          <a [href]="item.card.officialUrl" target="_blank" rel="noopener">{{ item.card.name }}</a>
+        </h3>
+        <p class="meta">
+          <span class="amount">{{ item.card.amountText }}</span>
+          <span class="deadline" [class.closing-soon]="item.card.deadlineStatus === 'closing_soon'">
+            @switch (item.card.deadlineStatus) {
+              @case ('open') {
+                Open until {{ item.card.deadline | date: 'd MMM y' }}
+              }
+              @case ('closing_soon') {
+                Closing soon: {{ item.card.deadline | date: 'd MMM y' }}
+              }
+              @case ('closed') {
+                This year's round closed {{ item.card.deadline | date: 'd MMM y' }}
+              }
+              @default {
+                Deadline not announced, check the official site
+              }
+            }
+          </span>
         </p>
-      } @else {
-        <p class="verified">Last verified {{ item.card.lastVerified | date: 'd MMM y' }}</p>
-      }
-      <a [href]="item.card.officialUrl" target="_blank" rel="noopener">Official site</a>
-      <button type="button" class="remove" (click)="remove(item)">Remove</button>
-    </article>
-  } @empty {
-    <p>You haven't saved any scholarships yet.</p>
-  }
+        @if (item.card.confidence === 'medium') {
+          <p class="verify">Verify on the official site</p>
+        }
+        @if (item.card.extraRequirements.length) {
+          <p class="extra">Also requires: {{ extraRequirementTexts(item.card) }}</p>
+        }
+        @if (item.state === 'no_longer_listed' || item.state === 'being_rechecked') {
+          <p class="verified">
+            As it looked when you saved it on {{ item.savedAt | date: 'd MMM y' }}
+          </p>
+        } @else {
+          <p class="verified">Last verified {{ item.card.lastVerified | date: 'd MMM y' }}</p>
+        }
+        <div class="actions">
+          <button type="button" class="remove" (click)="remove(item)">Remove</button>
+          <a [href]="item.card.officialUrl" target="_blank" rel="noopener">Official site</a>
+        </div>
+      </li>
+    } @empty {
+      <li class="empty">
+        You haven't saved any scholarships yet. <a routerLink="/">Find scholarships</a>
+      </li>
+    }
+  </ul>
 } @else {
-  <p>Loading your saved scholarships&hellip;</p>
+  <p class="status">Loading your saved scholarships&hellip;</p>
 }
