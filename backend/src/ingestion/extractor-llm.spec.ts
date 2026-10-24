@@ -115,7 +115,7 @@ describe('Extractor with the LLM for what the rules miss', () => {
       criteria.map(({ field, op, value }) => ({ field, op, value })),
     ).toEqual([
       { field: 'gender', op: 'eq', value: 'female' },
-      { field: 'citizenship', op: 'eq', value: 'indian' },
+      { field: 'citizenship', op: 'in', value: ['indian'] },
     ]);
   });
 

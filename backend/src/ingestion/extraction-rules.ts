@@ -1,3 +1,4 @@
+import { COUNTRIES, REGIONS } from '../match/countries.js';
 import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import { DATE, MONEY, STATE_NAMES, toClass } from './normalise.js';
@@ -211,12 +212,22 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'citizenship',
+    // An NRI is an Indian citizen living abroad; PIO cards were merged into
+    // OCI cards.
     options: [
-      ['indian', /\bindian (?:national|citizen)s?\b|\bcitizens? of india\b/i],
+      [
+        'indian',
+        /\bindian (?:national|citizen)s?\b|(?<!overseas\s)\bcitizens? of india\b|\bNRIs?\b|\bnon-?resident indians?\b/i,
+      ],
+      [
+        'oci',
+        /\bOCIs?\b|\bPIOs?\b|\b[Oo]verseas [Cc]itizens? of India\b|\b[Pp]ersons? of Indian [Oo]rigin\b/,
+      ],
     ],
   },
   {
-    field: 'domicileState',
+    // Domicile sentences name the Home state.
+    field: 'homeState',
     cue: /\bdomicile|\bdomiciled\b|\b(?:permanent )?residents? of\b/i,
     options: STATE_NAMES,
   },
@@ -293,6 +304,151 @@ function keywordRule(spec: KeywordField): FieldRule {
   };
 }
 
+// Where the Student must live, and the country they must be a citizen of,
+// read from the countries and regions a sentence names. India is never a
+// country of residence here: an Indian source's "residents of India" is not
+// a condition a Student abroad could have read, and Indian states are the
+// Home state (above).
+const COUNTRY_ALIASES: Record<string, string[]> = {
+  GB: ['UK', 'U.K.', 'Britain', 'Great Britain'],
+  US: ['USA', 'U.S.A.', 'U.S.', 'United States of America'],
+  AE: ['UAE', 'U.A.E.', 'Emirates'],
+};
+// Regions are read only for the countries the Watchlist has sources for,
+// under the names those sources use.
+const REGION_COUNTRIES = ['AE', 'AU', 'CA', 'GB', 'US'];
+const REGION_ALIASES: Record<string, string[]> = {
+  'AE-AJ': ['Ajman'],
+  'AE-AZ': ['Abu Dhabi'],
+  'AE-DU': ['Dubai'],
+  'AE-FU': ['Fujairah'],
+  'AE-RK': ['Ras Al Khaimah', 'Ras al-Khaimah'],
+  'AE-SH': ['Sharjah'],
+  'AE-UQ': ['Umm Al Quwain'],
+};
+
+type PlaceName = [code: string, pattern: RegExp, name: string];
+
+// One pattern per name, longest first, so "New South Wales" is read before
+// "Wales" and "Papua New Guinea" before "Guinea".
+function placeNames(places: [code: string, names: string[]][]): PlaceName[] {
+  return places
+    .flatMap(([code, names]) =>
+      names.map((name): PlaceName => [
+        code,
+        new RegExp(String.raw`(?<![\w-])${escape(name)}(?![\w-])`, 'g'),
+        name,
+      ]),
+    )
+    .sort((a, b) => b[2].length - a[2].length);
+}
+
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const COUNTRY_NAMES = placeNames(
+  COUNTRIES.map((c) => [
+    c.value,
+    [c.label, ...(COUNTRY_ALIASES[c.value] ?? [])],
+  ]),
+);
+const REGION_NAMES = placeNames(
+  REGION_COUNTRIES.flatMap((country) =>
+    (REGIONS[country] ?? []).map((r): [string, string[]] => [
+      r.value,
+      [r.label, ...(REGION_ALIASES[r.value] ?? [])],
+    ]),
+  ),
+);
+
+// The codes of the places a text names, in the order it names them, and the
+// text with those names blanked out.
+function namedPlaces(
+  text: string,
+  names: PlaceName[],
+): { codes: string[]; rest: string } {
+  const at = new Map<string, number>();
+  let rest = text;
+  for (const [code, pattern] of names) {
+    rest = rest.replace(pattern, (name, index: number) => {
+      if (!at.has(code) || at.get(code)! > index) at.set(code, index);
+      return ' '.repeat(name.length);
+    });
+  }
+  const codes = [...at.keys()].sort((a, b) => at.get(a)! - at.get(b)!);
+  return { codes, rest };
+}
+
+const LIVES =
+  /\bresid(?:e|es|ent|ents|ing)\b|\b(?:living|lives?) in\b|\bresident in\b/i;
+const PERMANENT_RESIDENT = /\bpermanent residen(?:ts?|cy)\b/i;
+const CITIZEN = /\b[Cc]itizens?\b|\bnationals\b/;
+const OCI = /\b[Oo]verseas [Cc]itizens? of India\b/g;
+
+// The regions, then the countries outside India, a sentence names; a region
+// name is not read again as a country ("Northern Ireland" is not Ireland).
+function placesIn(sentence: string) {
+  const plain = sentence.replace(OCI, ' ');
+  const regions = namedPlaces(plain, REGION_NAMES);
+  const countries = namedPlaces(regions.rest, COUNTRY_NAMES).codes.filter(
+    (code) => code !== 'IN',
+  );
+  return { plain, regions: regions.codes, countries };
+}
+
+// "residents of the United Arab Emirates", "living in the UK".
+const countryOfResidenceRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const { plain, countries } = placesIn(sentence);
+    if (LIVES.test(plain) && countries.length)
+      return found('countryOfResidence', countries, sentence);
+  }
+  return undefined;
+};
+
+// "residing in Ontario", "residents of Dubai".
+const regionRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const { plain, regions } = placesIn(sentence);
+    if (LIVES.test(plain) && regions.length)
+      return found('region', regions, sentence);
+  }
+  return undefined;
+};
+
+// "Singapore Citizens or Permanent Residents": a Residence status in the
+// country named.
+const residenceStatusRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const { plain, countries } = placesIn(sentence);
+    if (!PERMANENT_RESIDENT.test(plain) || !countries.length) continue;
+    const statuses = CITIZEN.test(plain)
+      ? ['citizen', 'permanent_resident']
+      : ['permanent_resident'];
+    return found('residenceStatus', statuses, sentence);
+  }
+  return undefined;
+};
+
+// "citizens of the United States": a citizen of the country named, wherever
+// they live. Citizens alongside residents are read as a Residence status.
+const citizenshipCountryRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const { plain, countries } = placesIn(sentence);
+    if (!CITIZEN.test(plain) || LIVES.test(plain) || !countries.length)
+      continue;
+    return found('citizenshipCountry', countries, sentence);
+  }
+  return undefined;
+};
+
+const RESIDENCE_RULES = [
+  countryOfResidenceRule,
+  regionRule,
+  residenceStatusRule,
+  citizenshipCountryRule,
+];
+const RESIDENCE_WORDS = [LIVES, PERMANENT_RESIDENT, CITIZEN];
+
 const DEADLINE_CUE =
   /\b(?:last date|deadline|closing date|apply (?:by|before)|open till|closes?(?: on)?|on or before|due date)\b/i;
 
@@ -324,13 +480,17 @@ export const FIELD_RULES: FieldRule[] = [
   marksRule('latestMarks'),
   schoolTypeRule,
   ...KEYWORD_FIELDS.map(keywordRule),
+  ...RESIDENCE_RULES,
 ];
 
 // A sentence is worth reading if it uses a word some rule looks for.
-const RULE_WORDS = KEYWORD_FIELDS.flatMap((spec) => [
-  ...(spec.cue ? [spec.cue] : []),
-  ...spec.options.map(([, pattern]) => pattern),
-]);
+const RULE_WORDS = [
+  ...KEYWORD_FIELDS.flatMap((spec) => [
+    ...(spec.cue ? [spec.cue] : []),
+    ...spec.options.map(([, pattern]) => pattern),
+  ]),
+  ...RESIDENCE_WORDS,
+];
 
 // Neither a condition for keeping a scholarship once awarded nor how its
 // places are shared out between groups is a Criterion (see GLOSSARY.md), so

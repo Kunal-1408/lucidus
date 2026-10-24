@@ -17,7 +17,14 @@ export const CRITERION_FIELDS: Record<
   minority: { op: 'eq', changeable: false },
   disability: { op: 'eq', changeable: false },
   singleGirlChild: { op: 'eq', changeable: false },
-  citizenship: { op: 'eq', changeable: false },
+  citizenship: { op: 'in', changeable: false },
+  countryOfResidence: { op: 'in', changeable: false },
+  region: { op: 'in', changeable: false },
+  homeState: { op: 'in', changeable: false },
+  residenceStatus: { op: 'in', changeable: false },
+  citizenshipCountry: { op: 'in', changeable: false },
+  // Replaced by homeState: only Criteria stored before it existed use it,
+  // and extraction no longer writes it (see REPLACED_FIELDS).
   domicileState: { op: 'in', changeable: false },
   schoolState: { op: 'in', changeable: false },
   schoolType: { op: 'in', changeable: false },
@@ -28,3 +35,7 @@ export const CRITERION_FIELDS: Record<
   parentOccupation: { op: 'in', changeable: false },
   examsQualified: { op: 'in', changeable: false },
 };
+
+// Fields a Criterion stored earlier may still check, but which extraction
+// no longer asks for: the Matcher still judges them, the LLM is not asked.
+export const REPLACED_FIELDS: readonly string[] = ['domicileState'];

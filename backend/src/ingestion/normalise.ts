@@ -158,6 +158,8 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
 type ArrayElement<T> = T extends readonly (infer E)[] ? E : never;
 
 const YES_NO_FIELDS = ['minority', 'disability', 'singleGirlChild'];
+// Fields holding ISO codes, which a source or the LLM may write in any case.
+const ISO_CODE_FIELDS = ['countryOfResidence', 'region', 'citizenshipCountry'];
 
 // The value a Criterion stores for a raw value a rule found, or undefined
 // when it falls outside the field's fixed list (the Criterion is dropped).
@@ -184,6 +186,10 @@ export function normaliseValue(
   }
   if (field === 'class10Marks' || field === 'latestMarks') {
     return toPercent(raw);
+  }
+  if (ISO_CODE_FIELDS.includes(field)) {
+    const codes = asList(raw).map((code) => code.trim().toUpperCase());
+    return oneOf(codes, FIXED_LISTS[field], op);
   }
   if (YES_NO_FIELDS.includes(field)) {
     if (raw === 'yes') return true;

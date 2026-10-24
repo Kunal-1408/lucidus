@@ -18,6 +18,17 @@ const FIELD_GUIDE: Record<string, string> = {
   minority: '"yes" when only minority-community students may apply',
   disability: '"yes" when only students with a disability may apply',
   singleGirlChild: '"yes" when only a single girl child may apply',
+  countryOfResidence:
+    'the countries the Student must live in, each an ISO 3166-1 alpha-2 code such as "AE" or "GB"; leave it out when the text only says "India"',
+  region:
+    'the states or regions within a country the Student must live in, each an ISO 3166-2 code such as "CA-ON" or "AE-DU"; an Indian state is homeState, never region',
+  homeState: `the Indian states the Student's family must belong to (domicile, "permanent resident of" a state), one or more of: ${FIXED_LISTS.homeState.join(', ')}`,
+  residenceStatus:
+    'the Student\'s status in the country they live in: one or more of citizen, permanent_resident, visa (for example "citizens or permanent residents of Singapore" is citizen and permanent_resident)',
+  citizenship:
+    'one or more of: indian (Indian citizens, including NRIs), oci (OCI or PIO card holders), other (another nationality)',
+  citizenshipCountry:
+    'the countries the Student must be a citizen of, other than India, each an ISO 3166-1 alpha-2 code such as "US"',
 };
 
 function guideFor(field: string): string {

@@ -90,8 +90,9 @@ describe('Normalisation onto the fixed lists', () => {
       ['jammu_and_kashmir', 'ladakh'],
     ],
     ['Applicants must be domiciled in Orissa.', ['odisha']],
-  ])('reads the states in "%s" as Profile slugs', (text, slugs) => {
-    expect(criterion(text, 'domicileState')?.value).toEqual(slugs);
+  ])('reads the states in "%s" as the Home state', (text, slugs) => {
+    expect(criterion(text, 'homeState')?.value).toEqual(slugs);
+    expect(criterion(text, 'domicileState')).toBeUndefined();
   });
 
   it('reads no disability Criterion from a seat reservation', () => {
@@ -356,6 +357,74 @@ describe('Sentences no rule reads', () => {
     ['any board', 'Students who passed from any board, CBSE or state board.'],
   ])('reads no board Criterion from %s', (_, text) => {
     expect(criterion(text, 'board')).toBeUndefined();
+  });
+});
+
+describe('Where the Student lives and their Citizenship', () => {
+  const values = (text: string) =>
+    Object.fromEntries(
+      extractByRules(text).criteria.map((c) => [c.field, c.value]),
+    );
+
+  it.each([
+    [
+      'Applicants must be residents of the United Arab Emirates.',
+      { countryOfResidence: ['AE'] },
+    ],
+    [
+      'Open to students living in the UK or Ireland.',
+      { countryOfResidence: ['GB', 'IE'] },
+    ],
+    [
+      'Applicants must be residents of New South Wales, Australia.',
+      { countryOfResidence: ['AU'], region: ['AU-NSW'] },
+    ],
+    ['Open to students residing in Ontario.', { region: ['CA-ON'] }],
+    [
+      'Students residing in Dubai or Sharjah may apply.',
+      { region: ['AE-DU', 'AE-SH'] },
+    ],
+  ])('reads where "%s" requires the Student to live', (text, expected) => {
+    expect(values(text)).toEqual(expected);
+  });
+
+  it('reads citizens and permanent residents of a country as a Residence status there', () => {
+    expect(
+      values('Applicants must be Singapore Citizens or Permanent Residents.'),
+    ).toEqual({
+      countryOfResidence: ['SG'],
+      residenceStatus: ['citizen', 'permanent_resident'],
+    });
+    expect(values('Applicants must be permanent residents of Canada.')).toEqual(
+      {
+        countryOfResidence: ['CA'],
+        residenceStatus: ['permanent_resident'],
+      },
+    );
+  });
+
+  it('reads the citizens of a country as the Citizenship country', () => {
+    expect(values('Applicants must be citizens of the United States.')).toEqual(
+      { citizenshipCountry: ['US'] },
+    );
+  });
+
+  it.each([
+    ['Applicants must be Indian citizens.', ['indian']],
+    ['Open to Overseas Citizens of India (OCI card holders).', ['oci']],
+    ['Children of NRIs, PIOs and OCIs may apply.', ['indian', 'oci']],
+  ])('reads the Citizenship in "%s"', (text, citizenship) => {
+    expect(values(text)).toEqual({ citizenship });
+  });
+
+  it('reads no country from a state of India, which is the Home state', () => {
+    expect(values('Open to permanent residents of Kerala.')).toEqual({
+      homeState: ['kerala'],
+    });
+  });
+
+  it('reads no country of residence from residents of India', () => {
+    expect(values('Applicants must be residents of India.')).toEqual({});
   });
 });
 

@@ -1,4 +1,7 @@
-import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
+import {
+  CRITERION_FIELDS,
+  REPLACED_FIELDS,
+} from '../scholarships/criterion-fields.js';
 import type {
   Criterion,
   ExtraRequirement,
@@ -39,7 +42,9 @@ export async function extract(
   const found = new Set(byRules.criteria.map((c) => c.field));
   const answer = await llm.read({
     text: text.slice(0, LLM_TEXT_LIMIT),
-    fields: Object.keys(CRITERION_FIELDS).filter((f) => !found.has(f)),
+    fields: Object.keys(CRITERION_FIELDS).filter(
+      (f) => !found.has(f) && !REPLACED_FIELDS.includes(f),
+    ),
     wantAmountText: byRules.amountText === AMOUNT_NOT_STATED,
     wantDeadline: byRules.deadline === undefined,
   });
