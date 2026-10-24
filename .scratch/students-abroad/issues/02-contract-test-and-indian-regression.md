@@ -6,7 +6,7 @@ See spec: "Testing Decisions".
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] A backend test imports the frontend's fixed lists and checks, field by field, that every value the form can send is in that field's Criterion vocabulary and the reverse
 - [x] Any value deliberately on one side only (for example the commented-out parent occupations) is listed in the test with the reason
@@ -20,3 +20,5 @@ See spec: "Testing Decisions".
 The regression scenarios are `backend/test/indian-regression.e2e-spec.ts`: the demo Watchlist fixtures plus `many/schemes-v1.html` (added through the admin endpoint), ingested on 2026-09-01, with buckets and Goals pinned for five Indian Profiles (Class 12 Kerala girl with 85%; Class 10 SC Bihar girl under ₹1 lakh; Class 9 OBC Tamil Nadu boy at a government school; Class 11 science Maharashtra boy over ₹8 lakh; Class 10 ST Odisha girl 3% short with boards upcoming). They pin today's results, misreadings included: NMMSS carries a `category: [sc, st]` Criterion read from "For the SC/ST students, this cut off is 32% marks" (the relaxation filter matches only "cut-off") and a 60% Class 10 marks Criterion from a continuation condition, and the state page's "Class 12 with Science" gives no stream Criterion. When 03/04 re-extract these pages onto new fields, keep the Profiles and change an expected bucket only where the ticket means to move it, saying why in the test; a fix to the NMMSS misreadings will move the Bihar and Odisha scenarios.
 
 **2026-10-24 (agent):** Merged into `integrate/abroad-wave-1` (8bf2524), including the Wave 1 code-review fixes. Every box is met; `npm run check` passes (backend 438 tests, 1 skipped; frontend 48 tests). Status stays as is until the branch is merged to main and the deploy and smoke check pass; then set `Status: done`.
+
+**2026-10-25 (agent):** Students abroad Wave 1 reached `main` through PR #11 (0eb1f31) and is live on Render. `node scripts/smoke.mjs <url> $(git rev-parse origin/main)` passes all five checks, including the deployed-commit check and every seed entry on the Watchlist. On live, `/api/match` answers 400 with reasons for a Class 12 result of 105% and for single girl child with gender male, and 200 for a Class 12 Kerala Profile in the new shape (no Eligible cards, as expected with the marks gap until ticket 09). `Status: done`.
