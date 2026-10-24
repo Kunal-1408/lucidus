@@ -269,3 +269,108 @@ describe('Extractor rules on an NSP guideline PDF (Top Class Education for SC)',
     );
   });
 });
+
+describe('Extractor rules on sentences wrapped across PDF lines', () => {
+  it('joins a line starting with a digit to a line ending in a word no sentence ends on', () => {
+    const text =
+      'Open to students from Class\n9 onwards till they complete Class 12.';
+    expect(criterion(text, 'class')?.value).toEqual([9, 10, 11, 12]);
+  });
+
+  it('keeps a heading apart from the sentence below it', () => {
+    const text = [
+      '3. Allocation of Scholarship',
+      'The total number of scholarships are fixed.',
+    ].join('\n');
+    expect(extractByRules(text).criteria).toEqual([]);
+  });
+
+  it('never joins a numbered item to the line above it', () => {
+    const text = [
+      'Students who passed Class 12 from',
+      '2. ELIGIBILITY:',
+      'family income below Rs. 2.5 lakh',
+    ].join('\n');
+    expect(criterion(text, 'class')?.sourceText).toBe(
+      'Students who passed Class 12 from',
+    );
+  });
+});
+
+describe('Sentences no rule reads', () => {
+  it.each([
+    [
+      'a percentage of places reserved',
+      'At least 30% of these scholarships are reserved for girls.',
+    ],
+    [
+      'a share of places segregated',
+      'Scholarships are divided after segregating share of CBSE and ICSE students.',
+    ],
+    [
+      'places shared in a ratio',
+      'Scholarships are distributed amongst pass outs of the Humanities, Science and Commerce streams in the ratio of 3:3:1.',
+    ],
+    [
+      'renewal',
+      'For renewal of scholarship in each year of study, besides getting at least 50% marks in the Annual Examination.',
+    ],
+  ])('reads nothing from %s', (_, text) => {
+    expect(extractByRules(text).criteria).toEqual([]);
+  });
+
+  it.each([
+    [
+      'a recognised board',
+      'Students who passed Class 12 through a recognized Board of Education including Central Board of Secondary Education (CBSE), Indian Certificate of Secondary Education (ICSE).',
+    ],
+    ['any board', 'Students who passed from any board, CBSE or state board.'],
+  ])('reads no board Criterion from %s', (_, text) => {
+    expect(criterion(text, 'board')).toBeUndefined();
+  });
+
+  it('reads no category Criterion from a category the Profile has no option for', () => {
+    const text =
+      'Students belonging to OBC, EBC and DNT categories are eligible.';
+    expect(criterion(text, 'category')).toBeUndefined();
+  });
+});
+
+// The guideline PDFs' text as the Fetcher reads it. Each yields only the
+// Criteria its guidelines state.
+describe.each([
+  [
+    'PM YASASVI Top Class Education in Schools',
+    'nsp-yasasvi-school-guidelines.txt',
+    [
+      { field: 'class', value: [9, 10, 11, 12] },
+      { field: 'incomeBand', value: 250_000 },
+    ],
+  ],
+  [
+    'PM-USP CSSS',
+    'nsp-csss-guidelines.txt',
+    [
+      { field: 'class', value: [12] },
+      { field: 'incomeBand', value: 450_000 },
+    ],
+  ],
+  [
+    'Ishan Uday',
+    'nsp-ishan-uday-guidelines.txt',
+    [
+      { field: 'class', value: [12] },
+      { field: 'incomeBand', value: 450_000 },
+    ],
+  ],
+])('Extractor rules on an NSP guideline PDF (%s)', (_, file, expected) => {
+  const { criteria } = extractByRules(
+    readFileSync(join(FIXTURES, 'extractor', file), 'utf8'),
+  );
+
+  it('finds only the Criteria the guidelines state', () => {
+    expect(criteria.map(({ field, value }) => ({ field, value }))).toEqual(
+      expected,
+    );
+  });
+});

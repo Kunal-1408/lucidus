@@ -198,9 +198,18 @@ const SENTENCE_END =
 // ("a. ...", "iv) ..."), begins a condition of its own.
 const WRAPPED_LINE = /(?<![.:;!?])\n(?=\p{Ll})(?!(?:[a-z]|[ivx]+)[.)]\s)/gu;
 
+// A line starting with a capital or a digit carries on the sentence above
+// only when that line ends in a comma or a word no sentence ends on ("from
+// Class" / "9 onwards", "Board of" / "Education"). Otherwise it may be a
+// heading ("3. Allocation of Scholarship") or a sentence of its own, and a
+// numbered or lettered list item ("2. ELIGIBILITY:") never carries on.
+const WRAPPED_AFTER_DANGLING_WORD =
+  /(?<=,|\b(?:of|the|a|an|and|or|from|to|in|on|at|for|by|with|including|as|than|under|Class|Grade|Standard))\n(?=[\p{Lu}\d])(?!(?:\d+|[A-Z]|[IVX]+)[.)]\s)/gu;
+
 function splitSentences(text: string): string[] {
   return text
     .replace(WRAPPED_LINE, ' ')
+    .replace(WRAPPED_AFTER_DANGLING_WORD, ' ')
     .split('\n')
     .flatMap((line) => line.split(SENTENCE_END))
     .map((s) => s.trim())

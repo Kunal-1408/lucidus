@@ -49,6 +49,11 @@ const CLASS_RANGE = new RegExp(
   String.raw`\b(?:class(?:es)?|grades?|std\.?|standards?)\s*${LEVEL}\s*(?:to|-|–)\s*(?:class\s*)?${LEVEL}\b`,
   'i',
 );
+// "from Class 9 onwards till they complete Class 12".
+const CLASS_SPAN = new RegExp(
+  String.raw`\bfrom\s+(?:class|grade|std\.?|standard)\s*${LEVEL}\b[^.]{0,40}?\b(?:till|until|up to|upto)\b[^.]{0,40}?\b(?:class|grade|std\.?|standard)\s*${LEVEL}\b`,
+  'i',
+);
 
 // A stated range of classes wins, the widest if there are several (a narrow
 // one is often a promotion, "from class 9th to class 10th"). Otherwise, when
@@ -57,7 +62,7 @@ const CLASS_RANGE = new RegExp(
 const classRule: FieldRule = (sentences) => {
   let widest: { from: number; to: number; sentence: string } | undefined;
   for (const sentence of sentences) {
-    const m = sentence.match(CLASS_RANGE);
+    const m = sentence.match(CLASS_RANGE) ?? sentence.match(CLASS_SPAN);
     const from = m && toClass(m[1]);
     const to = m && toClass(m[2]);
     if (from && to && from < to) {
@@ -149,6 +154,10 @@ interface KeywordField {
   cue?: RegExp;
   // Sentences about relaxations and quotas don't restrict who may apply.
   skip?: RegExp;
+  // A sentence naming a value the Profile has no option for gives no
+  // Criterion: one listing only the options it does have would wrongly fail
+  // the Students it leaves out.
+  beyondOptions?: RegExp;
   options: [raw: string, pattern: RegExp][];
 }
 
@@ -161,6 +170,8 @@ const KEYWORD_FIELDS: KeywordField[] = [
       String.raw`\b[Bb]elong(?:s|ing)? to\b|\b[Cc]ategor(?:y|ies)\b|\b(?:SC|ST|OBC|EWS)(?:\s*[/,]\s*(?:SC|ST|OBC|EWS))*\s+${STUDENTS}\b|\b[Ss]chedul(?:e|ed) (?:[Cc]astes?|[Tt]ribes?) ${STUDENTS}\b`,
     ),
     skip: /relax|cut-?off|reserv|quota/i,
+    beyondOptions:
+      /\bEBCs?\b|\bDNTs?\b|\b[Ee]conomically [Bb]ackward [Cc]lass(?:es)?\b|\b[Dd]e-?notified\b/,
     options: [
       ['sc', /\bSC\b|\b[Ss]chedul(?:e|ed) [Cc]astes?\b/],
       ['st', /\bST\b|\b[Ss]chedul(?:e|ed) [Tt]ribes?\b/],
@@ -215,6 +226,15 @@ const KEYWORD_FIELDS: KeywordField[] = [
   },
   {
     field: 'board',
+    // About the Students' board, not the officials of one ("For State
+    // Government/State Boards").
+    cue: new RegExp(
+      String.raw`\b${STUDENTS}\b|\b(?:[Pp]assed|[Pp]assing|[Ss]tudying|[Aa]ffiliated)\b`,
+    ),
+    // "a recognized Board of Education including CBSE, ICSE, NIOS": any
+    // board will do, the ones listed are examples.
+    beyondOptions:
+      /\brecogni[sz]ed [Bb]oards?\b|\bany [Bb]oards?\b|\bincluding\b[^.]*?(?:\bCBSE\b|\bI?CSE\b|\bCISCE\b|\bstate boards?\b|\bCentral Board\b)/i,
     options: [
       ['cbse', /\bCBSE\b/],
       ['cisce', /\bCISCE\b|\bICSE\b/],
@@ -256,6 +276,7 @@ function keywordRule(spec: KeywordField): FieldRule {
     for (const sentence of sentences) {
       if (spec.cue && !spec.cue.test(sentence)) continue;
       if (spec.skip?.test(sentence)) continue;
+      if (spec.beyondOptions?.test(sentence)) continue;
       const named = spec.options
         .filter(([, pattern]) => pattern.test(sentence))
         .map(([raw]) => raw);
@@ -306,7 +327,30 @@ const RULE_WORDS = KEYWORD_FIELDS.flatMap((spec) => [
   ...spec.options.map(([, pattern]) => pattern),
 ]);
 
+// Neither a condition for keeping a scholarship once awarded nor how its
+// places are shared out between groups is a Criterion (see GLOSSARY.md), so
+// no rule reads such a sentence. Places are shared out when a sentence
+// segregates, divides or shares them, or reserves, earmarks or allots a
+// percentage or ratio of them ("At least 30% of these scholarships are
+// reserved for girls"). A plain "reserved for students with disabilities"
+// shares nothing and is still a condition.
+const RENEWAL = /\brenew(?:al|als|ed|ing)?\b/i;
+const PLACES = /\b(?:scholarships?|slots?|seats?)\b/i;
+const SHARES_OUT = /\bshares?\b|\bsegregat\w*|\bdivided\b|\bin the ratio of\b/i;
+const SETS_ASIDE = /\breserved\b|\bearmarked\b|\ballott?ed\b/i;
+const PERCENT_OR_RATIO = /\d\s*%|\bper ?cent\b|\b\d+\s*:\s*\d+\b/i;
+
+function isNotACondition(sentence: string): boolean {
+  if (RENEWAL.test(sentence)) return true;
+  if (!PLACES.test(sentence)) return false;
+  return (
+    SHARES_OUT.test(sentence) ||
+    (SETS_ASIDE.test(sentence) && PERCENT_OR_RATIO.test(sentence))
+  );
+}
+
 export function isEligibilitySentence(sentence: string): boolean {
+  if (isNotACondition(sentence)) return false;
   return (
     ELIGIBILITY_WORDS.test(sentence) ||
     RULE_WORDS.some((pattern) => pattern.test(sentence))
