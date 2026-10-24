@@ -1,2 +1,7 @@
 npx lint-staged
-npm run check
+
+# The full check only covers backend/ and frontend/, so a commit touching only
+# tickets, docs or scripts skips it. CI still runs it on every PR.
+if git diff --cached --name-only | grep -qE '^(backend|frontend)/|^package(-lock)?\.json$'; then
+  npm run check
+fi

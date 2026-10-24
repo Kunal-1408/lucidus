@@ -16,6 +16,7 @@ out-tsc/
 # Test output
 coverage/
 __screenshots__/
+screenshots/
 
 # Angular CLI cache
 .angular/
