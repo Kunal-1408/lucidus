@@ -163,20 +163,25 @@ interface KeywordField {
 
 const STUDENTS = String.raw`(?:[Ss]tudents?|[Cc]andidates?|[Aa]pplicants?|[Cc]hildren|[Ww]ards)`;
 
+const CATEGORY_ABBREVIATIONS = String.raw`(?:SC|ST|OBC|EWS|EBC|DNT)`;
+
 const KEYWORD_FIELDS: KeywordField[] = [
   {
     field: 'category',
     cue: new RegExp(
-      String.raw`\b[Bb]elong(?:s|ing)? to\b|\b[Cc]ategor(?:y|ies)\b|\b(?:SC|ST|OBC|EWS)(?:\s*[/,]\s*(?:SC|ST|OBC|EWS))*\s+${STUDENTS}\b|\b[Ss]chedul(?:e|ed) (?:[Cc]astes?|[Tt]ribes?) ${STUDENTS}\b`,
+      String.raw`\b[Bb]elong(?:s|ing)? to\b|\b[Cc]ategor(?:y|ies)\b|\b${CATEGORY_ABBREVIATIONS}(?:\s*[/,]\s*${CATEGORY_ABBREVIATIONS})*\s+${STUDENTS}\b|\b[Ss]chedul(?:e|ed) (?:[Cc]astes?|[Tt]ribes?) ${STUDENTS}\b`,
     ),
     skip: /relax|cut-?off|reserv|quota/i,
     beyondOptions:
-      /\bEBCs?\b|\bDNTs?\b|\b[Ee]conomically [Bb]ackward [Cc]lass(?:es)?\b|\b[Dd]e-?notified\b/,
+      /\b(?:MBC|SEBC|VJNT)s?\b|\b[Ee]xtremely [Bb]ackward\b|\b[Mm]ost [Bb]ackward\b|\bVimukta\b/,
     options: [
       ['sc', /\bSC\b|\b[Ss]chedul(?:e|ed) [Cc]astes?\b/],
       ['st', /\bST\b|\b[Ss]chedul(?:e|ed) [Tt]ribes?\b/],
       ['obc', /\bOBC\b|\b[Oo]ther [Bb]ackward [Cc]lass(?:es)?\b/],
       ['ews', /\bEWS\b/],
+      // EBC is not EWS: an Economically Backward Class, not a weaker section.
+      ['ebc', /\bEBCs?\b|\b[Ee]conomically [Bb]ackward [Cc]lass(?:es)?\b/],
+      ['dnt', /\bDNTs?\b|\b[Dd]e-?notified\b/],
     ],
   },
   {

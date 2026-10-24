@@ -129,7 +129,7 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
     'other',
   ],
   gender: ['female', 'male', 'other'],
-  category: ['general', 'sc', 'st', 'obc', 'ews'],
+  category: ['general', 'sc', 'st', 'obc', 'ews', 'ebc', 'dnt'],
   parentOccupation: [
     'defence',
     'central_armed_police',

@@ -62,6 +62,8 @@ export const CATEGORIES = [
   { value: 'st', label: 'ST' },
   { value: 'obc', label: 'OBC' },
   { value: 'ews', label: 'EWS' },
+  { value: 'ebc', label: 'EBC' },
+  { value: 'dnt', label: 'DNT' },
 ] as const;
 
 export const INCOME_BANDS = [

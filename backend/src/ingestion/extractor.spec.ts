@@ -113,6 +113,35 @@ describe('Normalisation onto the fixed lists', () => {
   });
 
   it.each([
+    'OBC, EBC and DNT students are eligible.',
+    'OBC, EBC, and DNT students are eligible.',
+  ])('finds EBC and DNT among the categories, never changeable: %s', (text) => {
+    expect(criterion(text, 'category')).toMatchObject({
+      value: ['obc', 'ebc', 'dnt'],
+      changeable: false,
+    });
+  });
+
+  it.each([
+    'OBC and MBC students are eligible.',
+    'SEBC/OBC candidates may apply.',
+    'Students belonging to OBC or Extremely Backward Classes are eligible.',
+  ])(
+    'reads no category Criterion from a category the Profile has no option for: %s',
+    (text) => {
+      expect(criterion(text, 'category')).toBeUndefined();
+    },
+  );
+
+  it.each([
+    ['Economically Backward Classes', 'ebc'],
+    ['Denotified, Nomadic and Semi-Nomadic Tribes', 'dnt'],
+  ])('reads %s as %s, not EWS or ST', (name, value) => {
+    const text = `Students belonging to ${name} are eligible.`;
+    expect(criterion(text, 'category')?.value).toEqual([value]);
+  });
+
+  it.each([
     ['Applicants must have secured 60% marks in Class 10.', 'class10Marks', 60],
     ['Students should have scored 75% marks in Class 12.', 'latestMarks', 75],
     [
@@ -328,12 +357,6 @@ describe('Sentences no rule reads', () => {
   ])('reads no board Criterion from %s', (_, text) => {
     expect(criterion(text, 'board')).toBeUndefined();
   });
-
-  it('reads no category Criterion from a category the Profile has no option for', () => {
-    const text =
-      'Students belonging to OBC, EBC and DNT categories are eligible.';
-    expect(criterion(text, 'category')).toBeUndefined();
-  });
 });
 
 // The guideline PDFs' text as the Fetcher reads it. Each yields only the
@@ -345,6 +368,7 @@ describe.each([
     [
       { field: 'class', value: [9, 10, 11, 12] },
       { field: 'incomeBand', value: 250_000 },
+      { field: 'category', value: ['obc', 'ebc', 'dnt'] },
     ],
   ],
   [

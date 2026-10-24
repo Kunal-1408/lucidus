@@ -79,7 +79,7 @@ export interface Profile {
     | '6l_8l'
     | 'over_8l';
   gender?: 'female' | 'male' | 'other';
-  category?: 'general' | 'sc' | 'st' | 'obc' | 'ews';
+  category?: 'general' | 'sc' | 'st' | 'obc' | 'ews' | 'ebc' | 'dnt';
   minority?: boolean;
   disability?: boolean;
   singleGirlChild?: boolean;
