@@ -78,12 +78,12 @@ describe('Extractor with the LLM for what the rules miss', () => {
   it('normalises LLM values onto the fixed lists: rupees, classes, marks', async () => {
     const income = 'Family income must be within two and a half lakh.';
     const level = 'For students of the eleventh standard.';
-    const marks = 'Needs sixty percent in the last exam.';
+    const marks = 'Needs sixty percent in the final board exam.';
     const { llm } = fakeLlm({
       criteria: [
         { field: 'incomeBand', values: ['2.5 lakh'], quote: income },
         { field: 'class', values: ['XI'], quote: level },
-        { field: 'latestMarks', values: ['60%'], quote: marks },
+        { field: 'class12Result', values: ['60%'], quote: marks },
       ],
     });
     const { criteria } = await extract([income, level, marks].join('\n'), llm);
@@ -97,7 +97,12 @@ describe('Extractor with the LLM for what the rules miss', () => {
     ).toEqual([
       { field: 'incomeBand', op: 'lte', value: 250_000, changeable: false },
       { field: 'class', op: 'in', value: [11], changeable: true },
-      { field: 'latestMarks', op: 'gte', value: 60, changeable: true },
+      {
+        field: 'class12Result',
+        op: 'gte',
+        value: { scale: 'percentage', value: 60 },
+        changeable: true,
+      },
     ]);
   });
 
@@ -115,7 +120,7 @@ describe('Extractor with the LLM for what the rules miss', () => {
       criteria.map(({ field, op, value }) => ({ field, op, value })),
     ).toEqual([
       { field: 'gender', op: 'eq', value: 'female' },
-      { field: 'citizenship', op: 'eq', value: 'indian' },
+      { field: 'citizenship', op: 'in', value: ['indian'] },
     ]);
   });
 

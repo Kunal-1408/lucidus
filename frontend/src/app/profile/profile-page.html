@@ -15,16 +15,128 @@
   </label>
 
   <label>
-    State you live in (domicile)
-    <select (change)="setChoice('domicileState', $any($event.target).value)">
+    Country you live in
+    <select (change)="setChoice('countryOfResidence', $any($event.target).value)">
       <option value="">N.A</option>
-      @for (s of states; track s.value) {
-        <option [value]="s.value" [selected]="profile().domicileState === s.value">
-          {{ s.label }}
+      @for (c of countries; track c.value) {
+        <option [value]="c.value" [selected]="profile().countryOfResidence === c.value">
+          {{ c.label }}
         </option>
       }
     </select>
   </label>
+
+  @if (shown().has('region') && regions().length) {
+    <label>
+      State or region you live in
+      <select (change)="setChoice('region', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (r of regions(); track r.value) {
+          <option [value]="r.value" [selected]="profile().region === r.value">
+            {{ r.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (shown().has('homeState')) {
+    <label>
+      Home state in India, if you have one
+      <select (change)="setChoice('homeState', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (s of states; track s.value) {
+          <option [value]="s.value" [selected]="profile().homeState === s.value">
+            {{ s.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (shown().has('residenceStatus')) {
+    <label>
+      Residence status in that country
+      <select (change)="setChoice('residenceStatus', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (r of residenceStatuses; track r.value) {
+          <option [value]="r.value" [selected]="profile().residenceStatus === r.value">
+            {{ r.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  <label>
+    Citizenship
+    <select (change)="setChoice('citizenship', $any($event.target).value)">
+      <option value="">N.A</option>
+      @for (c of citizenships; track c.value) {
+        <option [value]="c.value" [selected]="profile().citizenship === c.value">
+          {{ c.label }}
+        </option>
+      }
+    </select>
+  </label>
+
+  @if (shown().has('citizenshipCountry')) {
+    <label>
+      Country of citizenship
+      <select (change)="setChoice('citizenshipCountry', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (c of countries; track c.value) {
+          <option [value]="c.value" [selected]="profile().citizenshipCountry === c.value">
+            {{ c.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  <label>
+    Board
+    <select (change)="setChoice('board', $any($event.target).value)">
+      <option value="">N.A</option>
+      @for (b of boards; track b.value) {
+        <option [value]="b.value" [selected]="profile().board === b.value">
+          {{ b.label }}
+        </option>
+      }
+    </select>
+  </label>
+
+  @if (shown().has('boardsUpcoming')) {
+    <label>
+      Are your board exams still upcoming?
+      <select (change)="setYesNo('boardsUpcoming', $any($event.target).value)">
+        <option value="" [selected]="yesNo('boardsUpcoming') === ''">N.A</option>
+        <option value="yes" [selected]="yesNo('boardsUpcoming') === 'yes'">Yes</option>
+        <option value="no" [selected]="yesNo('boardsUpcoming') === 'no'">No</option>
+      </select>
+    </label>
+  }
+
+  @for (question of boardMarksQuestions; track question) {
+    @if (shown().has(question)) {
+      <label>
+        {{ boardMarksLabel(question, profile()) }} (%)
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="0.1"
+          inputmode="decimal"
+          [value]="profile()[question]?.value ?? ''"
+          [attr.aria-invalid]="marksErrors()[question] ? true : null"
+          (change)="setMarks(question, $any($event.target).value)"
+        />
+        @if (marksErrors()[question]; as error) {
+          <span class="field-error" role="alert">{{ error }}</span>
+        }
+      </label>
+    }
+  }
 
   <label>
     Gender
@@ -36,15 +148,19 @@
     </select>
   </label>
 
-  <label>
-    Category
-    <select (change)="setChoice('category', $any($event.target).value)">
-      <option value="">N.A</option>
-      @for (c of categories; track c.value) {
-        <option [value]="c.value" [selected]="profile().category === c.value">{{ c.label }}</option>
-      }
-    </select>
-  </label>
+  @if (shown().has('category')) {
+    <label>
+      Category
+      <select (change)="setChoice('category', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (c of categories; track c.value) {
+          <option [value]="c.value" [selected]="profile().category === c.value">
+            {{ c.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
 
   <label>
     Family income per year
@@ -57,34 +173,6 @@
       }
     </select>
   </label>
-
-  <label>
-    Latest exam marks (%)
-    <input
-      type="number"
-      min="0"
-      max="100"
-      step="0.1"
-      inputmode="decimal"
-      [value]="profile().latestMarks ?? ''"
-      (change)="setMarks('latestMarks', $any($event.target).value)"
-    />
-  </label>
-
-  @if (profile().class !== 9) {
-    <label>
-      Class 10 board marks (%)
-      <input
-        type="number"
-        min="0"
-        max="100"
-        step="0.1"
-        inputmode="decimal"
-        [value]="profile().class10Marks ?? ''"
-        (change)="setMarks('class10Marks', $any($event.target).value)"
-      />
-    </label>
-  }
 
   <label>
     What do you want to study?
@@ -114,28 +202,7 @@
     <summary>More about you</summary>
 
     <div class="more-fields">
-      <label>
-        Are your board exams still upcoming?
-        <select (change)="setYesNo('boardsUpcoming', $any($event.target).value)">
-          <option value="" [selected]="yesNo('boardsUpcoming') === ''">N.A</option>
-          <option value="yes" [selected]="yesNo('boardsUpcoming') === 'yes'">Yes</option>
-          <option value="no" [selected]="yesNo('boardsUpcoming') === 'no'">No</option>
-        </select>
-      </label>
-
-      <label>
-        Board
-        <select (change)="setChoice('board', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (b of boards; track b.value) {
-            <option [value]="b.value" [selected]="profile().board === b.value">
-              {{ b.label }}
-            </option>
-          }
-        </select>
-      </label>
-
-      @if (profile().class !== 9 && profile().class !== 10) {
+      @if (shown().has('stream')) {
         <label>
           Stream (Class 11 and 12)
           <select (change)="setChoice('stream', $any($event.target).value)">
@@ -172,18 +239,6 @@
       </label>
 
       <label>
-        Citizenship
-        <select (change)="setChoice('citizenship', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (c of citizenships; track c.value) {
-            <option [value]="c.value" [selected]="profile().citizenship === c.value">
-              {{ c.label }}
-            </option>
-          }
-        </select>
-      </label>
-
-      <label>
         Do you belong to a religious or linguistic minority?
         <select (change)="setYesNo('minority', $any($event.target).value)">
           <option value="" [selected]="yesNo('minority') === ''">N.A</option>
@@ -201,7 +256,7 @@
         </select>
       </label>
 
-      @if (profile().gender === 'female') {
+      @if (shown().has('singleGirlChild')) {
         <label>
           Are you a single girl child?
           <select (change)="setYesNo('singleGirlChild', $any($event.target).value)">

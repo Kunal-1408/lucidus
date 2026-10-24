@@ -148,9 +148,12 @@ describe('Overrides', () => {
         'note is required',
         'reviewedBy is required',
         'criteria[0].field must be one of ' +
-          'class, class10Marks, latestMarks, incomeBand, gender, category, ' +
+          'class, class10Result, class12Result, class10Marks, latestMarks, ' +
+          'incomeBand, gender, category, ' +
           'minority, disability, singleGirlChild, citizenship, ' +
-          'domicileState, schoolState, schoolType, board, stream, ' +
+          'countryOfResidence, region, homeState, residenceStatus, ' +
+          'citizenshipCountry, domicileState, schoolState, schoolType, ' +
+          'board, stream, ' +
           'fieldOfStudy, destination, parentOccupation, examsQualified',
         'criteria[0].values must be a non-empty list of strings or numbers',
         'criteria[0].sourceText is required',

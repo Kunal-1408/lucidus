@@ -3,7 +3,17 @@ import type {
   Criterion,
   ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
-import type { Profile } from './profile.js';
+import {
+  type BoardMarksField,
+  isBoardMarksField,
+} from '../scholarships/criterion-fields.js';
+import { INDIA } from './countries.js';
+import {
+  type BoardResult,
+  type IndianState,
+  type Profile,
+  STATE_REGIONS,
+} from './profile.js';
 
 // The slice of a Scholarship the Matcher needs. Only active Scholarships
 // not needing review are matched; the others are skipped.
@@ -65,6 +75,11 @@ type Outcome = 'pass' | 'fail' | 'unknown';
 // How each Profile field is named to a Student.
 const FIELD_LABELS: Record<string, string> = {
   class: 'class',
+  countryOfResidence: 'the country you live in',
+  region: 'the state or region you live in',
+  homeState: 'home state',
+  residenceStatus: 'residence status',
+  citizenshipCountry: 'country of citizenship',
   domicileState: 'home state',
   schoolState: 'school state',
   schoolType: 'school type',
@@ -72,6 +87,8 @@ const FIELD_LABELS: Record<string, string> = {
   board: 'board',
   class10Marks: 'Class 10 marks',
   latestMarks: 'latest marks',
+  class10Result: 'Class 10 result',
+  class12Result: 'Class 12 result',
   boardsUpcoming: 'whether your boards are upcoming',
   stream: 'stream',
   fieldOfStudy: 'intended field of study',
@@ -192,6 +209,7 @@ const UG_GOAL = 'Get admitted to an undergraduate course to unlock this';
 function goalFor(criterion: Criterion, profile: Profile): string | undefined {
   if (!criterion.changeable) return undefined;
   const { field, op, value } = criterion;
+  if (isBoardMarksField(field)) return boardMarksGoal(criterion, profile);
   if (
     (field === 'latestMarks' || field === 'class10Marks') &&
     op === 'gte' &&
@@ -215,9 +233,52 @@ function goalFor(criterion: Criterion, profile: Profile): string | undefined {
   return undefined;
 }
 
+// Today's marks rule on Board marks: a percentage shortfall of at most 5 is
+// a Goal while the boards for that result are still upcoming. Only a Class
+// 12 result can be: a Class 12 Student's upcoming boards are Class 12's
+// (their Class 10 result is final), and a Class 10 Student with boards
+// upcoming gives no Class 10 result (the Board marks grid).
+function boardMarksGoal(
+  criterion: Criterion,
+  profile: Profile,
+): string | undefined {
+  const field = criterion.field as BoardMarksField;
+  const target = asBoardResult(criterion.value);
+  const answer = profile[field];
+  if (field !== 'class12Result' || criterion.op !== 'gte') return undefined;
+  if (!target || !answer) return undefined;
+  if (profile.boardsUpcoming !== true || profile.class !== 12) return undefined;
+  if (target.scale !== 'percentage' || answer.scale !== 'percentage')
+    return undefined;
+  if (target.value > 100 || target.value - answer.value > MAX_MARKS_GAP)
+    return undefined;
+  return `Score ${target.value}% in Class 12 to unlock this`;
+}
+
+// A Board marks result, or undefined when the value isn't one.
+function asBoardResult(value: unknown): BoardResult | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { scale, value: number } = value as Record<string, unknown>;
+  return typeof scale === 'string' && typeof number === 'number'
+    ? { scale: scale as BoardResult['scale'], value: number }
+    : undefined;
+}
+
+// A result passes a threshold on its own scale; on another scale it can't be
+// judged, since results are never converted.
+function compareBoardResult(threshold: unknown, answer: unknown): Outcome {
+  const target = asBoardResult(threshold);
+  const result = asBoardResult(answer);
+  if (!target || !result || target.scale !== result.scale) return 'unknown';
+  return result.value >= target.value ? 'pass' : 'fail';
+}
+
 // Income bands in rupees. A Student's income lies somewhere inside their
-// band; a threshold on a band edge still decides.
-const INCOME_BANDS: Record<string, [number, number]> = {
+// band; a threshold on a band edge still decides. The keys are also the
+// bands a Match request may send (profile-input.ts): they stay beside their
+// ranges rather than in FIXED_LISTS, which holds the values Criteria are
+// written in, and an income Criterion holds rupees, not a band.
+export const INCOME_BANDS: Record<string, [number, number]> = {
   under_1l: [0, 100_000],
   '1l_2l': [100_000, 200_000],
   '2l_2_5l': [200_000, 250_000],
@@ -228,8 +289,34 @@ const INCOME_BANDS: Record<string, [number, number]> = {
   over_8l: [800_000, Infinity],
 };
 
+// Answers that follow from others: the Home state of a Student in India is
+// the region they live in, and an old domicile state is the Home state (in
+// either direction, so old Profiles and old Criteria keep matching); an
+// Indian citizen is a citizen of India. An OCI card holder's country of
+// citizenship is not known.
+function derivedAnswer(profile: Profile, field: string): unknown {
+  const homeState =
+    profile.homeState ?? homeStateInIndia(profile) ?? profile.domicileState;
+  if (field === 'homeState') return homeState;
+  if (field === 'domicileState') return profile.domicileState ?? homeState;
+  if (field === 'citizenshipCountry') {
+    return (
+      profile.citizenshipCountry ??
+      (profile.citizenship === 'indian' ? INDIA : undefined)
+    );
+  }
+  return (profile as Record<string, unknown>)[field];
+}
+
+function homeStateInIndia(profile: Profile): IndianState | undefined {
+  if (profile.countryOfResidence !== INDIA) return undefined;
+  return (Object.keys(STATE_REGIONS) as IndianState[]).find(
+    (state) => STATE_REGIONS[state] === profile.region,
+  );
+}
+
 function answerFor(profile: Profile, field: string): unknown {
-  const answer = (profile as Record<string, unknown>)[field];
+  const answer = derivedAnswer(profile, field);
   if (answer === null || answer === '') return undefined;
   if (Array.isArray(answer) && answer.length === 0) return undefined;
   return answer;
@@ -243,6 +330,9 @@ function evaluate(criterion: Criterion, profile: Profile): Outcome {
 
 function compare(criterion: Criterion, answer: unknown): Outcome {
   const { op, value } = criterion;
+  if (isBoardMarksField(criterion.field) && op === 'gte') {
+    return compareBoardResult(value, answer);
+  }
   if (criterion.field === 'incomeBand' && (op === 'lte' || op === 'gte')) {
     return compareIncome(op, Number(value), String(answer));
   }

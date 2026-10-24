@@ -1,6 +1,8 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { COUNTRIES, REGIONS } from '../countries';
 import {
+  BoardResult,
   BOARDS,
   CATEGORIES,
   CITIZENSHIPS,
@@ -12,15 +14,29 @@ import {
   INCOME_BANDS,
   PARENT_OCCUPATIONS,
   Profile,
+  RESIDENCE_STATUSES,
   SCHOOL_TYPES,
   STATES,
   STREAMS,
-  withoutContradictions,
 } from '../profile-fields';
+import {
+  applyChange,
+  BOARD_MARKS_FIELDS,
+  BoardMarksQuestion,
+  boardMarksLabel,
+  checkAnswer,
+  profileForMatch,
+  visibleQuestions,
+} from '../profile-rules';
 import { ProfileStore } from '../profile-store';
 
 // Profile fields answered by picking one option from a fixed list.
 type ChoiceField =
+  | 'countryOfResidence'
+  | 'region'
+  | 'homeState'
+  | 'residenceStatus'
+  | 'citizenshipCountry'
   | 'domicileState'
   | 'schoolState'
   | 'schoolType'
@@ -33,7 +49,6 @@ type ChoiceField =
   | 'gender'
   | 'category';
 type YesNoField = 'boardsUpcoming' | 'minority' | 'disability' | 'singleGirlChild';
-type MarksField = 'class10Marks' | 'latestMarks';
 type MultiField = 'parentOccupation' | 'examsQualified';
 
 @Component({
@@ -57,12 +72,22 @@ export class ProfilePage {
   protected readonly destinations = DESTINATIONS;
   protected readonly parentOccupations = PARENT_OCCUPATIONS;
   protected readonly exams = EXAMS;
+  protected readonly countries = COUNTRIES;
+  protected readonly residenceStatuses = RESIDENCE_STATUSES;
+  protected readonly boardMarksQuestions = BOARD_MARKS_FIELDS;
+  protected readonly boardMarksLabel = boardMarksLabel;
 
   protected readonly profile = this.store.profile;
-  // School state defaults to the domicile state until the Student changes it.
-  protected readonly schoolState = computed(
-    () => this.profile().schoolState ?? this.profile().domicileState,
+  protected readonly shown = computed(() => visibleQuestions(this.profile()));
+  // The states or regions of the country the Student lives in.
+  protected readonly regions = computed(
+    () => REGIONS[this.profile().countryOfResidence ?? ''] ?? [],
   );
+  // Why the last answer typed into a Board marks field was not saved.
+  protected readonly marksErrors = signal<Partial<Record<BoardMarksQuestion, string>>>({});
+  // School state defaults to the Home state of a Student in India until the
+  // Student changes it; abroad there is no default.
+  protected readonly schoolState = computed(() => profileForMatch(this.profile()).schoolState);
 
   protected setClass(value: string) {
     this.update({ class: value ? (Number(value) as Profile['class']) : undefined });
@@ -81,11 +106,14 @@ export class ProfilePage {
     this.update({ [field]: value === '' ? undefined : value === 'yes' });
   }
 
-  protected setMarks(field: MarksField, value: string) {
-    const marks = value.trim() === '' ? NaN : Number(value);
-    this.update({
-      [field]: Number.isFinite(marks) ? Math.min(100, Math.max(0, marks)) : undefined,
-    });
+  // An empty field clears the answer; an answer out of range is not saved and
+  // the field says why. Only the percentage scale exists so far.
+  protected setMarks(question: BoardMarksQuestion, value: string) {
+    const result: BoardResult | undefined =
+      value.trim() === '' ? undefined : { scale: 'percentage', value: Number(value) };
+    const error = result === undefined ? undefined : checkAnswer(question, result);
+    this.marksErrors.update((errors) => ({ ...errors, [question]: error }));
+    if (!error) this.update({ [question]: result });
   }
 
   protected isPicked(field: MultiField, value: string): boolean {
@@ -107,6 +135,6 @@ export class ProfilePage {
   }
 
   private update(change: Partial<Record<keyof Profile, unknown>>) {
-    this.store.profile.update((p) => withoutContradictions({ ...p, ...change } as Profile));
+    this.store.profile.update((p) => applyChange(p, change as Partial<Profile>));
   }
 }

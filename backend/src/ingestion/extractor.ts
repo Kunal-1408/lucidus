@@ -1,4 +1,9 @@
-import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
+import {
+  CRITERION_FIELDS,
+  EXTRACTED_FIELDS,
+  isBoardMarksField,
+  isLegacyMarksField,
+} from '../scholarships/criterion-fields.js';
 import type {
   Criterion,
   ExtraRequirement,
@@ -8,6 +13,7 @@ import {
   FIELD_RULES,
   Found,
   isEligibilitySentence,
+  otherYearMarks,
 } from './extraction-rules.js';
 import {
   type Quoted,
@@ -39,18 +45,25 @@ export async function extract(
   const found = new Set(byRules.criteria.map((c) => c.field));
   const answer = await llm.read({
     text: text.slice(0, LLM_TEXT_LIMIT),
-    fields: Object.keys(CRITERION_FIELDS).filter((f) => !found.has(f)),
+    fields: EXTRACTED_FIELDS.filter((f) => !found.has(f)),
     wantAmountText: byRules.amountText === AMOUNT_NOT_STATED,
     wantDeadline: byRules.deadline === undefined,
   });
   const fromLlm = answer.criteria
-    .filter((c) => c.field in CRITERION_FIELDS && !found.has(c.field))
+    .filter((c) => EXTRACTED_FIELDS.includes(c.field) && !found.has(c.field))
     .map((reading) => fromCriterionReading(reading, text));
   // Extra requirements are never matched, so one whose sentence isn't on the
   // page is simply dropped rather than shown.
-  const extraRequirements = answer.extraRequirements
-    .filter((r) => r.text.trim() && quotedIn(text, r.quote))
-    .map((r) => ({ text: r.text.trim(), sourceText: r.quote }));
+  // The rules' own Extra requirements come first; the LLM's copy of the same
+  // sentence is dropped.
+  const ruleQuotes = byRules.extraRequirements.map((r) => r.sourceText);
+  const extraRequirements = [
+    ...byRules.extraRequirements,
+    ...answer.extraRequirements
+      .filter((r) => r.text.trim() && quotedIn(text, r.quote))
+      .filter((r) => !ruleQuotes.some((quote) => quotedIn(quote, r.quote)))
+      .map((r) => ({ text: r.text.trim(), sourceText: r.quote })),
+  ];
   const amountText =
     byRules.amountText !== AMOUNT_NOT_STATED
       ? byRules.amountText
@@ -79,7 +92,7 @@ export function extractByRules(text: string): Extraction {
   const deadline = deadlineText(sentences);
   return {
     criteria,
-    extraRequirements: [],
+    extraRequirements: otherYearMarks(eligibility),
     amountText: amountRule(sentences) ?? AMOUNT_NOT_STATED,
     deadline: deadline && toIsoDate(deadline),
   };
@@ -169,7 +182,9 @@ export function readValue(field: string, values: string[]): unknown {
 
 // The model and reviewers write a percentage with its sign ("60%").
 function tidyReadValue(field: string, raw: string): string {
-  return field.endsWith('Marks') ? raw.replace(/\s*%$/, '') : raw;
+  return isBoardMarksField(field) || isLegacyMarksField(field)
+    ? raw.replace(/\s*%$/, '')
+    : raw;
 }
 
 // A value the model says the source states, kept only when the value sits

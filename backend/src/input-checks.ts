@@ -25,12 +25,16 @@ export function text(
   return value.trim();
 }
 
+// A value from a fixed list. A long list (every country code) is better
+// named than spelled out, so the caller may give the reason a value outside
+// it gets instead.
 export function oneOf<T extends string>(
   raw: Record<string, unknown>,
   field: string,
   allowed: readonly T[],
   reasons: string[],
   label = field,
+  notAllowed = `${label} must be one of ${allowed.join(', ')}`,
 ): T | undefined {
   const value = raw[field];
   if (
@@ -39,10 +43,62 @@ export function oneOf<T extends string>(
   ) {
     return value as T;
   }
+  reasons.push(value === undefined ? `${label} is required` : notAllowed);
+  return undefined;
+}
+
+export function numberBetween(
+  raw: Record<string, unknown>,
+  field: string,
+  min: number,
+  max: number,
+  reasons: string[],
+  label = field,
+): number | undefined {
+  const value = raw[field];
+  if (typeof value === 'number' && value >= min && value <= max) return value;
   reasons.push(
     value === undefined
       ? `${label} is required`
-      : `${label} must be one of ${allowed.join(', ')}`,
+      : `${label} must be from ${min} to ${max}`,
+  );
+  return undefined;
+}
+
+export function yesNo(
+  raw: Record<string, unknown>,
+  field: string,
+  reasons: string[],
+  label = field,
+): boolean | undefined {
+  const value = raw[field];
+  if (typeof value === 'boolean') return value;
+  reasons.push(
+    value === undefined
+      ? `${label} is required`
+      : `${label} must be true or false`,
+  );
+  return undefined;
+}
+
+// A list whose every item is one of the allowed values; repeats are dropped.
+export function listOf<T extends string>(
+  raw: Record<string, unknown>,
+  field: string,
+  allowed: readonly T[],
+  reasons: string[],
+  label = field,
+): T[] | undefined {
+  const value = raw[field];
+  const isAllowed = (item: unknown): item is T =>
+    typeof item === 'string' && (allowed as readonly string[]).includes(item);
+  if (Array.isArray(value) && value.every(isAllowed)) {
+    return [...new Set(value)];
+  }
+  reasons.push(
+    value === undefined
+      ? `${label} is required`
+      : `${label} must be a list of ${allowed.join(', ')}`,
   );
   return undefined;
 }

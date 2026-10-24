@@ -14,3 +14,7 @@ See spec: "Ingestion", "Audit".
 - [ ] The audit endpoint lists Criteria with an unknown field, a value outside the fixed lists, or an unsupported scale or currency, each with its scholarship and sentence; covered by e2e; admin-token protected
 - [ ] `scripts/admin.mjs audit` calls it and prints the result
 - [ ] After deploy, the operator runs `ingest`, then `audit` and `review`, and records the outcome as a comment on this ticket
+
+## Comments
+
+**2026-10-25 (agent):** Wave 1 (tickets 01–04) deploys with live Scholarships still holding `class10Marks` / `latestMarks` Criteria, which no Profile the form sends can satisfy (see ticket 04's 2026-10-25 comment); this ticket's re-ingestion is what fixes them. Note for the build: `IngestionService.upsertScholarship` reuses the stored extraction when the content hash is unchanged, so a plain `ingest` run re-extracts nothing. The "full ingestion run" here needs a way to force re-extraction (for example, treating a stored extraction that names a removed field as stale, or a force flag on the run). Also delete `class10Marks` along with the three fields listed above.

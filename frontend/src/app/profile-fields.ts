@@ -50,6 +50,47 @@ export const STATES = [
   { value: 'puducherry', label: 'Puducherry (UT)' },
 ] as const;
 
+// Each Indian state's ISO 3166-2 region: for a Student living in India, the
+// region they live in is their Home state.
+export const STATE_REGIONS: Record<ValueOf<typeof STATES>, string> = {
+  andhra_pradesh: 'IN-AP',
+  arunachal_pradesh: 'IN-AR',
+  assam: 'IN-AS',
+  bihar: 'IN-BR',
+  chhattisgarh: 'IN-CG',
+  goa: 'IN-GA',
+  gujarat: 'IN-GJ',
+  haryana: 'IN-HR',
+  himachal_pradesh: 'IN-HP',
+  jharkhand: 'IN-JH',
+  karnataka: 'IN-KA',
+  kerala: 'IN-KL',
+  madhya_pradesh: 'IN-MP',
+  maharashtra: 'IN-MH',
+  manipur: 'IN-MN',
+  meghalaya: 'IN-ML',
+  mizoram: 'IN-MZ',
+  nagaland: 'IN-NL',
+  odisha: 'IN-OD',
+  punjab: 'IN-PB',
+  rajasthan: 'IN-RJ',
+  sikkim: 'IN-SK',
+  tamil_nadu: 'IN-TN',
+  telangana: 'IN-TS',
+  tripura: 'IN-TR',
+  uttar_pradesh: 'IN-UP',
+  uttarakhand: 'IN-UK',
+  west_bengal: 'IN-WB',
+  andaman_and_nicobar_islands: 'IN-AN',
+  chandigarh: 'IN-CH',
+  dadra_and_nagar_haveli_and_daman_and_diu: 'IN-DH',
+  delhi: 'IN-DL',
+  jammu_and_kashmir: 'IN-JK',
+  ladakh: 'IN-LA',
+  lakshadweep: 'IN-LD',
+  puducherry: 'IN-PY',
+};
+
 export const GENDERS = [
   { value: 'female', label: 'Female' },
   { value: 'male', label: 'Male' },
@@ -83,19 +124,33 @@ export const SCHOOL_TYPES = [
   { value: 'private', label: 'Private' },
 ] as const;
 
+// An NRI is an Indian citizen living outside India, never a Citizenship.
 export const CITIZENSHIPS = [
-  { value: 'indian', label: 'Indian' },
-  { value: 'other', label: 'Other' },
+  { value: 'indian', label: 'Indian citizen' },
+  { value: 'oci', label: 'OCI card holder' },
+  { value: 'other', label: 'Another nationality' },
+] as const;
+
+// Asked only of a Student living outside India, about that country.
+export const RESIDENCE_STATUSES = [
+  { value: 'citizen', label: 'Citizen of that country' },
+  { value: 'permanent_resident', label: 'Permanent resident' },
+  { value: 'visa', label: 'On a visa' },
 ] as const;
 
 export const BOARDS = [
   { value: 'cbse', label: 'CBSE' },
   { value: 'cisce', label: 'CISCE (ICSE / ISC)' },
   { value: 'state', label: 'State board' },
+  { value: 'cambridge', label: 'Cambridge/UK' },
   { value: 'ib', label: 'IB' },
-  { value: 'cambridge', label: 'Cambridge' },
+  { value: 'us_high_school', label: 'US high school' },
   { value: 'other', label: 'Other' },
 ] as const;
+
+// The scales a Board marks result can be given on. Results on different
+// scales are never compared.
+export const RESULT_SCALES = [{ value: 'percentage', label: 'Percentage' }] as const;
 
 export const STREAMS = [
   { value: 'science', label: 'Science' },
@@ -140,17 +195,36 @@ export const EXAMS = [
 
 type ValueOf<T extends readonly { value: unknown }[]> = T[number]['value'];
 
+export type ResultScale = ValueOf<typeof RESULT_SCALES>;
+
+// A Board marks result: a value on its Result scale.
+export interface BoardResult {
+  scale: ResultScale;
+  value: number;
+}
+
 // What a Student tells us about themselves. Every field is optional.
 export interface Profile {
   class?: ValueOf<typeof CLASSES>;
+  // Where the Student lives and who they are: an ISO 3166-1 alpha-2 country
+  // (COUNTRIES in countries.ts) and an ISO 3166-2 region of it; Home state
+  // and Residence status only abroad (in India the region is the Home
+  // state); a Citizenship country only for another nationality.
+  countryOfResidence?: string;
+  region?: string;
+  homeState?: ValueOf<typeof STATES>;
+  residenceStatus?: ValueOf<typeof RESIDENCE_STATUSES>;
+  citizenshipCountry?: string;
+  // Replaced by country of residence, region and Home state (a saved one is
+  // migrated on load); kept until the old fields are removed.
   domicileState?: ValueOf<typeof STATES>;
   schoolState?: ValueOf<typeof STATES>;
   schoolType?: ValueOf<typeof SCHOOL_TYPES>;
   citizenship?: ValueOf<typeof CITIZENSHIPS>;
   board?: ValueOf<typeof BOARDS>;
-  class10Marks?: number;
-  latestMarks?: number;
   boardsUpcoming?: boolean;
+  class10Result?: BoardResult;
+  class12Result?: BoardResult;
   stream?: ValueOf<typeof STREAMS>;
   fieldOfStudy?: ValueOf<typeof FIELDS_OF_STUDY>;
   destination?: ValueOf<typeof DESTINATIONS>;
@@ -162,26 +236,4 @@ export interface Profile {
   singleGirlChild?: boolean;
   parentOccupation?: ValueOf<typeof PARENT_OCCUPATIONS>[];
   examsQualified?: ValueOf<typeof EXAMS>[];
-}
-
-// Drops answers the rest of the Profile rules out: single girl child only applies
-// to a female Student, a stream only to Class 11 and 12, Class 10 board marks not
-// to Class 9.
-export function withoutContradictions(profile: Profile): Profile {
-  const kept: Profile = { ...profile };
-  if (kept.gender !== 'female') delete kept.singleGirlChild;
-  if (kept.class === 9 || kept.class === 10) delete kept.stream;
-  if (kept.class === 9) delete kept.class10Marks;
-  return kept;
-}
-
-// The Profile as sent inside a Match request: contradicting answers dropped and
-// school state falling back to the domicile state.
-export function profileForMatch(profile: Profile): Profile {
-  const sent = withoutContradictions(profile);
-  sent.schoolState ??= sent.domicileState;
-  for (const key of Object.keys(sent) as (keyof Profile)[]) {
-    if (sent[key] === undefined) delete sent[key];
-  }
-  return sent;
 }

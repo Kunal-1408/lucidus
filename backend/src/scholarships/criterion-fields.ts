@@ -9,6 +9,9 @@ export const CRITERION_FIELDS: Record<
   { op: Criterion['op']; changeable: boolean }
 > = {
   class: { op: 'in', changeable: true },
+  // Board marks: the value is a result on its Result scale.
+  class10Result: { op: 'gte', changeable: true },
+  class12Result: { op: 'gte', changeable: true },
   class10Marks: { op: 'gte', changeable: true },
   latestMarks: { op: 'gte', changeable: true },
   incomeBand: { op: 'lte', changeable: false },
@@ -17,7 +20,14 @@ export const CRITERION_FIELDS: Record<
   minority: { op: 'eq', changeable: false },
   disability: { op: 'eq', changeable: false },
   singleGirlChild: { op: 'eq', changeable: false },
-  citizenship: { op: 'eq', changeable: false },
+  citizenship: { op: 'in', changeable: false },
+  countryOfResidence: { op: 'in', changeable: false },
+  region: { op: 'in', changeable: false },
+  homeState: { op: 'in', changeable: false },
+  residenceStatus: { op: 'in', changeable: false },
+  citizenshipCountry: { op: 'in', changeable: false },
+  // Replaced by homeState: only Criteria stored before it existed use it,
+  // and extraction no longer writes it (see LEGACY_FIELDS).
   domicileState: { op: 'in', changeable: false },
   schoolState: { op: 'in', changeable: false },
   schoolType: { op: 'in', changeable: false },
@@ -28,3 +38,33 @@ export const CRITERION_FIELDS: Record<
   parentOccupation: { op: 'in', changeable: false },
   examsQualified: { op: 'in', changeable: false },
 };
+
+// The Board marks fields: each holds a result on its Result scale (frontend
+// copy: BOARD_MARKS_FIELDS in frontend/src/app/profile-rules.ts).
+export const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'] as const;
+export type BoardMarksField = (typeof BOARD_MARKS_FIELDS)[number];
+
+export function isBoardMarksField(field: string): field is BoardMarksField {
+  return (BOARD_MARKS_FIELDS as readonly string[]).includes(field);
+}
+
+// The percentage marks fields Board marks replaced, still read for stored
+// Criteria and Overrides until ticket 09 removes them.
+export const LEGACY_MARKS_FIELDS = ['class10Marks', 'latestMarks'] as const;
+
+export function isLegacyMarksField(field: string): boolean {
+  return (LEGACY_MARKS_FIELDS as readonly string[]).includes(field);
+}
+
+// Fields stored Criteria and Overrides may still name, but that extraction
+// no longer produces: Board marks replaced the marks fields, Home state the
+// domicile state. Ticket 09 removes them.
+export const LEGACY_FIELDS: readonly string[] = [
+  ...LEGACY_MARKS_FIELDS,
+  'domicileState',
+];
+
+// The fields extraction (rules, the LLM, JSON sources) reads Criteria for.
+export const EXTRACTED_FIELDS = Object.keys(CRITERION_FIELDS).filter(
+  (field) => !LEGACY_FIELDS.includes(field),
+);

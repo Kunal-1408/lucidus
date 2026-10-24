@@ -13,7 +13,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
 import { parseWatchlistEntry } from '../watchlist/watchlist-entry-input.js';
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
-import { rejected } from './admin-errors.js';
+import { rejected } from '../http-errors.js';
 import { insertUnique, type View, withId } from './admin-records.js';
 import { AdminTokenGuard } from './admin-token.guard.js';
 

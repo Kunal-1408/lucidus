@@ -40,18 +40,29 @@ describe('Extractor rules on a myScheme page (NMMSS)', () => {
     });
   });
 
-  it('finds the marks that name Class 10, skipping test cut-offs and earlier classes', () => {
+  it('finds the Board marks that name Class 10, skipping test cut-offs and earlier classes', () => {
     const marks = extractByRules(nmmss).criteria.filter((c) =>
-      c.field.endsWith('Marks'),
+      c.field.endsWith('Result'),
     );
     expect(marks).toEqual([
       {
-        field: 'class10Marks',
+        field: 'class10Result',
         op: 'gte',
-        value: 60,
+        value: { scale: 'percentage', value: 60 },
         changeable: true,
         sourceText: expect.stringContaining('60% marks in Class 10th'),
         confidence: 'high',
+      },
+    ]);
+  });
+
+  it('shows the Class 8 marks rule as an Extra requirement', () => {
+    expect(extractByRules(nmmss).extraRequirements).toEqual([
+      {
+        text: 'At least 55% marks in Class 8',
+        sourceText: expect.stringContaining(
+          '55% mark or equivalent grade in the Class 8th',
+        ),
       },
     ]);
   });
@@ -90,8 +101,9 @@ describe('Normalisation onto the fixed lists', () => {
       ['jammu_and_kashmir', 'ladakh'],
     ],
     ['Applicants must be domiciled in Orissa.', ['odisha']],
-  ])('reads the states in "%s" as Profile slugs', (text, slugs) => {
-    expect(criterion(text, 'domicileState')?.value).toEqual(slugs);
+  ])('reads the states in "%s" as the Home state', (text, slugs) => {
+    expect(criterion(text, 'homeState')?.value).toEqual(slugs);
+    expect(criterion(text, 'domicileState')).toBeUndefined();
   });
 
   it('reads no disability Criterion from a seat reservation', () => {
@@ -142,17 +154,64 @@ describe('Normalisation onto the fixed lists', () => {
   });
 
   it.each([
-    ['Applicants must have secured 60% marks in Class 10.', 'class10Marks', 60],
-    ['Students should have scored 75% marks in Class 12.', 'latestMarks', 75],
     [
-      'Candidates who obtained 80% in the previous examination are eligible.',
-      'latestMarks',
+      'Applicants must have secured 60% marks in Class 10.',
+      'class10Result',
+      60,
+    ],
+    ['Students should have scored 75% marks in Class 12.', 'class12Result', 75],
+    [
+      'Students who have passed Class XII with a minimum of 80% marks are eligible.',
+      'class12Result',
       80,
     ],
-  ])('reads the marks in "%s" as %s', (text, field, percent) => {
-    expect(criterion(text, field)?.value).toBe(percent);
-    const other = field === 'class10Marks' ? 'latestMarks' : 'class10Marks';
+    [
+      'Students of Class 11 who secured 75% in Class 10 board examination may apply.',
+      'class10Result',
+      75,
+    ],
+    [
+      'Candidates must have passed the Higher Secondary examination with at least 60% marks.',
+      'class12Result',
+      60,
+    ],
+  ])('reads the Board marks in "%s" as %s', (text, field, percent) => {
+    expect(criterion(text, field)?.value).toEqual({
+      scale: 'percentage',
+      value: percent,
+    });
+    const other = field === 'class10Result' ? 'class12Result' : 'class10Result';
     expect(criterion(text, other)).toBeUndefined();
+  });
+
+  it.each([
+    [
+      'Students must have scored at least 55% marks in Class VII.',
+      'At least 55% marks in Class 7',
+    ],
+    [
+      'Students studying in Class 11 with a minimum of 65% marks in Class 9 are eligible.',
+      'At least 65% marks in Class 9',
+    ],
+  ])(
+    'shows the marks for another year in "%s" as an Extra requirement',
+    (text, requirement) => {
+      const extraction = extractByRules(text);
+      expect(
+        extraction.criteria.filter((c) => c.field.endsWith('Result')),
+      ).toEqual([]);
+      expect(extraction.extraRequirements).toEqual([
+        { text: requirement, sourceText: text },
+      ]);
+    },
+  );
+
+  it('leaves marks that name no year to the LLM', () => {
+    const extraction = extractByRules(
+      'Candidates who obtained 80% in the previous examination are eligible.',
+    );
+    expect(extraction.criteria).toEqual([]);
+    expect(extraction.extraRequirements).toEqual([]);
   });
 
   it.each([
@@ -356,6 +415,74 @@ describe('Sentences no rule reads', () => {
     ['any board', 'Students who passed from any board, CBSE or state board.'],
   ])('reads no board Criterion from %s', (_, text) => {
     expect(criterion(text, 'board')).toBeUndefined();
+  });
+});
+
+describe('Where the Student lives and their Citizenship', () => {
+  const values = (text: string) =>
+    Object.fromEntries(
+      extractByRules(text).criteria.map((c) => [c.field, c.value]),
+    );
+
+  it.each([
+    [
+      'Applicants must be residents of the United Arab Emirates.',
+      { countryOfResidence: ['AE'] },
+    ],
+    [
+      'Open to students living in the UK or Ireland.',
+      { countryOfResidence: ['GB', 'IE'] },
+    ],
+    [
+      'Applicants must be residents of New South Wales, Australia.',
+      { countryOfResidence: ['AU'], region: ['AU-NSW'] },
+    ],
+    ['Open to students residing in Ontario.', { region: ['CA-ON'] }],
+    [
+      'Students residing in Dubai or Sharjah may apply.',
+      { region: ['AE-DU', 'AE-SH'] },
+    ],
+  ])('reads where "%s" requires the Student to live', (text, expected) => {
+    expect(values(text)).toEqual(expected);
+  });
+
+  it('reads citizens and permanent residents of a country as a Residence status there', () => {
+    expect(
+      values('Applicants must be Singapore Citizens or Permanent Residents.'),
+    ).toEqual({
+      countryOfResidence: ['SG'],
+      residenceStatus: ['citizen', 'permanent_resident'],
+    });
+    expect(values('Applicants must be permanent residents of Canada.')).toEqual(
+      {
+        countryOfResidence: ['CA'],
+        residenceStatus: ['permanent_resident'],
+      },
+    );
+  });
+
+  it('reads the citizens of a country as the Citizenship country', () => {
+    expect(values('Applicants must be citizens of the United States.')).toEqual(
+      { citizenshipCountry: ['US'] },
+    );
+  });
+
+  it.each([
+    ['Applicants must be Indian citizens.', ['indian']],
+    ['Open to Overseas Citizens of India (OCI card holders).', ['oci']],
+    ['Children of NRIs, PIOs and OCIs may apply.', ['indian', 'oci']],
+  ])('reads the Citizenship in "%s"', (text, citizenship) => {
+    expect(values(text)).toEqual({ citizenship });
+  });
+
+  it('reads no country from a state of India, which is the Home state', () => {
+    expect(values('Open to permanent residents of Kerala.')).toEqual({
+      homeState: ['kerala'],
+    });
+  });
+
+  it('reads no country of residence from residents of India', () => {
+    expect(values('Applicants must be residents of India.')).toEqual({});
   });
 });
 

@@ -266,6 +266,80 @@ describe('Matcher: marks', () => {
   });
 });
 
+describe('Matcher: Board marks', () => {
+  const percent = (value: number) => ({ scale: 'percentage' as const, value });
+  const resultAtLeast = (
+    field: 'class10Result' | 'class12Result',
+    value: number,
+  ) =>
+    scholarship([
+      { field, op: 'gte', value: percent(value), changeable: true },
+    ]);
+
+  it('passes, fails and asks on the result the Criterion names', () => {
+    const profile: Profile = {
+      class: 12,
+      class10Result: percent(70),
+      class12Result: percent(90),
+    };
+    expect(bucketOf(profile, resultAtLeast('class12Result', 80))).toBe(
+      'eligible',
+    );
+    expect(bucketOf(profile, resultAtLeast('class10Result', 80))).toBe(
+      'hidden',
+    );
+    expect(
+      cardFor({ class: 11 }, resultAtLeast('class12Result', 80)).missing,
+    ).toEqual([{ field: 'class12Result', label: 'Class 12 result' }]);
+  });
+
+  it('is unknown for a result on another scale', () => {
+    const onAnotherScale = scholarship([
+      {
+        field: 'class12Result',
+        op: 'gte',
+        value: { scale: 'ib_points', value: 36 },
+        changeable: true,
+      },
+    ]);
+    expect(
+      bucketOf({ class: 12, class12Result: percent(95) }, onAnotherScale),
+    ).toBe('tellUsMore');
+  });
+
+  it('gives a Class 12 Student with boards upcoming a Goal on the expected result', () => {
+    const profile: Profile = {
+      class: 12,
+      boardsUpcoming: true,
+      class12Result: percent(75),
+    };
+    expect(cardFor(profile, resultAtLeast('class12Result', 80)).goals).toEqual([
+      'Score 80% in Class 12 to unlock this',
+    ]);
+    expect(bucketOf(profile, resultAtLeast('class12Result', 81))).toBe(
+      'hidden',
+    );
+  });
+
+  it('gives no Goal on a result whose boards are already taken', () => {
+    const done: Profile = {
+      class: 12,
+      boardsUpcoming: false,
+      class12Result: percent(78),
+    };
+    expect(bucketOf(done, resultAtLeast('class12Result', 80))).toBe('hidden');
+    // A Class 12 Student's upcoming boards are Class 12's, not Class 10's.
+    const class10Behind: Profile = {
+      class: 12,
+      boardsUpcoming: true,
+      class10Result: percent(58),
+    };
+    expect(bucketOf(class10Behind, resultAtLeast('class10Result', 60))).toBe(
+      'hidden',
+    );
+  });
+});
+
 const NEXT_YEAR = 'Eligible from next year: watch for the next round';
 const UG_GOAL = 'Get admitted to an undergraduate course to unlock this';
 
@@ -477,6 +551,121 @@ describe('Matcher: missing fields', () => {
     expect(cardFor({}, s).missing).toEqual([
       { field: 'incomeBand', label: 'family income' },
       { field: 'domicileState', label: 'home state' },
+    ]);
+  });
+});
+
+describe('Matcher: where the Student lives and their Citizenship', () => {
+  const homeState = (value: string[]) =>
+    scholarship([{ field: 'homeState', op: 'in', value }]);
+  const inIndia = (region: string): Profile => ({
+    countryOfResidence: 'IN',
+    region,
+  });
+
+  it.each<[string, Profile, string]>([
+    ['a Student in India judged on their region', inIndia('IN-KL'), 'eligible'],
+    ['a Student in another Indian state', inIndia('IN-GA'), 'hidden'],
+    [
+      'a Student in India with no region',
+      { countryOfResidence: 'IN' },
+      'tellUsMore',
+    ],
+    [
+      'a Student abroad judged on the Home state they gave',
+      { countryOfResidence: 'AE', homeState: 'kerala' },
+      'eligible',
+    ],
+    [
+      'a Student abroad with no Home state',
+      { countryOfResidence: 'AE' },
+      'tellUsMore',
+    ],
+    [
+      'an old Profile giving a domicile state',
+      { domicileState: 'kerala' },
+      'eligible',
+    ],
+  ])('Home state: %s', (_, profile, bucket) => {
+    expect(bucketOf(profile, homeState(['kerala']))).toBe(bucket);
+  });
+
+  it('judges an old domicile Criterion on the Home state', () => {
+    const domicile = scholarship([
+      { field: 'domicileState', op: 'in', value: ['kerala'] },
+    ]);
+    expect(bucketOf(inIndia('IN-KL'), domicile)).toBe('eligible');
+    expect(
+      bucketOf({ countryOfResidence: 'AE', homeState: 'goa' }, domicile),
+    ).toBe('hidden');
+  });
+
+  it('judges country of residence, region and Residence status as given', () => {
+    const singapore = scholarship([
+      { field: 'countryOfResidence', op: 'in', value: ['SG'] },
+      {
+        field: 'residenceStatus',
+        op: 'in',
+        value: ['citizen', 'permanent_resident'],
+      },
+    ]);
+    expect(
+      bucketOf(
+        { countryOfResidence: 'SG', residenceStatus: 'permanent_resident' },
+        singapore,
+      ),
+    ).toBe('eligible');
+    expect(
+      bucketOf(
+        { countryOfResidence: 'SG', residenceStatus: 'visa' },
+        singapore,
+      ),
+    ).toBe('hidden');
+    expect(bucketOf({ countryOfResidence: 'IN' }, singapore)).toBe('hidden');
+    expect(bucketOf({ countryOfResidence: 'SG' }, singapore)).toBe(
+      'tellUsMore',
+    );
+    const ontario = scholarship([
+      { field: 'region', op: 'in', value: ['CA-ON'] },
+    ]);
+    expect(
+      bucketOf({ countryOfResidence: 'CA', region: 'CA-ON' }, ontario),
+    ).toBe('eligible');
+  });
+
+  it('counts an Indian citizen as a citizen of India, and an OCI card holder as no one country', () => {
+    const britons = scholarship([
+      { field: 'citizenshipCountry', op: 'in', value: ['GB'] },
+    ]);
+    expect(bucketOf({ citizenship: 'indian' }, britons)).toBe('hidden');
+    expect(bucketOf({ citizenship: 'oci' }, britons)).toBe('tellUsMore');
+    expect(
+      bucketOf({ citizenship: 'other', citizenshipCountry: 'GB' }, britons),
+    ).toBe('eligible');
+  });
+
+  it('judges Citizenship over Indian citizens, OCI card holders and others', () => {
+    const indianOrOci = scholarship([
+      { field: 'citizenship', op: 'in', value: ['indian', 'oci'] },
+    ]);
+    expect(bucketOf({ citizenship: 'oci' }, indianOrOci)).toBe('eligible');
+    expect(bucketOf({ citizenship: 'other' }, indianOrOci)).toBe('hidden');
+  });
+
+  it('names the new fields in words a Student understands', () => {
+    const s = scholarship([
+      { field: 'countryOfResidence', op: 'in', value: ['AE'] },
+      { field: 'region', op: 'in', value: ['AE-DU'] },
+      { field: 'homeState', op: 'in', value: ['kerala'] },
+      { field: 'residenceStatus', op: 'in', value: ['citizen'] },
+      { field: 'citizenshipCountry', op: 'in', value: ['AE'] },
+    ]);
+    expect(cardFor({}, s).missing).toEqual([
+      { field: 'countryOfResidence', label: 'the country you live in' },
+      { field: 'region', label: 'the state or region you live in' },
+      { field: 'homeState', label: 'home state' },
+      { field: 'residenceStatus', label: 'residence status' },
+      { field: 'citizenshipCountry', label: 'country of citizenship' },
     ]);
   });
 });

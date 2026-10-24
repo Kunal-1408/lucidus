@@ -1,7 +1,11 @@
 // JSON sources: how a parsed JSON value becomes cleaned text for the
 // Extractor, and which of its fields are Criteria in their own right.
 import { isObject } from '../input-checks.js';
-import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
+import {
+  BOARD_MARKS_FIELDS,
+  CRITERION_FIELDS,
+  EXTRACTED_FIELDS,
+} from '../scholarships/criterion-fields.js';
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import { normaliseValue } from './normalise.js';
 
@@ -60,7 +64,7 @@ export function itemsAt(
 }
 
 // Fields whose values are parsed from figures and labels, not slugs.
-const PARSED_FIELDS = ['class', 'class10Marks', 'latestMarks', 'incomeBand'];
+const PARSED_FIELDS = ['class', ...BOARD_MARKS_FIELDS, 'incomeBand'];
 
 // The Criteria an item states as top-level fields named after Profile
 // fields (CRITERION_FIELDS). A value that fits the field's fixed list is high Confidence, like
@@ -69,7 +73,8 @@ const PARSED_FIELDS = ['class', 'class10Marks', 'latestMarks', 'incomeBand'];
 export function structuredCriteria(item: unknown): Criterion[] {
   if (!isObject(item)) return [];
   const criteria: Criterion[] = [];
-  for (const [field, { op, changeable }] of Object.entries(CRITERION_FIELDS)) {
+  for (const field of EXTRACTED_FIELDS) {
+    const { op, changeable } = CRITERION_FIELDS[field];
     const given = item[field];
     if (
       !isPrimitive(given) &&
