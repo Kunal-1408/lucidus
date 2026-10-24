@@ -6,7 +6,7 @@ See spec: "Profile", "Which questions appear" (other conditional questions), "Cr
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Profile (both copies) gains country of residence, region, Home state, Residence status, Citizenship `indian` | `oci` | `other` and Citizenship country; every field optional
 - [x] Rules module: region needs a country and must belong to it; Home state and Residence status only when country isn't India (in India, Home state is the region); Citizenship country only for `other`; category only for `indian` or `oci`; changing country clears region, Home state and Residence status; Citizenship moving to `other` clears category, leaving `other` clears Citizenship country
@@ -36,3 +36,5 @@ For later tickets: 06 (income abroad) should take the currency default from `cou
 **2026-10-24 (agent, review fixes on `fix/abroad-wave-1-review`):** `profileForMatch` now falls back to the Home state for the school state only for a Student in India or one who gives no country; a Student abroad (Dubai, Home state Goa) sends no school state, and the profile page shows no default there. India's code is one `INDIA` const per side (`countries.ts` on both), used by the Matcher, `profile-input.ts`, `placesIn` and `profile-rules.ts`. `oneOf` (`input-checks.ts`) takes an optional reason, so `residenceAnswers` no longer re-implements it. `STATE_REGIONS`, `ResidenceStatus` and `Citizenship` in `backend/src/match/profile.ts` now name their frontend copies. `rejected` moved to `backend/src/http-errors.ts`, shared by the admin and Match controllers. The Indian regression scenarios now also send each Profile in the form's new shape (`countryOfResidence: 'IN'` with the state's ISO region) and get the same buckets. Recorded: rule extraction gives a `region` only for AE, AU, CA, GB and US; other countries' regions are left to the LLM.
 
 **2026-10-24 (agent):** Merged into `integrate/abroad-wave-1` (8bf2524), including the Wave 1 code-review fixes. Every box is met; `npm run check` passes (backend 438 tests, 1 skipped; frontend 48 tests). Status stays as is until the branch is merged to main and the deploy and smoke check pass; then set `Status: done`.
+
+**2026-10-25 (agent):** Students abroad Wave 1 reached `main` through PR #11 (0eb1f31) and is live on Render. `node scripts/smoke.mjs <url> $(git rev-parse origin/main)` passes all five checks, including the deployed-commit check and every seed entry on the Watchlist. On live, `/api/match` answers 400 with reasons for a Class 12 result of 105% and for single girl child with gender male, and 200 for a Class 12 Kerala Profile in the new shape (no Eligible cards, as expected with the marks gap until ticket 09). `Status: done`.

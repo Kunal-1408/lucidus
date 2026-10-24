@@ -6,7 +6,7 @@ See spec: "Which questions appear (the grid)", glossary term Board marks.
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Profile gains a Class 10 result and a Class 12 result, each `{ scale, value }`, with only the percentage scale for now; `latestMarks` stays readable until ticket 09
 - [x] Rules module implements the grid: Class 9 none; Class 10 gets the Class 10 result only once boards are done; Class 11 the Class 10 result; Class 12 both, the Class 12 one labelled "Expected Class 12 result (pre-boards or predicted)" while boards are upcoming; boards-upcoming only for Class 10 and 12; class not given shows both results and no boards-upcoming
@@ -42,3 +42,5 @@ Open for the spec owner: the Odisha regression scenario's bucket change (NMMSS a
 **2026-10-24 (agent):** Merged into `integrate/abroad-wave-1` (8bf2524), including the Wave 1 code-review fixes. Every box is met; `npm run check` passes (backend 438 tests, 1 skipped; frontend 48 tests). Status stays as is until the branch is merged to main and the deploy and smoke check pass; then set `Status: done`. Open for the spec owner: with boards upcoming a Class 10 Student is no longer asked for Class 10 marks (story 20), which moved NMMSS and LIC Special Scholarship for the Odisha regression Profile from Within reach to Tell us more, against story 65.
 
 **2026-10-25 (agent):** Known gap accepted for the Wave 1 deploy, fixed by ticket 09: an ingestion run skips pages whose content hash is unchanged and reuses the stored extraction, so Scholarships already live keep their `class10Marks` / `latestMarks` Criteria. The form now sends only `class10Result` / `class12Result`, so on live those marks Criteria come out unknown and marks-gated Scholarships show as Tell us more for every Student until 09 re-extracts them. Domicile Criteria are unaffected: the Matcher still reads `domicileState` as Home state. Live checks of this ticket should expect this; the e2e tests don't show it because they ingest fresh fixtures.
+
+**2026-10-25 (agent):** Students abroad Wave 1 reached `main` through PR #11 (0eb1f31) and is live on Render. `node scripts/smoke.mjs <url> $(git rev-parse origin/main)` passes all five checks, including the deployed-commit check and every seed entry on the Watchlist. On live, `/api/match` answers 400 with reasons for a Class 12 result of 105% and for single girl child with gender male, and 200 for a Class 12 Kerala Profile in the new shape (no Eligible cards, as expected with the marks gap until ticket 09). The Odisha question (Class 10 marks with boards upcoming, story 20 vs story 65) moved to ticket 11. `Status: done`.
