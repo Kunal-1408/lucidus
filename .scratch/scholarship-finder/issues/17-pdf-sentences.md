@@ -4,7 +4,7 @@
 
 **Blocked by:** 15
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] A line starting with a digit or a capital joins the line above only when that line ends in a comma or in a word that can't end a sentence (of, the, and, from, to, in, for, by, with, including, "Class", ...). Headings stay apart: "3. Allocation of Scholarship" is not joined to "The total number ..." below it, nor is anything joined to "2. ELIGIBILITY:"
 - [x] Numbered and lettered list items still begin conditions of their own (the lower-case join added in 15 already keeps "a. ..." and "iv) ..." apart)
@@ -18,7 +18,7 @@
 - [x] A category sentence naming a category outside the Profile's options gives no category Criterion: YASASVI's "OBC, EBC and DNT" no longer gives [obc] (EBC and DNT are added in 18)
 - [x] Extractor tests run against fixture text copies of the three guideline PDFs (as `test/fixtures/extractor/nsp-top-class-sc-guidelines.txt` is)
 - [x] CSSS and Ishan Uday are added back to `backend/data/watchlist.json`, and each yields only Criteria its guidelines state. YASASVI is added back in 18
-- [ ] Deployed: the next deploy seeds the two new entries. Two Ingestion runs, then the Review report and the CSSS and Ishan Uday cards are checked: when the rules find nothing for a field the LLM is asked, and it could still give a wrong medium Criterion (e.g. board [cbse, cisce]). Fix any with a seeded Override. The post-deploy smoke check passes
+- [x] Deployed: the next deploy seeds the two new entries. Two Ingestion runs, then the Review report and the CSSS and Ishan Uday cards are checked: when the rules find nothing for a field the LLM is asked, and it could still give a wrong medium Criterion (e.g. board [cbse, cisce]). Fix any with a seeded Override. The post-deploy smoke check passes
 
 ## Comments
 
@@ -32,3 +32,5 @@ All three fetch and hash the same on repeat runs. The Reliance Foundation underg
 **2026-10-24 (agent):** Grilled with the user. Running the current rules over the three PDFs gives seven wrong high Criteria, not three: YASASVI class [12], latestMarks 30 (a girls' quota) and category [obc] (EBC and DNT have no Profile option); CSSS board [cbse, cisce], latestMarks 50 (renewal) and stream [science, commerce] (a share ratio that also lost Humanities to a wrap); Ishan Uday board [cbse, cisce]. Each now has a box. Decisions: join on a dangling last word or comma rather than line length; one filter for place-sharing sentences; renewal and place-sharing sentences recorded as not Criteria in `GLOSSARY.md`; EBC/DNT and YASASVI's re-add split into 18. The Reliance FAQ stays out of scope (a capability sentence, not a wrapped line).
 
 **2026-10-24 (agent):** Built on `feat/17-pdf-sentences`; everything except the deploy is done. Fixtures `nsp-yasasvi-school-guidelines.txt`, `nsp-csss-guidelines.txt` and `nsp-ishan-uday-guidelines.txt` are the Fetcher's text of the three PDFs (pdf-parse, `pageJoiner: ''`, `tidyLines`). The new join is `WRAPPED_AFTER_DANGLING_WORD` in `extractor.ts`. Renewal and place-sharing sentences are dropped in `isEligibilitySentence`, so no rule sees them. A `beyondOptions` pattern on a keyword field skips a sentence that names a value the Profile has no option for (EBC and DNT for category; a recognised or any board, or boards after "including", for board). Once the share sentence stopped being read, CSSS's heading "10. For State Government/State Boards" gave board [state]. The board rule now needs a cue (Students, or passed, passing, studying, affiliated). The rules now give YASASVI class 9–12 and income only; CSSS and Ishan Uday give class [12] and income ₹4.5 lakh only. Worth a look at the deploy check: both CSSS and Ishan Uday are for college students who have passed Class 12, yet `classRule` reads "passed Class XII" as class [12], so a Student now in Class 12 matches. That is how the rule already treated such a sentence (the highest class named), and no box covers it.
+
+**2026-10-24 (agent):** Deployed with PR #7 (12da284). The smoke check passes all four checks. Run 6adc6230ee9a668c6785edd5 extracted CSSS and Ishan Uday, and neither is in the Review report. CSSS is high confidence and asks only for class and income, the two rule Criteria; the LLM added nothing, so it gave no board Criterion. Ishan Uday is medium: the LLM added domicileState, schoolState and destination. Probing Match shows the values the guidelines state: all eight NER states pass for domicile and school, West Bengal and Tamil Nadu fail, and a UK destination fails. No Override needed. Class [12] for both, which covers college students who have passed Class 12, is still as noted above; no box covers it. `Status: done`.

@@ -9,8 +9,8 @@
 - [ ] 17 Scholarships in the seed file (the 14 here, plus CSSS and Ishan Uday from 17 and YASASVI from 18), each verified, from official sources only (no aggregators), all within Class 9–12 or undergraduate scope
 - [x] Coverage includes a PDF, a many-scholarship source, a JSON source, a needs_js page replaced by its JSON endpoint, and a deadline that isn't announced
 - [ ] The developer picks the sources; each is verified to fetch, split and extract
-- [ ] A full Ingestion run on the deployed app processes every entry; any low-confidence ones show in the Review report
-- [ ] A second run reports the unchanged pages as skipped
+- [x] A full Ingestion run on the deployed app processes every entry; any low-confidence ones show in the Review report
+- [x] A second run reports the unchanged pages as skipped
 - [x] Fixture copies of representative pages are committed for tests
 - [x] Deployed to Render; the post-deploy smoke check passes
 
@@ -35,3 +35,5 @@ Deploying: the deployed Watchlist is not empty, so the seeder won't add the new 
 **2026-10-24 (agent):** The deploy of this seed added nothing: the seeder only filled an empty Watchlist, and the deployed one had Santoor. The seeder now adds every seed entry it hasn't seeded before (recorded by URL in `watchlist_seeded`), so the next deploy brings in the new entries. `scripts/add-watchlist.mjs` is gone. The deploy steps are now: merge to main, let Render redeploy, trigger two Ingestion runs, check the Review report, then run the smoke check.
 
 **2026-10-24 (agent):** Smoke check against https://scholarship-finder-hafk.onrender.com with the expected commit `origin/main` (d18200a) passes all four checks: deployed commit d18200a, page served, Match returns, admin rejects a missing token. The user reports the platform tested on Render. An Ingestion run ran after this deploy (lastVerified 2026-10-23T20:19Z). Match shows 9 of the 14 Scholarships: Exeter, NMMSS, AICTE Pragati and Saksham, Top Class SC, Post-Matric SC, LIC General and Special, and Global Futures. Santoor, Pearson, York, Sydney and MEXT are not shown. They are probably in the Review report (needs review or no Criteria), and MEXT is closed. That isn't verified here: the Review report and run summaries need the admin token. The two Ingestion-run boxes stay unticked until the Review report and the second run's skipped count are checked. The first box now counts 17 Scholarships, reached through 17 and 18.
+
+**2026-10-24 (agent):** Checked on the deploy of PR #7 (12da284). Run 6adc6230ee9a668c6785edd5 (07:45–07:47Z) processed all 15 entries: 13 unchanged, CSSS and Ishan Uday extracted, and MEXT failed with `server_error` (the embassy page, not extraction). The run after it re-verified CSSS and Ishan Uday (lastVerified 07:53Z). The Review report then held one entry, York (no criteria). Why the other four missing cards are hidden: Santoor's deadline (2026-10-15) and Pearson's (nomination 2026-10-09) have passed, and Match hides closed Scholarships; MEXT is closed; Sydney is neither reviewed nor shown, which fits a closed deadline, but its page gives no close date in plain text, so that isn't confirmed. Ticked the two Ingestion-run boxes. The first box stays open until 18 brings YASASVI back.
