@@ -78,8 +78,12 @@ export function parseProfile(body: unknown): ProfileParseResult {
     if (field in raw)
       keep(field, listOf(raw, field, FIXED_LISTS[field], reasons));
   }
+  for (const [field, value] of residenceAnswers(raw, reasons)) {
+    keep(field, value);
+  }
 
   reasons.push(...contradictions(raw));
+  reasons.push(...residenceContradictions(raw));
   if (reasons.length > 0) return { ok: false, reasons };
   return { ok: true, profile: profile as Profile };
 }
@@ -97,6 +101,74 @@ function contradictions(raw: Record<string, unknown>): string[] {
   }
   if ('class10Marks' in raw && raw.class === 9) {
     reasons.push('class10Marks is not asked in Class 9');
+  }
+  return reasons;
+}
+
+// Where the Student lives and their Citizenship (citizenship itself is a
+// plain fixed list above): ISO codes for the country, region and
+// Citizenship country, fixed lists for Home state and Residence status.
+const COUNTRY_FIELDS = ['countryOfResidence', 'citizenshipCountry'] as const;
+const RESIDENCE_ONE_OF_FIELDS = ['homeState', 'residenceStatus'] as const;
+const INDIA = 'IN';
+
+function residenceAnswers(
+  raw: Record<string, unknown>,
+  reasons: string[],
+): [string, unknown][] {
+  const answers: [string, unknown][] = [];
+  for (const field of COUNTRY_FIELDS) {
+    if (!(field in raw)) continue;
+    if (FIXED_LISTS[field].includes(raw[field] as string)) {
+      answers.push([field, raw[field]]);
+    } else {
+      reasons.push(`${field} must be an ISO 3166-1 alpha-2 country code`);
+    }
+  }
+  if ('region' in raw) {
+    if (FIXED_LISTS.region.includes(raw.region as string)) {
+      answers.push(['region', raw.region]);
+    } else {
+      reasons.push('region must be an ISO 3166-2 region code');
+    }
+  }
+  for (const field of RESIDENCE_ONE_OF_FIELDS) {
+    if (field in raw)
+      answers.push([field, oneOf(raw, field, FIXED_LISTS[field], reasons)]);
+  }
+  return answers;
+}
+
+// The answers the rest of the Profile rules out, as the form clears them:
+// a region needs a country and must be one of its regions; Home state and
+// Residence status only abroad (in India the region is the Home state); a
+// Citizenship country only for another nationality, and a category for
+// everyone else.
+function residenceContradictions(raw: Record<string, unknown>): string[] {
+  const reasons: string[] = [];
+  const country = raw.countryOfResidence;
+  if ('region' in raw) {
+    if (country === undefined) {
+      reasons.push('region is only asked when countryOfResidence is given');
+    } else if (
+      typeof raw.region === 'string' &&
+      typeof country === 'string' &&
+      FIXED_LISTS.region.includes(raw.region) &&
+      !raw.region.startsWith(`${country}-`)
+    ) {
+      reasons.push('region must be a region of countryOfResidence');
+    }
+  }
+  for (const field of RESIDENCE_ONE_OF_FIELDS) {
+    if (field in raw && (country === undefined || country === INDIA)) {
+      reasons.push(`${field} is only asked when countryOfResidence is not IN`);
+    }
+  }
+  if ('citizenshipCountry' in raw && raw.citizenship !== 'other') {
+    reasons.push('citizenshipCountry is only asked when citizenship is other');
+  }
+  if ('category' in raw && raw.citizenship === 'other') {
+    reasons.push('category is only asked when citizenship is indian or oci');
   }
   return reasons;
 }

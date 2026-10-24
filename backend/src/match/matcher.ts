@@ -3,7 +3,7 @@ import type {
   Criterion,
   ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
-import type { Profile } from './profile.js';
+import { type IndianState, type Profile, STATE_REGIONS } from './profile.js';
 
 // The slice of a Scholarship the Matcher needs. Only active Scholarships
 // not needing review are matched; the others are skipped.
@@ -65,6 +65,11 @@ type Outcome = 'pass' | 'fail' | 'unknown';
 // How each Profile field is named to a Student.
 const FIELD_LABELS: Record<string, string> = {
   class: 'class',
+  countryOfResidence: 'the country you live in',
+  region: 'the state or region you live in',
+  homeState: 'home state',
+  residenceStatus: 'residence status',
+  citizenshipCountry: 'country of citizenship',
   domicileState: 'home state',
   schoolState: 'school state',
   schoolType: 'school type',
@@ -228,8 +233,34 @@ export const INCOME_BANDS: Record<string, [number, number]> = {
   over_8l: [800_000, Infinity],
 };
 
+// Answers that follow from others: the Home state of a Student in India is
+// the region they live in, and an old domicile state is the Home state (in
+// either direction, so old Profiles and old Criteria keep matching); an
+// Indian citizen is a citizen of India. An OCI card holder's country of
+// citizenship is not known.
+function derivedAnswer(profile: Profile, field: string): unknown {
+  const homeState =
+    profile.homeState ?? homeStateInIndia(profile) ?? profile.domicileState;
+  if (field === 'homeState') return homeState;
+  if (field === 'domicileState') return profile.domicileState ?? homeState;
+  if (field === 'citizenshipCountry') {
+    return (
+      profile.citizenshipCountry ??
+      (profile.citizenship === 'indian' ? 'IN' : undefined)
+    );
+  }
+  return (profile as Record<string, unknown>)[field];
+}
+
+function homeStateInIndia(profile: Profile): IndianState | undefined {
+  if (profile.countryOfResidence !== 'IN') return undefined;
+  return (Object.keys(STATE_REGIONS) as IndianState[]).find(
+    (state) => STATE_REGIONS[state] === profile.region,
+  );
+}
+
 function answerFor(profile: Profile, field: string): unknown {
-  const answer = (profile as Record<string, unknown>)[field];
+  const answer = derivedAnswer(profile, field);
   if (answer === null || answer === '') return undefined;
   if (Array.isArray(answer) && answer.length === 0) return undefined;
   return answer;

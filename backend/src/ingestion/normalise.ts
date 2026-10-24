@@ -1,5 +1,6 @@
 // Normalisation: turns the raw values the rules (and, later, the LLM) find
 // into the exact values the Matcher compares against the Profile.
+import { COUNTRIES, REGIONS } from '../match/countries.js';
 import type { IndianState, Profile } from '../match/profile.js';
 
 const LAKH = 100_000;
@@ -102,12 +103,23 @@ export const STATE_NAMES: [IndianState, RegExp][] = STATES.map(
   },
 );
 
+// Every ISO 3166-1 alpha-2 country and ISO 3166-2 region code.
+export const COUNTRY_CODES = COUNTRIES.map((country) => country.value);
+export const REGION_CODES = Object.values(REGIONS).flatMap((regions) =>
+  regions.map((region) => region.value),
+);
+
 // The fixed lists, as the Profile stores them.
 export const FIXED_LISTS: Record<string, readonly string[]> = {
+  countryOfResidence: COUNTRY_CODES,
+  region: REGION_CODES,
+  homeState: STATES,
+  residenceStatus: ['citizen', 'permanent_resident', 'visa'],
+  citizenshipCountry: COUNTRY_CODES,
   domicileState: STATES,
   schoolState: STATES,
   schoolType: ['government', 'aided', 'private'],
-  citizenship: ['indian', 'other'],
+  citizenship: ['indian', 'oci', 'other'],
   board: ['cbse', 'cisce', 'state', 'ib', 'cambridge', 'other'],
   stream: ['science', 'commerce', 'arts', 'not_chosen'],
   fieldOfStudy: [
