@@ -71,17 +71,43 @@
     />
   </label>
 
+  @if (profile().class !== 9) {
+    <label>
+      Class 10 board marks (%)
+      <input
+        type="number"
+        min="0"
+        max="100"
+        step="0.1"
+        inputmode="decimal"
+        [value]="profile().class10Marks ?? ''"
+        (change)="setMarks('class10Marks', $any($event.target).value)"
+      />
+    </label>
+  }
+
   <label>
-    Class 10 board marks (%)
-    <input
-      type="number"
-      min="0"
-      max="100"
-      step="0.1"
-      inputmode="decimal"
-      [value]="profile().class10Marks ?? ''"
-      (change)="setMarks('class10Marks', $any($event.target).value)"
-    />
+    What do you want to study?
+    <select (change)="setChoice('fieldOfStudy', $any($event.target).value)">
+      <option value="">N.A</option>
+      @for (f of fieldsOfStudy; track f.value) {
+        <option [value]="f.value" [selected]="profile().fieldOfStudy === f.value">
+          {{ f.label }}
+        </option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Where do you want to study?
+    <select (change)="setChoice('destination', $any($event.target).value)">
+      <option value="">N.A</option>
+      @for (d of destinations; track d.value) {
+        <option [value]="d.value" [selected]="profile().destination === d.value">
+          {{ d.label }}
+        </option>
+      }
+    </select>
   </label>
 
   <details class="more">
@@ -109,17 +135,19 @@
         </select>
       </label>
 
-      <label>
-        Stream (Class 11 and 12)
-        <select (change)="setChoice('stream', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (s of streams; track s.value) {
-            <option [value]="s.value" [selected]="profile().stream === s.value">
-              {{ s.label }}
-            </option>
-          }
-        </select>
-      </label>
+      @if (profile().class !== 9 && profile().class !== 10) {
+        <label>
+          Stream (Class 11 and 12)
+          <select (change)="setChoice('stream', $any($event.target).value)">
+            <option value="">N.A</option>
+            @for (s of streams; track s.value) {
+              <option [value]="s.value" [selected]="profile().stream === s.value">
+                {{ s.label }}
+              </option>
+            }
+          </select>
+        </label>
+      }
 
       <label>
         School type
@@ -215,30 +243,6 @@
           }
         </div>
       </fieldset>
-
-      <label>
-        What do you want to study?
-        <select (change)="setChoice('fieldOfStudy', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (f of fieldsOfStudy; track f.value) {
-            <option [value]="f.value" [selected]="profile().fieldOfStudy === f.value">
-              {{ f.label }}
-            </option>
-          }
-        </select>
-      </label>
-
-      <label>
-        Where do you want to study?
-        <select (change)="setChoice('destination', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (d of destinations; track d.value) {
-            <option [value]="d.value" [selected]="profile().destination === d.value">
-              {{ d.label }}
-            </option>
-          }
-        </select>
-      </label>
     </div>
   </details>
 

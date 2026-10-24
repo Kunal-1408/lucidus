@@ -72,7 +72,7 @@
       <h2>
         Within reach <span class="count">{{ r.withinReach.length }}</span>
       </h2>
-      <p>You fall short on something you can still change. The blue line says what it takes.</p>
+      <p>You don't meet some criteria, but you're close!</p>
     </header>
     <ol class="results">
       @for (card of r.withinReach; track card.id) {
@@ -103,9 +103,14 @@
   </section>
 
   @for (group of r.universityPointers; track group.country) {
-    <section class="pointers">
-      <p class="pointers-label">{{ group.label }}</p>
-      <ul class="results">
+    <section class="bucket pointers">
+      <header class="bucket-head">
+        <h2>
+          Universities to explore <span class="count">{{ group.names.length }}</span>
+        </h2>
+        <p>{{ group.label }}</p>
+      </header>
+      <ul class="pointer-list">
         @for (name of group.names; track name) {
           <li class="pointer">{{ name }}</li>
         }

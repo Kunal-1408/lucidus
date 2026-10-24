@@ -5,6 +5,7 @@
   --field: #d3dbe7;
   --accent: #1d4ed8;
   --accent-wash: #eff4fe;
+  --card: #f6f8fb;
   --amber: #a15c07;
   --surface: #ffffff;
   font-family:
@@ -239,7 +240,7 @@ button[type='submit']:hover {
   }
 }
 
-/* Results and Saved: a divided list, read like search results. */
+/* Results and Saved: a list of softly carded results, read like search results. */
 
 .bucket {
   margin-top: 2.5rem;
@@ -268,9 +269,17 @@ button[type='submit']:hover {
   padding: 0;
 }
 
+ol.results,
+.saved-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
 .result {
-  padding: 1.25rem 0;
-  border-bottom: 1px solid var(--line);
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: var(--card);
 }
 
 .result p {
@@ -370,10 +379,11 @@ button[type='submit']:hover {
 }
 
 .empty {
-  padding: 1.25rem 0;
+  padding: 1.25rem;
   margin: 0;
   color: var(--muted);
-  border-bottom: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--card);
 }
 
 .badge {
@@ -391,21 +401,20 @@ button[type='submit']:hover {
   color: var(--muted);
 }
 
-.pointers {
-  margin-top: 2.5rem;
-}
-
-.pointers-label {
-  margin: 0;
-  padding-bottom: 0.5rem;
-  color: var(--muted);
-  font-size: 0.9375rem;
-  border-bottom: 1px solid var(--line);
+.pointer-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.5rem;
 }
 
 .pointer {
-  padding: 0.625rem 0;
-  border-bottom: 1px solid var(--line);
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--card);
+  font-weight: 500;
 }
 
 @media (prefers-reduced-motion: reduce) {

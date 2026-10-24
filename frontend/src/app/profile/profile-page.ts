@@ -15,6 +15,7 @@ import {
   SCHOOL_TYPES,
   STATES,
   STREAMS,
+  withoutContradictions,
 } from '../profile-fields';
 import { ProfileStore } from '../profile-store';
 
@@ -93,7 +94,11 @@ export class ProfilePage {
 
   protected togglePicked(field: MultiField, value: string, picked: boolean) {
     const current = (this.profile()[field] as string[] | undefined) ?? [];
-    const next = picked ? [...new Set([...current, value])] : current.filter((v) => v !== value);
+    let next = picked ? [...new Set([...current, value])] : current.filter((v) => v !== value);
+    // "None of these" and a real occupation can't both be true.
+    if (picked && field === 'parentOccupation') {
+      next = value === 'none' ? ['none'] : next.filter((v) => v !== 'none');
+    }
     this.update({ [field]: next.length ? next : undefined });
   }
 
@@ -102,6 +107,6 @@ export class ProfilePage {
   }
 
   private update(change: Partial<Record<keyof Profile, unknown>>) {
-    this.store.profile.update((p) => ({ ...p, ...change }) as Profile);
+    this.store.profile.update((p) => withoutContradictions({ ...p, ...change } as Profile));
   }
 }
