@@ -15,7 +15,9 @@ const FIELD_GUIDE: Record<string, string> = {
   class12Result:
     'the minimum Class 12 board exam result, one percentage such as "75"',
   incomeBand:
-    'the upper limit on annual family income, one figure as the text writes it, such as "Rs. 2.5 lakh"',
+    'the upper limit on annual family income in rupees, one figure as the text writes it, such as "Rs. 2.5 lakh"',
+  incomeAmount:
+    'the upper limit on family income in a currency other than rupees: one value, the ISO 4217 code, the figure and monthly or yearly as the text counts it, such as "USD 5000 monthly" or "GBP 62215 yearly"',
   minority: '"yes" when only minority-community students may apply',
   disability: '"yes" when only students with a disability may apply',
   singleGirlChild: '"yes" when only a single girl child may apply',

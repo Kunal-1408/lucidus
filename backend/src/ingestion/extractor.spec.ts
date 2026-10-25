@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AMOUNT_NOT_STATED, extractByRules } from './extractor.js';
+import { AMOUNT_NOT_STATED, extractByRules, readValue } from './extractor.js';
 import { cleanHtml } from './fetcher.js';
 
 // Seam 3: the Extractor as a pure function over a Scholarship's cleaned text,
@@ -93,6 +93,68 @@ describe('Normalisation onto the fixed lists', () => {
   ])('turns the income limit in "%s" into rupees', (text, rupees) => {
     expect(criterion(text, 'incomeBand')?.value).toBe(rupees);
   });
+
+  it.each([
+    [
+      'The total household monthly income of the parent(s) of the applicant should NOT exceed an amount equivalent to US Dollar Five Thousand (US$ 5000).',
+      { currency: 'USD', period: 'monthly', value: 5000 },
+    ],
+    [
+      'To qualify you must have a household income of under £62,215 a year.',
+      { currency: 'GBP', period: 'yearly', value: 62215 },
+    ],
+    [
+      'Have a household income under £70,000.',
+      { currency: 'GBP', period: 'yearly', value: 70000 },
+    ],
+    [
+      'Annual family income must not exceed AED 250,000.',
+      { currency: 'AED', period: 'yearly', value: 250000 },
+    ],
+    [
+      'Family income should be below US$65,000 per year.',
+      { currency: 'USD', period: 'yearly', value: 65000 },
+    ],
+  ])(
+    'records the currency and period of the income limit in "%s"',
+    (text, limit) => {
+      expect(criterion(text, 'incomeAmount')).toMatchObject({
+        op: 'lte',
+        value: limit,
+        changeable: false,
+        sourceText: text,
+      });
+      expect(criterion(text, 'incomeBand')).toBeUndefined();
+    },
+  );
+
+  it('leaves a bare dollar sign to the LLM, since many countries use one', () => {
+    const text = 'Family income should be below $65,000 per year.';
+    expect(criterion(text, 'incomeAmount')).toBeUndefined();
+  });
+
+  it('keeps a rupee income limit a rupee band limit', () => {
+    const text = 'Annual family income should be less than Rs. 2.5 lakh.';
+    expect(criterion(text, 'incomeAmount')).toBeUndefined();
+  });
+
+  it.each([
+    ['USD 5000 monthly', { currency: 'USD', period: 'monthly', value: 5000 }],
+    ['GBP 62,215 yearly', { currency: 'GBP', period: 'yearly', value: 62215 }],
+    ['sgd 70000', { currency: 'SGD', period: 'yearly', value: 70000 }],
+  ])(
+    'reads an income limit "%s" as the LLM or a reviewer writes it',
+    (raw, limit) => {
+      expect(readValue('incomeAmount', [raw])).toEqual(limit);
+    },
+  );
+
+  it.each(['INR 250000 yearly', 'XYZ 5000 monthly', 'USD -5 monthly', 'USD'])(
+    'refuses "%s" as an income limit abroad',
+    (raw) => {
+      expect(readValue('incomeAmount', [raw])).toBeUndefined();
+    },
+  );
 
   it.each([
     ['The applicant must be a domicile of Tamil Nadu.', ['tamil_nadu']],
