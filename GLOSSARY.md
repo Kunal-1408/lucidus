@@ -43,11 +43,11 @@ The scale a result is given on: percentage, CGPA out of 10, GPA out of 4, IB poi
 _Avoid_: Grading system, conversion
 
 **Test score**:
-A score kept apart from Board marks: the ATAR (0–99.95), asked only of a Student living in Australia, and the SAT score (400–1600), asked only on the US high-school board or of a Student heading to the US. Neither is a Result scale, so neither is ever compared with Board marks.
+A score kept apart from Board marks: the ATAR (0–99.95), asked only of a Student living in Australia, and the SAT score (400–1600), asked only on the US high-school board or of a Student heading to the US. Neither is a Result scale, so neither is ever compared with Board marks, though a Scholarship may accept one in place of a Class 12 result (an Alternatives group).
 _Avoid_: Board result, marks (for a test score)
 
 **Alternatives group**:
-Criteria a Scholarship accepts in place of each other, one per Result scale ("36 IB points or AAA at A-level"). The group passes when any member passes, fails when every member that can be judged fails and none is unknown, and is otherwise unknown.
+Criteria a Scholarship accepts in place of each other, on one field or several ("A-levels AAA, IB 39 points, or SAT ≥ 1450"). The group passes when any member passes, fails when every member that can be judged fails and none is unknown, and is otherwise unknown.
 _Avoid_: `OR-criteria`, `either-or`
 
 **Field of study group**:

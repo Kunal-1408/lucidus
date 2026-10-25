@@ -29,10 +29,11 @@ export class Criterion {
   @Prop({ type: String, required: true, enum: ['high', 'medium', 'low'] })
   confidence: ConfidenceLevel;
 
-  // Criteria sharing an alternatives group are alternatives ("IB 36 or AAA
-  // at A-level"): the group passes when any member passes, fails when every
-  // member that can be judged fails and none is unknown, and is otherwise
-  // unknown. Absent on a Criterion that stands alone.
+  // Criteria sharing an alternatives group are alternatives, on any fields
+  // ("IB 36, AAA at A-level or SAT ≥ 1450"): the group passes when any member
+  // passes, fails when every member that can be judged fails and none is
+  // unknown, and is otherwise unknown. The value is only a name. Absent on a
+  // Criterion that stands alone.
   @Prop()
   alternativeGroup?: string;
 }

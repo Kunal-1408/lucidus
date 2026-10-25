@@ -308,6 +308,69 @@ describe('Normalisation onto the fixed lists', () => {
     expect(criterion(text, field)).toBeUndefined();
   });
 
+  it('groups a SAT score offered beside results on several Result scales with them', () => {
+    const text = [
+      'Entry requirements:',
+      'A-levels: AAA',
+      'IB Diploma: 39 points',
+      'American: SAT score ≥ 1450',
+    ].join('\n');
+    const grouped = extractByRules(text).criteria.map(
+      ({ field, value, alternativeGroup }) => ({
+        field,
+        value,
+        alternativeGroup,
+      }),
+    );
+    expect(grouped).toEqual([
+      {
+        field: 'class12Result',
+        value: { scale: 'ib_points', value: 39 },
+        alternativeGroup: 'class12Result',
+      },
+      {
+        field: 'class12Result',
+        value: { scale: 'a_level', value: ['A', 'A', 'A'] },
+        alternativeGroup: 'class12Result',
+      },
+      { field: 'sat', value: 1450, alternativeGroup: 'class12Result' },
+    ]);
+  });
+
+  it('groups a test score the sentence offers in place of a Class 12 result', () => {
+    const text = 'Applicants need AAA at A-level or an ATAR of 98.';
+    expect(
+      extractByRules(text).criteria.map((c) => [c.field, c.alternativeGroup]),
+    ).toEqual([
+      ['class12Result', 'class12Result'],
+      ['atar', 'class12Result'],
+    ]);
+  });
+
+  it.each([
+    [
+      'a GPA and a SAT score, both asked',
+      'Applicants need a minimum GPA of 3.5.\nApplicants need a minimum SAT score of 1,400.',
+      ['class12Result', 'sat'],
+    ],
+    [
+      'a percentage "or equivalent" beside an ATAR',
+      'Students must have scored 80% marks in Class 12 or equivalent and an ATAR of 90.',
+      ['class12Result', 'atar'],
+    ],
+    [
+      'a SAT score with no Class 12 result',
+      'A minimum SAT score of 1,300.',
+      ['sat'],
+    ],
+  ])('keeps a test score standing alone: %s', (_, text, fields) => {
+    expect(
+      extractByRules(text)
+        .criteria.filter((c) => c.field !== 'class')
+        .map((c) => [c.field, c.alternativeGroup]),
+    ).toEqual(fields.map((field) => [field, undefined]));
+  });
+
   it('still reads a scholarship reserved for students with disabilities', () => {
     const text = 'This scholarship is reserved for students with disabilities.';
     expect(criterion(text, 'disability')?.value).toBe(true);

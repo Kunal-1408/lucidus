@@ -48,7 +48,7 @@ export function checkOverride(
   const problems: string[] = [];
   if (override.action === 'approve') {
     for (const criterion of extracted) {
-      const { field, op, changeable, sourceText } = criterion;
+      const { field, op, changeable, sourceText, alternativeGroup } = criterion;
       const value = approvedValue(criterion);
       if (value === undefined) {
         problems.push(`${field}: values outside the allowed options`);
@@ -59,15 +59,21 @@ export function checkOverride(
           value,
           changeable,
           sourceText,
+          ...(alternativeGroup && { alternativeGroup }),
           confidence: 'high',
         });
       }
     }
   } else {
-    for (const { field, values, sourceText } of override.criteria ?? []) {
+    for (const replacement of override.criteria ?? []) {
+      const { field, values, sourceText, alternativeGroup } = replacement;
       const checked = checkQuoted({ field, values, quote: sourceText }, text);
       if (checked.ok) {
-        criteria.push({ ...checked.criterion, confidence: 'high' });
+        criteria.push({
+          ...checked.criterion,
+          ...(alternativeGroup && { alternativeGroup }),
+          confidence: 'high',
+        });
       } else {
         problems.push(checked.problem);
       }

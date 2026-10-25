@@ -5,7 +5,8 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 ## 09 remove old fields, re-ingest, audit
 
 - known gap: country name wrapped across lines in HTML not read, sentence splitter breaks it (07)
-- operator after deploy: `ingest` (re-extracts all, `EXTRACTION_VERSION` 2), then `audit`, `review`; record on ticket (09)
+- operator after deploy: `ingest` (re-extracts all, `EXTRACTION_VERSION` 3 since 12), then `audit`, `review`; record on ticket (09)
+- 12's bump lapses approve Overrides on re-read Scholarships (SPDC's is replace, unaffected); expect them in `review` (12)
 
 ## Any ticket changing extraction
 
@@ -27,3 +28,4 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 
 - A-level Student below grades on IB-or-A-level page → Tell us more asking IB points, not hidden (05)
 - Pearson: Tell us more for every Indian Profile without destination (07)
+- result on 2+ scales + SAT/ATAR asked as well → grouped as alternatives anyway; Override to fix (12)

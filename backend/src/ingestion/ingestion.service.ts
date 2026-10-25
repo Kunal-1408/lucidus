@@ -35,8 +35,9 @@ import {
 // rather than keeping its stored extraction. 2: the old fields (latest
 // marks, Class 10 marks, domicile and school state) removed, with Result
 // scales, income abroad, Field of study groups, destinations and Test
-// scores read.
-export const EXTRACTION_VERSION = 2;
+// scores read. 3: a Test score offered in place of a Class 12 result joins
+// its Alternatives group.
+export const EXTRACTION_VERSION = 3;
 
 export type StartResult =
   { started: true; runId: string } | { started: false; runId: string };

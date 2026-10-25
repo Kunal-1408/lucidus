@@ -25,6 +25,11 @@ export class ReplacementCriterion {
 
   @Prop({ required: true })
   sourceText: string;
+
+  // Replacement Criteria sharing a name are an Alternatives group, on any
+  // fields ("3.5 GPA" or a SAT score of 1400).
+  @Prop()
+  alternativeGroup?: string;
 }
 
 // A person's fix for one Scholarship, holding only for the page text (the

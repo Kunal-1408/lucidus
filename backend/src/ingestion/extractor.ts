@@ -1,3 +1,4 @@
+import { TEST_SCORE_RANGES } from '../match/profile.js';
 import {
   CRITERION_FIELDS,
   EXTRACTED_FIELDS,
@@ -71,7 +72,9 @@ export async function extract(
   const llmDeadline = quotedValue(text, answer.deadline);
   const deadline = byRules.deadline ?? (llmDeadline && toIsoDate(llmDeadline));
   return {
-    criteria: withDestinationForHome([...byRules.criteria, ...fromLlm]),
+    criteria: withDestinationForHome(
+      withTestScoresInPlaceOfResults([...byRules.criteria, ...fromLlm]),
+    ),
     extraRequirements,
     amountText,
     deadline,
@@ -91,7 +94,7 @@ export function extractByRules(text: string): Extraction {
     .map((c) => ({ ...c, confidence: 'high' as const }));
   const deadline = deadlineText(sentences);
   return {
-    criteria: withDestinationForHome(criteria),
+    criteria: withDestinationForHome(withTestScoresInPlaceOfResults(criteria)),
     extraRequirements: marksExtraRequirements(eligibility),
     amountText: amountRule(sentences) ?? AMOUNT_NOT_STATED,
     deadline: deadline && toIsoDate(deadline),
@@ -105,6 +108,56 @@ export function extractByRules(text: string): Extraction {
 function withDestinationForHome(criteria: Criterion[]): Criterion[] {
   if (criteria.some((c) => c.field === 'destination')) return criteria;
   return criteria.filter((c) => c.field !== 'destinationIsResidence');
+}
+
+// The Alternatives group a Test score offered in place of a Class 12 result
+// joins: the Class 12 result's own, so stored groups keep their name.
+const CLASS_12_GROUP = 'class12Result';
+// "... or SAT ≥ 1450", "... or an ATAR of 98": "or equivalent" is not one.
+const OR_TEST_SCORE = /\bor\s+(?:an?\s+|the\s+)?(?:SAT|ATAR)\b/i;
+
+// A Test score offered in place of a Class 12 result ("A-levels AAA, IB 39,
+// or SAT ≥ 1450") joins the result's Alternatives group, with every Class 12
+// result Criterion. It is offered in place of one when the page lists the
+// result on several Result scales (one entry requirement per qualification),
+// when the result's sentence offers it with an "or", or when the LLM says so.
+// Otherwise, or when there is no Class 12 result to stand in for, it stands
+// alone: a US page asking for a GPA and a SAT score asks for both.
+function withTestScoresInPlaceOfResults(criteria: Criterion[]): Criterion[] {
+  const results = criteria.filter((c) => c.field === 'class12Result');
+  const inPlaceOfResult = (c: Criterion) =>
+    c.field in TEST_SCORE_RANGES &&
+    (c.alternativeGroup === CLASS_12_GROUP ||
+      results.length > 1 ||
+      results.some(
+        (r) =>
+          r.sourceText === c.sourceText && OR_TEST_SCORE.test(c.sourceText),
+      ));
+  const joining = criteria.filter(inPlaceOfResult);
+  const grouped = results.length > 0 && joining.length > 0;
+  return criteria.map((c) => {
+    if (grouped && (c.field === 'class12Result' || joining.includes(c)))
+      return inGroup(c, CLASS_12_GROUP);
+    if (c.field in TEST_SCORE_RANGES) return inGroup(c, undefined);
+    return c;
+  });
+}
+
+// A copy of a Criterion in the given Alternatives group, or in none.
+function inGroup(
+  criterion: Criterion,
+  alternativeGroup: string | undefined,
+): Criterion {
+  const { field, op, value, changeable, sourceText, confidence } = criterion;
+  return {
+    field,
+    op,
+    value,
+    changeable,
+    sourceText,
+    confidence,
+    ...(alternativeGroup && { alternativeGroup }),
+  };
 }
 
 function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {
@@ -122,10 +175,16 @@ function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {
 }
 
 // Several results the LLM gives for one Board marks field are alternatives
-// on different Result scales: one Criterion each, grouped.
+// on different Result scales: one Criterion each, grouped. A Test score the
+// LLM says is offered in place of the Class 12 result keeps that group
+// (withTestScoresInPlaceOfResults decides whether it stands).
 function alternatives(reading: CriterionReading, text: string): Criterion[] {
   if (!isBoardMarksField(reading.field) || reading.values.length < 2) {
-    return [fromCriterionReading(reading, text)];
+    const criterion = fromCriterionReading(reading, text);
+    return reading.field in TEST_SCORE_RANGES &&
+      reading.alternativeGroup === CLASS_12_GROUP
+      ? [inGroup(criterion, CLASS_12_GROUP)]
+      : [criterion];
   }
   return reading.values.map((value) => {
     const member = fromCriterionReading({ ...reading, values: [value] }, text);

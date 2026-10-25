@@ -501,6 +501,37 @@ describe('Matcher: Result scales', () => {
     });
   });
 
+  describe('alternatives across fields', () => {
+    // "IB 36 or SAT ≥ 1450", the SAT score first, which has no Goal.
+    const satOrIb = () =>
+      scholarship([
+        {
+          field: 'sat',
+          op: 'gte',
+          value: 1450,
+          changeable: true,
+          alternativeGroup: 'class12',
+        },
+        ib36,
+      ]);
+
+    it('passes on a Test score in place of the Class 12 result', () => {
+      expect(bucketOf({ sat: 1500 }, satOrIb())).toBe('eligible');
+    });
+
+    it('takes the Goal of the first member that has one when every member fails', () => {
+      const profile: Profile = {
+        class: 12,
+        boardsUpcoming: true,
+        class12Result: result('ib_points', 35),
+        sat: 1300,
+      };
+      expect(cardFor(profile, satOrIb()).goals).toEqual([
+        'Score 36 IB points to unlock this',
+      ]);
+    });
+  });
+
   describe('Goals', () => {
     const upcoming = (class12Result: BoardResult): Profile => ({
       class: 12,
