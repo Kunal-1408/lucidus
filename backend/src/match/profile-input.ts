@@ -107,7 +107,10 @@ export function parseProfile(body: unknown): ProfileParseResult {
 
   reasons.push(...contradictions(raw), ...boardMarksContradictions(raw));
   reasons.push(...residenceContradictions(raw), ...incomeContradictions(raw));
-  reasons.push(...testScoreContradictions(raw));
+  reasons.push(
+    ...testScoreContradictions(raw),
+    ...indianOnlyContradictions(raw),
+  );
   if (reasons.length > 0) return { ok: false, reasons };
   return { ok: true, profile: profile as Profile };
 }
@@ -334,6 +337,45 @@ function testScoreContradictions(raw: Record<string, unknown>): string[] {
   ) {
     reasons.push(
       'sat is only asked for the us_high_school board or when destination is US',
+    );
+  }
+  return reasons;
+}
+
+// The Indian boards, whose Class 11 and 12 streams the stream question asks
+// about (frontend copy: INDIAN_BOARDS in frontend/src/app/profile-rules.ts).
+const INDIAN_BOARDS: readonly unknown[] = ['cbse', 'cisce', 'state'];
+
+// Questions whose answers are Indian terms, as the form asks them, each also
+// when its deciding answer is not given: the stream only on an Indian board,
+// school type and the NMMS exam only of a Student living in India, parents'
+// occupation only of an Indian citizen or OCI card holder (frontend copy:
+// unaskedIndianOnly and offeredExams in frontend/src/app/profile-rules.ts).
+function indianOnlyContradictions(raw: Record<string, unknown>): string[] {
+  const reasons: string[] = [];
+  const country = raw.countryOfResidence;
+  const abroad = country !== undefined && country !== INDIA;
+  if (
+    'stream' in raw &&
+    raw.board !== undefined &&
+    !INDIAN_BOARDS.includes(raw.board)
+  ) {
+    reasons.push('stream is only asked for the cbse, cisce or state board');
+  }
+  if ('schoolType' in raw && abroad) {
+    reasons.push(
+      'schoolType is only asked when countryOfResidence is IN or not given',
+    );
+  }
+  if ('parentOccupation' in raw && raw.citizenship === 'other') {
+    reasons.push(
+      'parentOccupation is only asked when citizenship is indian or oci',
+    );
+  }
+  const exams = raw.examsQualified;
+  if (Array.isArray(exams) && exams.includes('nmms') && abroad) {
+    reasons.push(
+      'examsQualified nmms is only asked when countryOfResidence is IN or not given',
     );
   }
   return reasons;

@@ -167,7 +167,7 @@ The Watchlist grows with sources for Students abroad (SPDC first, then the Gulf,
 
 Board narrows the grid: IB and Cambridge/UK have no Class 10 result (GCSE/IGCSE requirements are Extra requirements); US high school has no Class 10 result and gives one GPA in the Class 12 slot; boards-upcoming only appears where the board has an exam at that class. Board presets the scale (CBSE/CISCE/State: percentage, with CGPA allowed for Class 10; Cambridge/UK: A-level grades; IB: IB points; US: GPA), and the Student may change it.
 
-Other conditional questions: region needs a country; Residence status and Home state need a country other than India (for India, Home state is the region); Citizenship country needs Citizenship `other`; category needs Citizenship `indian` or `oci`; ATAR needs country Australia; single girl child needs gender female (as today); stream needs Class 11 or 12 (as today).
+Other conditional questions: region needs a country; Residence status and Home state need a country other than India (for India, Home state is the region); Citizenship country needs Citizenship `other`; category needs Citizenship `indian` or `oci`; ATAR needs country Australia; single girl child needs gender female (as today); stream needs Class 11 or 12 (as today) and board CBSE, CISCE or State board, or no board; school type needs country India, or no country; parents' occupation needs Citizenship `indian` or `oci`, or no Citizenship; exams qualified is asked of everyone, with the NMMS option only for country India, or no country.
 
 ### Profile rules module (frontend)
 

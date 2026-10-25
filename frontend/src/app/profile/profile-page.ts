@@ -7,7 +7,6 @@ import {
   CATEGORIES,
   CITIZENSHIPS,
   CLASSES,
-  EXAMS,
   FieldOfStudyGroup,
   FIELDS_OF_STUDY,
   GENDERS,
@@ -31,6 +30,7 @@ import {
   checkAnswer,
   findSubjects,
   incomeCurrency,
+  offeredExams,
   readResult,
   resultScale,
   shownResult,
@@ -92,7 +92,6 @@ export class ProfilePage {
   protected readonly streams = STREAMS;
   protected readonly fieldsOfStudy = FIELDS_OF_STUDY;
   protected readonly parentOccupations = PARENT_OCCUPATIONS;
-  protected readonly exams = EXAMS;
   protected readonly countries = COUNTRIES;
   protected readonly residenceStatuses = RESIDENCE_STATUSES;
   protected readonly currencies = CURRENCIES;
@@ -104,6 +103,8 @@ export class ProfilePage {
 
   protected readonly profile = this.store.profile;
   protected readonly shown = computed(() => visibleQuestions(this.profile()));
+  // The exams the exams-qualified question offers this Student.
+  protected readonly exams = computed(() => offeredExams(this.profile()));
   // The states or regions of the country the Student lives in.
   protected readonly regions = computed(
     () => REGIONS[this.profile().countryOfResidence ?? ''] ?? [],

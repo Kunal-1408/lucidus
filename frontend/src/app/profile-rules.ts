@@ -8,6 +8,7 @@ import {
   A_LEVEL_GRADES,
   ALevelGrade,
   BoardResult,
+  EXAMS,
   FIELDS_OF_STUDY,
   IncomeAmount,
   Profile,
@@ -59,7 +60,49 @@ export function visibleQuestions(profile: Profile): ReadonlySet<Question> {
   if (profile.class === 9 || profile.class === 10) hidden.add('stream');
   for (const question of unaskedForResidence(profile)) hidden.add(question);
   for (const question of unaskedTestScores(profile)) hidden.add(question);
+  for (const question of unaskedIndianOnly(profile)) hidden.add(question);
   return new Set(QUESTIONS.filter((question) => !hidden.has(question)));
+}
+
+// The Indian boards, whose Class 11 and 12 streams the stream question asks
+// about (backend copy: INDIAN_BOARDS in backend/src/match/profile-input.ts).
+export const INDIAN_BOARDS: readonly NonNullable<Profile['board']>[] = ['cbse', 'cisce', 'state'];
+
+// Questions whose answers are Indian terms, asked only where they apply or
+// when the deciding answer is not given: the stream only on an Indian board,
+// school type only of a Student living in India, parents' occupation (Indian
+// defence and central armed police) only of an Indian citizen or OCI card
+// holder (backend copy: indianOnlyContradictions in
+// backend/src/match/profile-input.ts).
+function unaskedIndianOnly(profile: Profile): Question[] {
+  const unasked: Question[] = [];
+  if (profile.board !== undefined && !INDIAN_BOARDS.includes(profile.board)) unasked.push('stream');
+  if (livesAbroad(profile)) unasked.push('schoolType');
+  if (profile.citizenship === 'other') unasked.push('parentOccupation');
+  return unasked;
+}
+
+function livesAbroad({ countryOfResidence }: Profile): boolean {
+  return countryOfResidence !== undefined && countryOfResidence !== INDIA;
+}
+
+// The exams the exams-qualified question offers: NMMS (a Class 8 exam for
+// government schools in India) only of a Student living in India or who
+// gives no country (backend copy: indianOnlyContradictions in
+// backend/src/match/profile-input.ts).
+export function offeredExams(profile: Profile): readonly (typeof EXAMS)[number][] {
+  return livesAbroad(profile) ? EXAMS.filter((exam) => exam.value !== 'nmms') : EXAMS;
+}
+
+// An exam the question no longer offers is dropped from the answer, and an
+// answer left empty is cleared.
+function withOfferedExams(profile: Profile): Profile {
+  const { examsQualified, ...rest } = profile;
+  if (examsQualified === undefined) return profile;
+  const offered = offeredExams(profile).map((exam) => exam.value);
+  const kept = examsQualified.filter((exam) => offered.includes(exam));
+  if (kept.length === examsQualified.length) return profile;
+  return kept.length ? { ...rest, examsQualified: kept } : rest;
 }
 
 // The ATAR is asked only of a Student living in Australia; the SAT score only
@@ -379,9 +422,18 @@ function isOnScale(scale: ResultScale, value: unknown): boolean {
 // other answer to a question the form no longer has, is dropped.
 export function migrateSavedProfile(saved: Record<string, unknown>): Profile {
   const migrated = withDestinationCode(withHomeState(withClass10Result(saved)));
-  return Object.fromEntries(
+  const known = Object.fromEntries(
     Object.entries(migrated).filter(([question]) => QUESTIONS.includes(question as Question)),
   ) as Profile;
+  return withoutIndianOnlyUnasked(known);
+}
+
+// A saved Profile may hold an answer to an Indian-only question given before
+// it was asked only where it applies; that answer is dropped.
+function withoutIndianOnlyUnasked(profile: Profile): Profile {
+  const kept = { ...profile };
+  for (const question of unaskedIndianOnly(profile)) delete kept[question];
+  return withOfferedExams(kept);
 }
 
 // The destinations the form offered before every country, with the code each
@@ -482,7 +534,7 @@ function isRegionOf(region: string, country: string | undefined): boolean {
 // Clearing one answer can hide another question in turn, so this repeats
 // until nothing more is cleared.
 function withoutUnasked(profile: Profile): Profile {
-  let current = profile;
+  let current = withOfferedExams(profile);
   for (;;) {
     const asked = visibleQuestions(current);
     const kept = Object.fromEntries(
