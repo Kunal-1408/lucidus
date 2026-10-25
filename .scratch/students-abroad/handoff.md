@@ -12,11 +12,17 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 
 - bump `EXTRACTION_VERSION` (ingestion.service.ts) when unchanged text should be read again; approve Overrides on re-read Scholarships lapse (09)
 
-## 10 Watchlist for Students abroad
+## 10 post-deploy ingestion run
 
-- `foundation` provider type missing; abroad fixtures use `corporate` for now (08)
 - rule extraction gives `region` only for AE, AU, CA, GB, US; other regions left to LLM (03)
-- "predicted ATAR of 95" reads as ATAR Criterion, not Extra requirement; research file says otherwise (08)
+- "predicted ATAR of 95" reads as ATAR Criterion, not Extra requirement; Tuckwell live page does this (08, 10)
+- SPDC Override in `backend/data/overrides.json` written by agent: operator confirm; lapses on 2026-27 PDF, re-point URL + re-review (10)
+- watch: CBSE SGC class [12] not 11–12, JKCF fieldOfStudy science, Coca-Cola countryOfResidence US; Loran/Schulich/NTU/Gates "no criteria" without LLM (10)
+
+## Later
+
+- no Gulf source: AUS, Qatar Univ, RCSI name awards in `<dt>`/accordion links, not headings; Splitter takes h1–h6 only. Needs a non-heading split selector (10)
+- NMSC, Melbourne, Crankstart 403 to the Fetcher (10)
 
 ## Open for the spec owner
 

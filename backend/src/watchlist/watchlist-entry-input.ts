@@ -1,7 +1,8 @@
-import type {
-  SourceType,
-  SplitRule,
-  WatchlistEntry,
+import {
+  PROVIDER_TYPES,
+  type SourceType,
+  type SplitRule,
+  type WatchlistEntry,
 } from './watchlist-entry.schema.js';
 import { isObject, oneOf, text } from '../input-checks.js';
 
@@ -14,7 +15,6 @@ export type ParseResult =
 
 const SOURCE_TYPES = ['html', 'pdf', 'json'] as const;
 const REGIONS = ['india', 'abroad'] as const;
-const SCHOLARSHIP_TYPES = ['government', 'corporate', 'university'] as const;
 const HOLDS = ['one', 'many'] as const;
 
 // The fields of a split rule each source type needs, per the Splitter's
@@ -41,7 +41,7 @@ export function parseWatchlistEntry(body: unknown): ParseResult {
   const scholarshipType = oneOf(
     raw,
     'scholarshipType',
-    SCHOLARSHIP_TYPES,
+    PROVIDER_TYPES,
     reasons,
   );
   const officialUrl = httpUrl(raw, 'officialUrl', reasons);

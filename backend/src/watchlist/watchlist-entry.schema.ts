@@ -2,6 +2,14 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
 export type SourceType = 'html' | 'pdf' | 'json';
+// Who offers a Scholarship; a foundation is neither a company nor a state.
+export const PROVIDER_TYPES = [
+  'government',
+  'corporate',
+  'university',
+  'foundation',
+] as const;
+export type ProviderType = (typeof PROVIDER_TYPES)[number];
 export type LastResult =
   'ok' | 'unchanged' | 'needs_js' | 'empty' | 'failed' | 'not_found';
 
@@ -40,12 +48,8 @@ export class WatchlistEntry {
   @Prop({ required: true })
   provider: string;
 
-  @Prop({
-    type: String,
-    required: true,
-    enum: ['government', 'corporate', 'university'],
-  })
-  scholarshipType: 'government' | 'corporate' | 'university';
+  @Prop({ type: String, required: true, enum: PROVIDER_TYPES })
+  scholarshipType: ProviderType;
 
   @Prop({ required: true })
   officialUrl: string;

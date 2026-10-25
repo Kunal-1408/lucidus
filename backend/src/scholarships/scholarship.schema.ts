@@ -1,5 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import {
+  PROVIDER_TYPES,
+  type ProviderType,
+} from '../watchlist/watchlist-entry.schema.js';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
@@ -53,12 +57,8 @@ export class Scholarship {
   @Prop({ required: true })
   provider: string;
 
-  @Prop({
-    type: String,
-    required: true,
-    enum: ['government', 'corporate', 'university'],
-  })
-  type: 'government' | 'corporate' | 'university';
+  @Prop({ type: String, required: true, enum: PROVIDER_TYPES })
+  type: ProviderType;
 
   @Prop({ required: true })
   amountText: string;

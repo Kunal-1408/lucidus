@@ -161,5 +161,115 @@
     "scholarshipType": "government",
     "officialUrl": "https://www.chennai.in.emb-japan.go.jp/itpr_ja/11_000001_00446.html",
     "holds": "one"
+  },
+  {
+    "url": "https://www.indianembassyalgiers.gov.in/content/Final-SPDC-Guidelines-2025-26.pdf",
+    "type": "pdf",
+    "region": "india",
+    "name": "Scholarship Programme for Diaspora Children (SPDC)",
+    "provider": "Ministry of External Affairs, Government of India",
+    "scholarshipType": "government",
+    "officialUrl": "https://www.indianembassyalgiers.gov.in/section/news/scholarship-programme-for-diaspora-children-spdc-2025-26/",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.cbse.gov.in/cbsenew/scholar/Guidelines_SGC_2025.pdf",
+    "type": "pdf",
+    "region": "india",
+    "name": "CBSE Merit Scholarship Scheme for Single Girl Child",
+    "provider": "Central Board of Secondary Education",
+    "scholarshipType": "government",
+    "officialUrl": "https://www.cbse.gov.in/cbsenew/scholar/Guidelines_SGC_2025.pdf",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.cambridgestudents.cam.ac.uk/fees-and-funding/cambridge-bursary-scheme/how-apply",
+    "type": "html",
+    "region": "abroad",
+    "name": "Cambridge Bursary Scheme",
+    "provider": "University of Cambridge",
+    "scholarshipType": "university",
+    "officialUrl": "https://www.cambridgestudents.cam.ac.uk/fees-and-funding/cambridge-bursary-scheme",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.imperial.ac.uk/study/fees-and-funding/undergraduate/bursaries-grants-scholarships/imperial-bursary/",
+    "type": "html",
+    "region": "abroad",
+    "name": "Imperial Bursary",
+    "provider": "Imperial College London",
+    "scholarshipType": "university",
+    "officialUrl": "https://www.imperial.ac.uk/study/fees-and-funding/undergraduate/bursaries-grants-scholarships/imperial-bursary/",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.jkcf.org/our-scholarships/college-scholarship-program/how-to-apply/",
+    "type": "html",
+    "region": "abroad",
+    "name": "Cooke College Scholarship Program",
+    "provider": "Jack Kent Cooke Foundation",
+    "scholarshipType": "foundation",
+    "officialUrl": "https://www.jkcf.org/our-scholarships/college-scholarship-program/",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.coca-colascholarsfoundation.org/apply/",
+    "type": "html",
+    "region": "abroad",
+    "name": "Coca-Cola Scholars Program",
+    "provider": "The Coca-Cola Scholars Foundation",
+    "scholarshipType": "foundation",
+    "officialUrl": "https://www.coca-colascholarsfoundation.org/apply/",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.thegatesscholarship.org/scholarship",
+    "type": "html",
+    "region": "abroad",
+    "name": "The Gates Scholarship",
+    "provider": "The Gates Scholarship",
+    "scholarshipType": "foundation",
+    "officialUrl": "https://www.thegatesscholarship.org/scholarship",
+    "holds": "one"
+  },
+  {
+    "url": "https://loranscholar.ca/the-program/how-to-apply/",
+    "type": "html",
+    "region": "abroad",
+    "name": "Loran Award",
+    "provider": "Loran Scholars Foundation",
+    "scholarshipType": "foundation",
+    "officialUrl": "https://loranscholar.ca/the-program/how-to-apply/",
+    "holds": "one"
+  },
+  {
+    "url": "https://schulichleaders.com/apply/",
+    "type": "html",
+    "region": "abroad",
+    "name": "Schulich Leader Scholarships",
+    "provider": "Schulich Leader Scholarships",
+    "scholarshipType": "foundation",
+    "officialUrl": "https://schulichleaders.com/apply/",
+    "holds": "one"
+  },
+  {
+    "url": "https://www.ntu.edu.sg/admissions/undergraduate/scholarships/scholarship-opportunities/detail/nanyang-scholarship",
+    "type": "html",
+    "region": "abroad",
+    "name": "Nanyang Scholarship",
+    "provider": "Nanyang Technological University",
+    "scholarshipType": "university",
+    "officialUrl": "https://www.ntu.edu.sg/admissions/undergraduate/scholarships/scholarship-opportunities/detail/nanyang-scholarship",
+    "holds": "one"
+  },
+  {
+    "url": "https://tuckwell.anu.edu.au/apply/eligibility",
+    "type": "html",
+    "region": "abroad",
+    "name": "Tuckwell Scholarship",
+    "provider": "The Australian National University",
+    "scholarshipType": "university",
+    "officialUrl": "https://tuckwell.anu.edu.au/apply/eligibility",
+    "holds": "one"
   }
 ]

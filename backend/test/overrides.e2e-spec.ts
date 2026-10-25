@@ -35,6 +35,8 @@ describe('Overrides', () => {
       fixtures: { [ENGINEERING]: 'llm/engineering-girls.html' },
       watchlist: [ENGINEERING_ENTRY],
       now: DAY_1,
+      // Not the repo file: its Overrides are for real sources.
+      overridesFile: 'overrides/empty.json',
       llm: () => ({
         criteria: [
           {
@@ -402,7 +404,7 @@ describe('Overrides', () => {
   });
 
   describe('seeding', () => {
-    it('starts empty from the repo file', async () => {
+    it('starts empty from an empty file', async () => {
       expect(await admin.list()).toEqual([]);
     });
 
