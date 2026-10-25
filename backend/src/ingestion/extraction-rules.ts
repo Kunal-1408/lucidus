@@ -336,6 +336,30 @@ function unsupportedResults(sentences: string[]): ExtraRequirement[] {
 // The words a Board marks sentence on another Result scale uses.
 const RESULT_WORDS = [IB, A_LEVEL, /\bC?GPA\b/i, /\bI?GCSEs?\b/, AP];
 
+// Test scores apart from Board marks: "an ATAR of at least 99.90", "SAT
+// composite score of 1200", "SAT score ≥ 1450". The figure is the first one
+// after the name, in the same sentence, and must be inside the score's range
+// (normaliseValue), so NMMS's "Scholastic Aptitude Test (SAT) ... 40 %
+// marks" gives nothing. A predicted ATAR is still the ATAR a Student gives.
+// Both are changeable: a Student can still sit or resit the test.
+const ATAR = /\bATAR\b[^.\d]{0,40}?(\d{1,2}(?:\.\d{1,2})?)(?!\.?\d|\s*%)/;
+const SAT = /\bSAT\b[^.\d]{0,40}?(\d,?\d{3}|\d{3})(?![.,]?\d|\s*%)/;
+
+function testScoreRule(field: 'atar' | 'sat', pattern: RegExp): FieldRule {
+  return (sentences) => {
+    for (const sentence of sentences) {
+      const m = sentence.match(pattern);
+      if (m) return found(field, m[1].replace(/,/g, ''), sentence);
+    }
+    return undefined;
+  };
+}
+
+const TEST_SCORE_RULES = [
+  testScoreRule('atar', ATAR),
+  testScoreRule('sat', SAT),
+];
+
 // "studying ... in a Government, Government-aided and local body school".
 // Only where the Student studies now: "Passed class 10 from a government
 // school" is an earlier qualification.
@@ -762,6 +786,7 @@ export const FIELD_RULES: FieldRule[] = [
   incomeRule,
   foreignIncomeRule,
   ...BOARD_MARKS_FIELDS.map(boardMarksRule),
+  ...TEST_SCORE_RULES,
   schoolTypeRule,
   ...KEYWORD_FIELDS.map(keywordRule),
   ...RESIDENCE_RULES,
@@ -775,6 +800,8 @@ const RULE_WORDS = [
   ]),
   ...RESIDENCE_WORDS,
   ...RESULT_WORDS,
+  ATAR,
+  SAT,
 ];
 
 // Neither a condition for keeping a scholarship once awarded nor how its

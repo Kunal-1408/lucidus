@@ -21,6 +21,7 @@ import {
   RESULT_SCALE_RANGES,
   SLOT_SCALES,
   STATE_REGIONS,
+  TEST_SCORE_RANGES,
 } from '../match/profile.js';
 import { CRITERION_FIELDS } from './criterion-fields.js';
 
@@ -55,6 +56,8 @@ const YES_NO_FIELDS = ['minority', 'disability', 'singleGirlChild'];
 const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'];
 // Fields the form asks as an amount in a currency.
 const AMOUNT_FIELDS = ['incomeAmount'];
+// Test scores: fields the form asks as a number in a range.
+const TEST_SCORE_FIELDS = ['atar', 'sat'] as const;
 
 // Values deliberately on one side only, each with the reason.
 const FORM_ONLY_FIELDS: Record<string, string> = {
@@ -95,6 +98,7 @@ describe('Form ↔ Criteria contract', () => {
     ...YES_NO_FIELDS,
     ...BOARD_MARKS_FIELDS,
     ...AMOUNT_FIELDS,
+    ...TEST_SCORE_FIELDS,
   ];
 
   it('the form asks about every field a Criterion can check, or it is listed with a reason', () => {
@@ -189,6 +193,18 @@ describe('Form ↔ Criteria contract', () => {
     expect(rules.RESULT_SCALE_RANGES).toEqual(RESULT_SCALE_RANGES);
     expect(rules.NO_CLASS_10_EXAM_BOARDS).toEqual(NO_CLASS_10_EXAM_BOARDS);
     expect(rules.NO_CLASS_12_EXAM_BOARDS).toEqual(NO_CLASS_12_EXAM_BOARDS);
+  });
+
+  describe.each(TEST_SCORE_FIELDS)('%s', (field) => {
+    it('the form and the backend take the same range', () => {
+      expect(rules.TEST_SCORE_RANGES[field]).toEqual(TEST_SCORE_RANGES[field]);
+    });
+
+    it('holds a minimum inside the range the form takes, and nothing outside it', () => {
+      const [, max] = TEST_SCORE_RANGES[field];
+      expect(readValue(field, [String(max)])).toBe(max);
+      expect(readValue(field, [String(max + 1)])).toBeUndefined();
+    });
   });
 
   describe('incomeBand', () => {

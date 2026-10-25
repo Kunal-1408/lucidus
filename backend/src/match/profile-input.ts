@@ -24,6 +24,7 @@ import {
   type Profile,
   RESULT_SCALE_RANGES,
   SLOT_SCALES,
+  TEST_SCORE_RANGES,
 } from './profile.js';
 
 export type ProfileParseResult =
@@ -49,6 +50,8 @@ const ONE_OF_FIELDS = [
   'category',
 ] as const;
 const LIST_FIELDS = ['parentOccupation', 'examsQualified'] as const;
+// Test scores, each a number in its range (TEST_SCORE_RANGES).
+const TEST_SCORE_FIELDS = ['atar', 'sat'] as const;
 
 // Checks the Profile sent in a Match request against the rules the form
 // applies (the frontend's copy is frontend/src/app/profile-rules.ts):
@@ -102,9 +105,14 @@ export function parseProfile(body: unknown): ProfileParseResult {
     if (field in raw) keep(field, boardResult(raw, field, reasons));
   }
   if ('incomeAmount' in raw) keep('incomeAmount', incomeAmount(raw, reasons));
+  for (const field of TEST_SCORE_FIELDS) {
+    const [min, max] = TEST_SCORE_RANGES[field];
+    if (field in raw) keep(field, numberBetween(raw, field, min, max, reasons));
+  }
 
   reasons.push(...contradictions(raw), ...boardMarksContradictions(raw));
   reasons.push(...residenceContradictions(raw), ...incomeContradictions(raw));
+  reasons.push(...testScoreContradictions(raw));
   if (reasons.length > 0) return { ok: false, reasons };
   return { ok: true, profile: profile as Profile };
 }
@@ -330,6 +338,27 @@ function incomeContradictions(raw: Record<string, unknown>): string[] {
     ];
   }
   return [];
+}
+
+// Test scores, as the form asks them: the ATAR only of a Student living in
+// Australia, the SAT score only on the US high-school board or of a Student
+// heading to the US (frontend copy: unaskedTestScores in
+// frontend/src/app/profile-rules.ts).
+function testScoreContradictions(raw: Record<string, unknown>): string[] {
+  const reasons: string[] = [];
+  if ('atar' in raw && raw.countryOfResidence !== 'AU') {
+    reasons.push('atar is only asked when countryOfResidence is AU');
+  }
+  if (
+    'sat' in raw &&
+    raw.board !== 'us_high_school' &&
+    raw.destination !== 'US'
+  ) {
+    reasons.push(
+      'sat is only asked for the us_high_school board or when destination is US',
+    );
+  }
+  return reasons;
 }
 
 // The fields that hold an answer: absent and null both mean not given.

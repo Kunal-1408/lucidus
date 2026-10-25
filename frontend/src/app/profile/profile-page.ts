@@ -36,6 +36,7 @@ import {
   shownResult,
   SLOT_SCALES,
   subjectAnswer,
+  TEST_SCORE_RANGES,
   subjectNote,
   visibleQuestions,
 } from '../profile-rules';
@@ -61,6 +62,18 @@ type ChoiceField =
   | 'category';
 type YesNoField = 'boardsUpcoming' | 'minority' | 'disability' | 'singleGirlChild';
 type MultiField = 'parentOccupation' | 'examsQualified';
+type TestScore = keyof typeof TEST_SCORE_RANGES;
+
+// The test scores, each asked as a number in its range.
+const TEST_SCORES = (
+  [
+    ['atar', 'ATAR', 0.05],
+    ['sat', 'SAT score', 10],
+  ] as const
+).map(([question, label, step]) => {
+  const [min, max] = TEST_SCORE_RANGES[question];
+  return { question, label, step, min, max };
+});
 
 @Component({
   selector: 'app-profile-page',
@@ -87,6 +100,9 @@ export class ProfilePage {
   protected readonly currencies = CURRENCIES;
   protected readonly boardMarksQuestions = BOARD_MARKS_FIELDS;
   protected readonly boardMarksLabel = boardMarksLabel;
+  protected readonly testScores = TEST_SCORES;
+  // Why the last score typed into a test score field was not saved.
+  protected readonly scoreErrors = signal<Partial<Record<TestScore, string>>>({});
 
   protected readonly profile = this.store.profile;
   protected readonly shown = computed(() => visibleQuestions(this.profile()));
@@ -192,6 +208,15 @@ export class ProfilePage {
     const error = result === undefined ? undefined : checkAnswer(question, result);
     this.marksErrors.update((errors) => ({ ...errors, [question]: error }));
     if (!error) this.update({ [question]: result });
+  }
+
+  // An empty field clears the score; a score out of range is not saved and
+  // the field says why.
+  protected setTestScore(question: TestScore, typed: string) {
+    const score = typed.trim() === '' ? undefined : Number(typed);
+    const error = score === undefined ? undefined : checkAnswer(question, score);
+    this.scoreErrors.update((errors) => ({ ...errors, [question]: error }));
+    if (!error) this.update({ [question]: score });
   }
 
   protected isPicked(field: MultiField, value: string): boolean {

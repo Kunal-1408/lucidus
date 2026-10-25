@@ -14,6 +14,9 @@ export const CRITERION_FIELDS: Record<
   class12Result: { op: 'gte', changeable: true },
   class10Marks: { op: 'gte', changeable: true },
   latestMarks: { op: 'gte', changeable: true },
+  // Test scores apart from Board marks: a minimum ATAR, a minimum SAT score.
+  atar: { op: 'gte', changeable: true },
+  sat: { op: 'gte', changeable: true },
   incomeBand: { op: 'lte', changeable: false },
   // Family income abroad: the value is an income limit with its currency
   // and period.

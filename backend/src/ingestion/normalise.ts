@@ -12,6 +12,7 @@ import {
   RESULT_SCALE_RANGES,
   type ResultScale,
   SLOT_SCALES,
+  TEST_SCORE_RANGES,
 } from '../match/profile.js';
 import {
   type BoardMarksField,
@@ -244,6 +245,9 @@ export function normaliseValue(
   if (isBoardMarksField(field)) {
     return toBoardResult(field, raw);
   }
+  if (field === 'atar' || field === 'sat') {
+    return toTestScore(field, raw);
+  }
   if (ISO_CODE_FIELDS.includes(field)) {
     const codes = asList(raw).map((code) => isoCode(field, code));
     return oneOf(codes, FIXED_LISTS[field], op);
@@ -269,6 +273,20 @@ function isoCode(field: string, raw: string): string {
 function toPercent(raw: string | string[]): number | undefined {
   const value = typeof raw === 'string' ? Number(raw) : NaN;
   return value > 0 && value <= 100 ? value : undefined;
+}
+
+// A minimum ATAR ("99.90") or SAT score ("1400", "1,400"), dropped when it
+// is outside the score's range or no minimum at all.
+function toTestScore(
+  field: 'atar' | 'sat',
+  raw: string | string[],
+): number | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const text = raw.trim().replace(/,/g, '');
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return undefined;
+  const value = Number(text);
+  const [min, max] = TEST_SCORE_RANGES[field];
+  return value > 0 && value >= min && value <= max ? value : undefined;
 }
 
 // A Board marks threshold, written as the rules, the LLM guide and

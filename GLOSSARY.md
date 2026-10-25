@@ -40,6 +40,10 @@ _Avoid_: Latest marks, previous-year marks, grades
 The scale a result is given on: percentage, CGPA out of 10, GPA out of 4, IB points out of 45 or A-level grades. Results on different scales are never compared.
 _Avoid_: Grading system, conversion
 
+**Test score**:
+A score kept apart from Board marks: the ATAR (0–99.95), asked only of a Student living in Australia, and the SAT score (400–1600), asked only on the US high-school board or of a Student heading to the US. Neither is a Result scale, so neither is ever compared with Board marks.
+_Avoid_: Board result, marks (for a test score)
+
 **Alternatives group**:
 Criteria a Scholarship accepts in place of each other, one per Result scale ("36 IB points or AAA at A-level"). The group passes when any member passes, fails when every member that can be judged fails and none is unknown, and is otherwise unknown.
 _Avoid_: OR-criteria, either-or
@@ -49,7 +53,7 @@ One of a few broad groups (Engineering, Medicine and health, Natural sciences, a
 _Avoid_: Course, stream, subject (for the group)
 
 **Core fields**:
-The Profile fields asked up front: class, country of residence and its state or region, home state, citizenship, board, Board marks and whether board exams are still upcoming, gender, category, family income, field of study and where the Student wants to study. Every other field is asked only through a Prompt.
+The Profile fields asked up front: class, country of residence and its state or region, home state, citizenship, board, Board marks and whether board exams are still upcoming, the ATAR or SAT score where asked, gender, category, family income, field of study and where the Student wants to study. Every other field is asked only through a Prompt.
 
 ## Scholarships
 
