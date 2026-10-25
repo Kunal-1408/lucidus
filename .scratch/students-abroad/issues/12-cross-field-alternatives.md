@@ -12,9 +12,13 @@ See spec: "Criteria and matching"; glossary terms Alternatives group and Test sc
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-triage
+**Status:** ready-for-agent
 
 - [ ] The spec owner picks an option and the spec (and glossary, if groups span fields) is updated to match
 - [ ] If groups span fields: extraction rules, LLM guide, extractor grouping, Overrides and the Matcher built test-first; e2e over a fixture with "A-levels AAA, IB 39, or SAT ≥ 1450" that is Eligible for an A-level Student, an IB Student and a SAT Student
 - [ ] New rules reach stored Scholarships through ticket 09's re-extraction, or the gap is named
 - [ ] `npm run check` passes
+
+## Comments
+
+**2026-10-25 (spec owner):** groups across fields. Goal and missing-field label: first member with a Goal, as today.

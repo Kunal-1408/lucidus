@@ -114,7 +114,7 @@ The Watchlist grows with sources for Students abroad (SPDC first, then the Gulf,
 62. As a Class 12 Student with an expected result just below a threshold, I want to see the scholarship as Within reach with a Goal, so that I know what to aim for.
 63. As a Student, I want marks rules for years I am not asked about (Class 7 or 8 marks, GCSE grades, weighted GPA, AP, Quebec's R score) shown as Extra requirements, so that I still see them without being wrongly matched.
 64. As a Student whose Residence status a scholarship checks, I want to be judged on it, so that awards for permanent residents or citizens of my country sort me correctly.
-65. As an Indian Student, I want my results for the existing scholarships unchanged by this work, so that nothing I relied on breaks.
+65. As an Indian Student, I want my results for the existing scholarships unchanged by this work, so that nothing I relied on breaks. One exception, by story 20: a Class 10 Student whose boards are upcoming gives no Class 10 result, so a Class 10 marks Criterion that once gave them a Within reach Goal now asks them in Tell us more.
 
 ### Validation at the backend
 
@@ -218,6 +218,8 @@ Other conditional questions: region needs a country; Residence status and Home s
 - Scholarships whose eligibility hinges only on admission to a named university (those stay University pointers).
 - Weighted GPA, AP, Quebec's R score and other scales beyond those listed, except as Extra requirements.
 - A school-state answer separate from where the Student lives.
+- An expected Class 10 result (pre-boards or predicted) while boards are upcoming (ticket 11).
+- A negative Criterion operator ("not living in India"); "for NRIs" checks Citizenship only, and a Student in India without a destination sees such a scholarship in Tell us more.
 - Any account or server-side storage of the Profile.
 - Sources the research could not verify on an official page (Saudi Arabia, Kuwait, Oman, Hamdan award, Oxford Crankstart, NUS) until an official page is found.
 

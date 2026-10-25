@@ -5,7 +5,6 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 ## 09 remove old fields, re-ingest, audit
 
 - known gap: country name wrapped across lines in HTML not read, sentence splitter breaks it (07)
-- known gap: "for NRIs" checks Citizenship `indian` only; no `not in` op for "not living in India" (03)
 - operator after deploy: `ingest` (re-extracts all, `EXTRACTION_VERSION` 2), then `audit`, `review`; record on ticket (09)
 
 ## Any ticket changing extraction
@@ -26,7 +25,5 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 
 ## Open for the spec owner
 
-- 11: Class 10 expected result while boards upcoming (story 20 vs 65)
-- 12: Alternatives groups across fields (SAT in place of A-level/IB); Overrides can't write groups
 - A-level Student below grades on IB-or-A-level page → Tell us more asking IB points, not hidden (05)
 - Pearson: Tell us more for every Indian Profile without destination (07)

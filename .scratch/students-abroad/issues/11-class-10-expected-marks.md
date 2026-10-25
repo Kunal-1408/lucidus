@@ -12,8 +12,12 @@ See spec: "Which questions appear (the grid)", stories 20, 24 and 65; ticket 04'
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-triage
+**Status:** done
 
-- [ ] The spec owner picks an option and the spec (grid or story 65) is updated to match
-- [ ] If an expected Class 10 result is asked: rules module, backend validation and Goal built test-first; the Odisha regression scenario pinned to its new buckets with the reason noted
-- [ ] `npm run check` passes
+- [x] The spec owner picks an option and the spec (grid or story 65) is updated to match
+- [x] If an expected Class 10 result is asked: rules module, backend validation and Goal built test-first; the Odisha regression scenario pinned to its new buckets with the reason noted (not asked; n/a)
+- [x] `npm run check` passes (spec-only change)
+
+## Comments
+
+**2026-10-25 (spec owner):** keep the grid; predicted Class 10 marks not worth building. Story 65 names the exception; Out of Scope lists it. Odisha scenario stays at Tell us more.
