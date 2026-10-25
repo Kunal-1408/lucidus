@@ -1,6 +1,6 @@
 ## Checks
 
-`npm run check` at the repo root runs every format, lint, build and test check for backend/ and frontend/; the pre-commit hook and CI run the same. In a fresh clone, `npm run setup` installs all three packages first.
+`npm run check` at the repo root runs every format, lint, build and test check for backend/ and frontend/; the pre-commit hook and CI run the same, so a commit lands only once the check is green: keep work in progress uncommitted until then, and merge other branches in after that first green commit. In a fresh clone, `npm run setup` installs all three packages first.
 
 ## Tools
 
