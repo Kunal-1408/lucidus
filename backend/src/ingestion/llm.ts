@@ -11,7 +11,9 @@ export interface LlmClient {
 export interface LlmRequest {
   // A Scholarship's cleaned text, already capped (see LLM_TEXT_LIMIT).
   text: string;
-  // The Profile fields the rules found no Criterion for.
+  // The Profile fields the rules found no Criterion for, and, beside a Class
+  // 12 result, the Test scores they read (asked again only for whether each
+  // stands in for the result).
   fields: string[];
   // Whether the rules found no Amount text, and no deadline.
   wantAmountText: boolean;
@@ -36,7 +38,13 @@ export interface CriterionReading {
   // ("11"), a percentage ("60") or a money figure ("Rs. 2.5 lakh").
   values: string[];
   quote: string;
+  // Only on a Test score the source accepts in place of a Class 12 result.
+  alternativeGroup?: typeof CLASS_12_GROUP;
 }
+
+// The Alternatives group a Test score offered in place of a Class 12 result
+// joins: the Class 12 result's own, so stored groups keep their name.
+export const CLASS_12_GROUP = 'class12Result';
 
 export interface Quoted {
   value: string;

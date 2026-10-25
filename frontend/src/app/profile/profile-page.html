@@ -324,16 +324,6 @@
       </label>
 
       <label>
-        State your school is in
-        <select (change)="setChoice('schoolState', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (s of states; track s.value) {
-            <option [value]="s.value" [selected]="schoolState() === s.value">{{ s.label }}</option>
-          }
-        </select>
-      </label>
-
-      <label>
         Do you belong to a religious or linguistic minority?
         <select (change)="setYesNo('minority', $any($event.target).value)">
           <option value="" [selected]="yesNo('minority') === ''">N.A</option>

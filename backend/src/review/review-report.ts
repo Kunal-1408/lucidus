@@ -1,5 +1,9 @@
 import type { Types } from 'mongoose';
-import type { Override } from '../overrides/override.schema.js';
+import {
+  isSkipped,
+  type Override,
+  type SkippedResult,
+} from '../overrides/override.schema.js';
 import {
   type ScholarshipKey,
   scholarshipKey,
@@ -32,14 +36,22 @@ export interface NoCriteriaEntry extends ReviewEntryBase {
   reason: 'no criteria';
 }
 
-// An Override for the current text that the last run skipped: a replacement
-// Criterion's sentence isn't on the page or its values aren't allowed.
-export interface InvalidOverrideEntry extends ReviewEntryBase {
-  reason: 'invalid override';
+// An Override for the current text that the last run skipped. Invalid: a
+// replacement Criterion's sentence isn't on the page or its values aren't
+// allowed. Lapsed: it names a field Criteria no longer check, or approved an
+// extraction read again since; it is kept, and the Scholarship is checked
+// again.
+export interface SkippedOverrideEntry extends ReviewEntryBase {
+  reason: 'invalid override' | 'override lapsed';
   overrideId: string;
   problems: string[];
   note: string;
 }
+
+const SKIPPED_REASONS: Record<SkippedResult, SkippedOverrideEntry['reason']> = {
+  invalid: 'invalid override',
+  lapsed: 'override lapsed',
+};
 
 // An Override written against text the page no longer has. It is kept but
 // no longer holds, so the Scholarship is checked again.
@@ -56,7 +68,7 @@ export interface PageChangedEntry extends ReviewEntryBase {
 export type ReviewEntry =
   | LowConfidenceEntry
   | NoCriteriaEntry
-  | InvalidOverrideEntry
+  | SkippedOverrideEntry
   | PageChangedEntry;
 
 export type StoredScholarship = Scholarship & { _id: Types.ObjectId };
@@ -115,10 +127,10 @@ function overrideEntry(
       newHash: scholarship.contentHash,
     };
   }
-  if (override.lastResult === 'invalid') {
+  if (isSkipped(override.lastResult)) {
     return {
       ...base,
-      reason: 'invalid override',
+      reason: SKIPPED_REASONS[override.lastResult],
       ...about,
       problems: override.problems ?? [],
     };

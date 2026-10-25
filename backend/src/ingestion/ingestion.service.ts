@@ -18,7 +18,12 @@ import {
 import type { ScholarshipKey } from '../scholarships/scholarship-key.js';
 import { UniversityPointersService } from '../universities/university-pointers.service.js';
 import { WatchlistEntry } from '../watchlist/watchlist-entry.schema.js';
-import { EXTRACTOR, type Extraction, type Extractor } from './extractor.js';
+import {
+  EXTRACTOR,
+  type Extraction,
+  type ExtractionOrigin,
+  type Extractor,
+} from './extractor.js';
 import { Fetcher } from './fetcher.js';
 import { withStructured } from './json-source.js';
 import { IngestionRun } from './ingestion-run.schema.js';
@@ -29,6 +34,15 @@ import {
   SourceOutcome,
   zeroCounts,
 } from './run-summary.js';
+
+// Raised when a release changes what extraction reads off unchanged text, so
+// the next run re-extracts every Scholarship stored under an older version
+// rather than keeping its stored extraction. 2: the old fields (latest
+// marks, Class 10 marks, domicile and school state) removed, with Result
+// scales, income abroad, Field of study groups, destinations and Test
+// scores read. 3: a Test score offered in place of a Class 12 result joins
+// its Alternatives group.
+export const EXTRACTION_VERSION = 3;
 
 export type StartResult =
   { started: true; runId: string } | { started: false; runId: string };
@@ -256,9 +270,10 @@ export class IngestionService implements OnApplicationBootstrap {
   }
 
   // Extracts and upserts one section's Scholarship. When its content hash
-  // shows the text is the same as last time, the stored extraction is used
-  // instead of reading the page again: that is what the Review report showed
-  // and what an Override added or removed since applies to or restores. The
+  // shows the text is the same as last time, and it was read by today's
+  // extraction (EXTRACTION_VERSION), the stored extraction is used instead
+  // of reading the page again: that is what the Review report showed and
+  // what an Override added or removed since applies to or restores. The
   // Scholarship's Override, if any, is checked against that extraction.
   private async upsertScholarship(
     entry: WatchlistEntry,
@@ -267,18 +282,24 @@ export class IngestionService implements OnApplicationBootstrap {
     const key: ScholarshipKey = { sourceUrl: entry.url, schemeName };
     const contentHash = sha256(text);
     const stored = await this.scholarships.findOne(key).lean();
-    const previous =
-      stored?.contentHash === contentHash
-        ? storedExtraction(stored)
-        : undefined;
+    const reuse = reusable(stored, contentHash);
     // A failed extraction throws before anything is written: a new
     // Scholarship isn't stored, a changed one keeps its previous version,
     // and with no new hash saved the next run tries again.
-    const extraction = previous ?? (await this.extract(text, structured));
+    const extraction =
+      reuse.origin === 'stored'
+        ? reuse.extraction
+        : await this.extract(text, structured);
     const override = await this.overrides.findOne(key).lean();
     const check =
       override &&
-      checkOverride(override, contentHash, text, extraction.criteria);
+      checkOverride(
+        override,
+        contentHash,
+        text,
+        extraction.criteria,
+        reuse.origin,
+      );
     const review = check?.result === 'applied' ? check.review : undefined;
 
     const { extraRequirements, amountText, deadline } = extraction;
@@ -303,6 +324,7 @@ export class IngestionService implements OnApplicationBootstrap {
       needsReview: !review && (confidence === 'low' || criteria.length === 0),
       criteria,
       extractedCriteria: extraction.criteria,
+      extractionVersion: EXTRACTION_VERSION,
       extraRequirements,
       ...(review && {
         reviewedBy: review.reviewedBy,
@@ -326,12 +348,12 @@ export class IngestionService implements OnApplicationBootstrap {
     if (override && check) {
       await this.overrides.updateOne(
         { _id: override._id },
-        check.result === 'invalid'
+        'problems' in check
           ? { lastResult: check.result, problems: check.problems }
           : { lastResult: check.result, $unset: { problems: 1 } },
       );
     }
-    return previous ? 'unchanged' : 'extracted';
+    return reuse.origin === 'stored' ? 'unchanged' : 'extracted';
   }
 
   // One LLM call per new or changed text. Structured JSON Criteria (high)
@@ -347,6 +369,24 @@ export class IngestionService implements OnApplicationBootstrap {
       criteria: withStructured(structured, extraction.criteria),
     };
   }
+}
+
+// Whether a section's stored extraction can be used again: only for the same
+// text, read by today's extraction (EXTRACTION_VERSION), and kept.
+function reusable(
+  stored: Scholarship | null,
+  contentHash: string,
+):
+  | { origin: 'stored'; extraction: Extraction }
+  | { origin: Exclude<ExtractionOrigin, 'stored'> } {
+  if (stored?.contentHash !== contentHash) return { origin: 'new text' };
+  const kept =
+    stored.extractionVersion === EXTRACTION_VERSION
+      ? storedExtraction(stored)
+      : undefined;
+  return kept
+    ? { origin: 'stored', extraction: kept }
+    : { origin: 'read again' };
 }
 
 // The extraction a Scholarship was stored with, if it was kept.

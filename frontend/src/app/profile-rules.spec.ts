@@ -75,10 +75,10 @@ describe('checkAnswer', () => {
 });
 
 describe('profileForMatch', () => {
-  it('falls back to the domicile state and drops contradictions', () => {
-    expect(
-      profileForMatch({ domicileState: 'bihar', gender: 'other', singleGirlChild: true }),
-    ).toEqual({ domicileState: 'bihar', schoolState: 'bihar', gender: 'other' });
+  it('drops contradictions', () => {
+    expect(profileForMatch({ gender: 'other', singleGirlChild: true })).toEqual({
+      gender: 'other',
+    });
   });
 
   it('drops answers a saved Profile kept from before a rule existed', () => {
@@ -166,10 +166,22 @@ describe('Board marks', () => {
     );
   });
 
-  it('drops latest exam marks from a saved Profile and keeps Class 10 marks as the Class 10 result', () => {
+  it('drops latest exam marks and the school state from a saved Profile and keeps Class 10 marks as the Class 10 result', () => {
     expect(
-      migrateSavedProfile({ class: 12, latestMarks: 85, class10Marks: 91, gender: 'female' }),
+      migrateSavedProfile({
+        class: 12,
+        latestMarks: 85,
+        class10Marks: 91,
+        schoolState: 'kerala',
+        gender: 'female',
+      }),
     ).toEqual({ class: 12, class10Result: percent(91), gender: 'female' });
+  });
+
+  it('keeps a Class 10 result already given over saved Class 10 marks', () => {
+    expect(migrateSavedProfile({ class10Marks: 91, class10Result: percent(70) })).toEqual({
+      class10Result: percent(70),
+    });
   });
 
   it('leaves a saved Profile with nothing to migrate as it is', () => {
@@ -415,15 +427,11 @@ describe('where the Student lives and their Citizenship', () => {
     ).toEqual({ citizenship: 'oci' });
   });
 
-  it('sends the Home state as the school state fallback for a Student in India', () => {
+  it('sends where the Student lives as given', () => {
     expect(profileForMatch({ countryOfResidence: 'IN', region: 'IN-KL' })).toEqual({
       countryOfResidence: 'IN',
       region: 'IN-KL',
-      schoolState: 'kerala',
     });
-  });
-
-  it('sends no school state fallback for a Student abroad, whose school is not in India', () => {
     expect(profileForMatch({ countryOfResidence: 'AE', homeState: 'goa' })).toEqual({
       countryOfResidence: 'AE',
       homeState: 'goa',
@@ -496,7 +504,7 @@ describe('family income', () => {
   });
 });
 
-describe('migrateSavedProfile: Home state', () => {
+describe('migrateSavedProfile: residence', () => {
   it('turns a saved domicile state into India and its region, so the same Home state', () => {
     expect(migrateSavedProfile({ domicileState: 'kerala', gender: 'female' })).toEqual({
       countryOfResidence: 'IN',
@@ -603,11 +611,14 @@ describe('migrateSavedProfile: field of study and destination', () => {
     expect(migrateSavedProfile({ destination: saved })).toEqual({ destination: code });
   });
 
-  it('drops a saved destination of other, which named no country', () => {
-    expect(migrateSavedProfile({ destination: 'other', gender: 'male' })).toEqual({
-      gender: 'male',
-    });
-  });
+  it.each(['other', 'atlantis'])(
+    'drops a saved destination of %s, which names no country',
+    (saved) => {
+      expect(migrateSavedProfile({ destination: saved, gender: 'male' })).toEqual({
+        gender: 'male',
+      });
+    },
+  );
 
   it('keeps a destination that is already a country code', () => {
     expect(migrateSavedProfile({ destination: 'SG' })).toEqual({ destination: 'SG' });

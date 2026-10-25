@@ -9,15 +9,16 @@ import {
 import {
   BOARD_MARKS_FIELDS,
   type BoardMarksField,
-  LEGACY_MARKS_FIELDS,
 } from '../scholarships/criterion-fields.js';
 import { INDIA } from './countries.js';
 import { CURRENCY_CODES } from './currencies.js';
 import { INCOME_BANDS } from './matcher.js';
 import {
   type BoardResult,
+  CLASSES,
   type IncomeAmount,
   isALevelGrades,
+  isInRange,
   NO_CLASS_10_EXAM_BOARDS,
   NO_CLASS_12_EXAM_BOARDS,
   type Profile,
@@ -30,7 +31,6 @@ import {
 export type ProfileParseResult =
   { ok: true; profile: Profile } | { ok: false; reasons: string[] };
 
-const CLASSES = [9, 10, 11, 12] as const;
 // Every answer the form takes as yes or no, boards upcoming included.
 const YES_NO_FIELDS = [
   'boardsUpcoming',
@@ -39,8 +39,6 @@ const YES_NO_FIELDS = [
   'singleGirlChild',
 ] as const;
 const ONE_OF_FIELDS = [
-  'domicileState',
-  'schoolState',
   'schoolType',
   'citizenship',
   'board',
@@ -76,9 +74,6 @@ export function parseProfile(body: unknown): ProfileParseResult {
     } else {
       reasons.push(`class must be one of ${CLASSES.join(', ')}`);
     }
-  }
-  for (const field of LEGACY_MARKS_FIELDS) {
-    if (field in raw) keep(field, numberBetween(raw, field, 0, 100, reasons));
   }
   for (const field of YES_NO_FIELDS) {
     if (field in raw) keep(field, yesNo(raw, field, reasons));
@@ -118,8 +113,7 @@ export function parseProfile(body: unknown): ProfileParseResult {
 }
 
 // Answers the rest of the Profile rules out, as the form clears them:
-// single girl child only for a female Student, a stream only from Class 11,
-// Class 10 board marks not in Class 9.
+// single girl child only for a female Student, a stream only from Class 11.
 function contradictions(raw: Record<string, unknown>): string[] {
   const reasons: string[] = [];
   if ('singleGirlChild' in raw && raw.gender !== 'female') {
@@ -127,9 +121,6 @@ function contradictions(raw: Record<string, unknown>): string[] {
   }
   if ('stream' in raw && (raw.class === 9 || raw.class === 10)) {
     reasons.push('stream is only asked from Class 11');
-  }
-  if ('class10Marks' in raw && raw.class === 9) {
-    reasons.push('class10Marks is not asked in Class 9');
   }
   return reasons;
 }
@@ -236,8 +227,7 @@ function boardResult(
   if (scale === 'ib_points') {
     const [min, max] = RESULT_SCALE_RANGES.ib_points;
     const points = answer.value;
-    const whole = typeof points === 'number' && Number.isInteger(points);
-    if (whole && points >= min && points <= max)
+    if (isInRange(points, [min, max]) && Number.isInteger(points))
       return { scale, value: points };
     reasons.push(`${label} must be a whole number from ${min} to ${max}`);
     return undefined;

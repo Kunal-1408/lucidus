@@ -59,7 +59,13 @@ describe('The demo Watchlist', () => {
 
   it('seeds only entries the admin endpoint accepts', async () => {
     const entries = await watchlist();
-    expect(entries).toHaveLength(16);
+    expect(entries).toHaveLength(27);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        name: 'Loran Award',
+        scholarshipType: 'foundation',
+      }),
+    );
     for (const { id, lastResult: _, ...entry } of entries) {
       await harness
         .http()

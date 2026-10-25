@@ -121,11 +121,6 @@ describe('Where the Student lives and their Citizenship, through the Match endpo
       { countryOfResidence: 'AE' },
       'tellUsMore',
     ],
-    [
-      'an old Profile with a domicile state',
-      { domicileState: 'kerala' },
-      'eligible',
-    ],
   ])('a Home state: %s', async (_, profile, bucket) => {
     expect(await bucketOf(profile, 'Example Kerala Students Scholarship')).toBe(
       bucket,

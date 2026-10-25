@@ -1,5 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import {
+  PROVIDER_TYPES,
+  type ProviderType,
+} from '../watchlist/watchlist-entry.schema.js';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
@@ -25,12 +29,21 @@ export class Criterion {
   @Prop({ type: String, required: true, enum: ['high', 'medium', 'low'] })
   confidence: ConfidenceLevel;
 
-  // Criteria sharing an alternatives group are alternatives ("IB 36 or AAA
-  // at A-level"): the group passes when any member passes, fails when every
-  // member that can be judged fails and none is unknown, and is otherwise
-  // unknown. Absent on a Criterion that stands alone.
+  // Criteria sharing an alternatives group are alternatives, on any fields
+  // ("IB 36, AAA at A-level or SAT ≥ 1450"): the group passes when any member
+  // passes, fails when every member that can be judged fails and none is
+  // unknown, and is otherwise unknown. The value is only a name. Absent on a
+  // Criterion that stands alone.
   @Prop()
   alternativeGroup?: string;
+}
+
+// The alternativeGroup to spread into a Criterion: the group, or nothing for
+// one that stands alone (so no empty key is stored).
+export function memberOf(
+  alternativeGroup: string | undefined,
+): Pick<Criterion, 'alternativeGroup'> {
+  return alternativeGroup ? { alternativeGroup } : {};
 }
 
 // Mirrored in frontend/src/app/api.ts.
@@ -53,12 +66,8 @@ export class Scholarship {
   @Prop({ required: true })
   provider: string;
 
-  @Prop({
-    type: String,
-    required: true,
-    enum: ['government', 'corporate', 'university'],
-  })
-  type: 'government' | 'corporate' | 'university';
+  @Prop({ type: String, required: true, enum: PROVIDER_TYPES })
+  type: ProviderType;
 
   @Prop({ required: true })
   amountText: string;
@@ -108,6 +117,12 @@ export class Scholarship {
   // on records stored before it was kept; those are read again once.
   @Prop({ type: [Criterion], default: undefined })
   extractedCriteria?: Criterion[];
+
+  // The extraction rules the stored extraction was read with
+  // (EXTRACTION_VERSION in ingestion/ingestion.service.ts). Absent on records
+  // read before it was kept.
+  @Prop()
+  extractionVersion?: number;
 
   @Prop({ type: [ExtraRequirement], default: [] })
   extraRequirements: ExtraRequirement[];

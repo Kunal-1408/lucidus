@@ -24,8 +24,8 @@ describe('Match request Profile validation', () => {
   it('still matches a valid Profile with every field answered', async () => {
     const res = await matchWith({
       class: 12,
-      domicileState: 'kerala',
-      schoolState: 'kerala',
+      countryOfResidence: 'IN',
+      region: 'IN-KL',
       schoolType: 'government',
       citizenship: 'indian',
       board: 'state',
@@ -53,22 +53,20 @@ describe('Match request Profile validation', () => {
     await matchWith({}).expect(200);
   });
 
+  it('ignores the fields Board marks and Home state replaced', async () => {
+    const girl = { gender: 'female', class: 12 };
+    const res = await matchWith({
+      ...girl,
+      latestMarks: 105,
+      class10Marks: 'ninety',
+      domicileState: 'atlantis',
+      schoolState: 'kerala',
+    }).expect(200);
+    const plain = await matchWith(girl).expect(200);
+    expect(res.body).toEqual(plain.body);
+  });
+
   it.each([
-    [
-      'a mark over 100',
-      { class10Marks: 105 },
-      'class10Marks must be from 0 to 100',
-    ],
-    [
-      'a negative mark',
-      { latestMarks: -1 },
-      'latestMarks must be from 0 to 100',
-    ],
-    [
-      'a mark that is not a number',
-      { latestMarks: '90' },
-      'latestMarks must be from 0 to 100',
-    ],
     [
       'a class outside 9 to 12',
       { class: 8 },
@@ -78,11 +76,6 @@ describe('Match request Profile validation', () => {
       'an unknown gender',
       { gender: 'unknown' },
       'gender must be one of female, male, other',
-    ],
-    [
-      'an unknown state',
-      { domicileState: 'atlantis' },
-      expect.stringMatching(/^domicileState must be one of andhra_pradesh, /),
     ],
     [
       'an unknown income band',
@@ -108,11 +101,6 @@ describe('Match request Profile validation', () => {
       'a stream before Class 11',
       { class: 10, stream: 'science' },
       'stream is only asked from Class 11',
-    ],
-    [
-      'Class 10 marks in Class 9',
-      { class: 9, class10Marks: 80 },
-      'class10Marks is not asked in Class 9',
     ],
     // Board marks: a result on its scale's range, only where the grid asks it.
     [
@@ -166,7 +154,7 @@ describe('Match request Profile validation', () => {
 
   it('lists every bad field at once', async () => {
     const res = await matchWith({
-      class10Marks: 101,
+      class: 8,
       gender: 'robot',
     }).expect(400);
     expect(res.body.message).toHaveLength(2);

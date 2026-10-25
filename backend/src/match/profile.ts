@@ -151,6 +151,14 @@ export const RESULT_SCALE_RANGES: Record<
   ib_points: [0, 45],
 };
 
+// Whether a value is a number inside a range, both ends included.
+export function isInRange(
+  value: unknown,
+  [min, max]: readonly [min: number, max: number],
+): value is number {
+  return typeof value === 'number' && value >= min && value <= max;
+}
+
 // The Profile fields holding a Test score, kept apart from Board marks
 // (frontend copy: TestScoreField in frontend/src/app/profile-rules.ts).
 export type TestScoreField = 'atar' | 'sat';
@@ -165,6 +173,10 @@ export const TEST_SCORE_RANGES: Record<
   atar: [0, 99.95],
   sat: [400, 1600],
 };
+
+export function isTestScoreField(field: string): field is TestScoreField {
+  return Object.keys(TEST_SCORE_RANGES).includes(field);
+}
 
 // Board narrowing (frontend copies of the same names in
 // frontend/src/app/profile-rules.ts): Cambridge/UK, IB and US high school
@@ -187,7 +199,8 @@ export interface IncomeAmount {
 
 // How often an income limit is counted. A monthly limit is compared as
 // twelve months.
-export type IncomePeriod = 'monthly' | 'yearly';
+export const INCOME_PERIODS = ['monthly', 'yearly'] as const;
+export type IncomePeriod = (typeof INCOME_PERIODS)[number];
 
 // An income limit on a Criterion: at most this amount, in this currency,
 // per this period.
@@ -212,8 +225,11 @@ export type FieldOfStudyGroup =
   | 'education'
   | 'other';
 
+// The classes a Student can be in.
+export const CLASSES = [9, 10, 11, 12] as const;
+
 export interface Profile {
-  class?: 9 | 10 | 11 | 12;
+  class?: (typeof CLASSES)[number];
   // Where the Student lives and who they are: an ISO 3166-1 alpha-2 country
   // and an ISO 3166-2 region of it (countries.ts); Home state and Residence
   // status only abroad (in India the region is the Home state); a
@@ -223,10 +239,6 @@ export interface Profile {
   homeState?: IndianState;
   residenceStatus?: ResidenceStatus;
   citizenshipCountry?: string;
-  // Replaced by country of residence, region and Home state; kept until the
-  // old fields are removed.
-  domicileState?: IndianState;
-  schoolState?: IndianState;
   schoolType?: 'government' | 'aided' | 'private';
   citizenship?: Citizenship;
   board?:
@@ -237,9 +249,6 @@ export interface Profile {
     | 'ib'
     | 'us_high_school'
     | 'other';
-  // Readable until ticket 09 removes them: the form no longer sends them.
-  class10Marks?: number;
-  latestMarks?: number;
   boardsUpcoming?: boolean;
   class10Result?: BoardResult;
   class12Result?: BoardResult;

@@ -12,9 +12,34 @@ See spec: "Criteria and matching"; glossary terms Alternatives group and Test sc
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-triage
+**Status:** ready-for-agent
 
-- [ ] The spec owner picks an option and the spec (and glossary, if groups span fields) is updated to match
-- [ ] If groups span fields: extraction rules, LLM guide, extractor grouping, Overrides and the Matcher built test-first; e2e over a fixture with "A-levels AAA, IB 39, or SAT ≥ 1450" that is Eligible for an A-level Student, an IB Student and a SAT Student
-- [ ] New rules reach stored Scholarships through ticket 09's re-extraction, or the gap is named
-- [ ] `npm run check` passes
+- [x] The spec owner picks an option and the spec (and glossary, if groups span fields) is updated to match
+- [x] If groups span fields: extraction rules, LLM guide, extractor grouping, Overrides and the Matcher built test-first; e2e over a fixture with "A-levels AAA, IB 39, or SAT ≥ 1450" that is Eligible for an A-level Student, an IB Student and a SAT Student
+- [x] New rules reach stored Scholarships through ticket 09's re-extraction, or the gap is named
+- [x] `npm run check` passes
+
+## Comments
+
+**2026-10-25 (spec owner):** groups across fields. Goal and missing-field label: first member with a Goal, as today.
+
+**2026-10-25 (agent):** built on `feat/abroad-12-cross-field-alternatives` from `integrate/abroad-wave-3` (73eec54). `npm run check` green (backend 610 tests, 1 skipped; frontend 112).
+
+- Group key: free name. Extraction names a Test score + Class 12 result group `class12Result` (same as stored per-scale groups, so nothing renamed). Overrides: any name.
+- Extractor (`withTestScoresInPlaceOfResults`, extractor.ts), run on rules output and on rules + LLM merged: an ATAR/SAT joins the Class 12 result's group when (a) Class 12 result on 2+ scales (per-qualification list), (b) same sentence as the result with "or SAT/ATAR", or (c) LLM gave `alternativeGroup: "class12Result"`. All Class 12 result Criteria join with it. No Class 12 result → score stands alone, LLM's group dropped. GPA + SAT in separate sentences: both required (US pattern). "80% in Class 12 or equivalent and an ATAR": not grouped.
+- LLM: `CriterionReading.alternativeGroup?`; schema adds optional `alternativeGroup` enum `["class12Result"]`; SYSTEM gains an Alternatives rule. Not run against real Haiku (real test skipped).
+- Overrides: `ReplacementCriterion.alternativeGroup?` (text if given, `criteria[i].alternativeGroup must be a string`); `checkOverride` carries it on replace, and approve now keeps extracted groups (it dropped them before).
+- Matcher: unchanged. Unit tests pin pass via SAT and the failing group's Goal from the first member with one (IB, SAT has none). Missing fields name every unknown member ("Class 12 result in A-level grades", "SAT score").
+- e2e `backend/test/cross-field-alternatives.e2e-spec.ts`: `scales/a-level-ib-or-sat.html` ("Applicants need A-levels AAA, IB 39 points, or SAT ≥ 1450"; the rules need "points" to read IB) Eligible for A-level, IB, SAT Students; approve keeps the group; `scales/gpa-or-sat.html` grouped by a replace Override.
+- Stored data: `EXTRACTION_VERSION` 3, so the next run re-extracts every Scholarship; approve Overrides on them lapse (09 rule).
+- Known gap: per-scale list + a SAT asked *as well* ("IB 36 or AAA; all applicants also need SAT 1400") is grouped wrongly by (a). Low risk; a replace Override fixes it.
+
+**2026-10-25 (agent, review fixes):** on `fix/abroad-12-review` from `integrate/abroad-wave-3` (3958b2f).
+
+- (c) now fires when the rules read the score: beside a Class 12 result, rules-read ATAR/SAT also go in `LlmRequest.fields`; the LLM's `alternativeGroup` decides grouping, rules' value kept. Same single LLM call per extraction (count unchanged; field list +1–2). e2e: `scales/gpa-or-sat-read-by-llm.html` Eligible for SAT and GPA Students, no Override.
+- (a) skips a score whose sentence says "also" / "as well" / "in addition" / "all applicants". e2e `scales/ib-or-a-level-and-sat.html`: SAT stands alone. Residual gap (other wording) named in the spec bullet.
+- Refactors: `CLASS_12_GROUP` in llm.ts (schema enum, `CriterionReading.alternativeGroup` narrowed); `isTestScoreField` in match/profile.ts; `memberOf` helper (scholarship.schema.ts) for the group spread; `inGroup` rest-spread; LLM grouping decided once (`groupedByLlm` set passed to `withTestScoresInPlaceOfResults`; `alternatives()` no longer groups Test scores); renames `class12Results` / `testScoresInPlace` / `groupApplies`; matcher.spec group named `class12Result`.
+- Not done: e2e `hashOf` via the Saved endpoint. `SavedCard` doesn't expose `contentHash` (only stored), and no public endpoint returns a hash for a Scholarship outside the Review report; left reading the store.
+- `EXTRACTION_VERSION` stays 3 (nothing deployed since).
+
+**2026-10-25 (agent):** Merged into `integrate/abroad-wave-3` (3958b2f), review fixes (dafe5e5). Every box met; `npm run check` passes (backend 618, 1 skipped; frontend 122). Before deploy: `REAL_LLM=1 npx vitest run anthropic-llm` once (new optional `alternativeGroup` in the LLM schema). Status stays until merged to main + deploy + smoke check; then `Status: done`.

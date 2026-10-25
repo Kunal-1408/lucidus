@@ -35,6 +35,8 @@ describe('Overrides', () => {
       fixtures: { [ENGINEERING]: 'llm/engineering-girls.html' },
       watchlist: [ENGINEERING_ENTRY],
       now: DAY_1,
+      // Not the repo file: its Overrides are for real sources.
+      overridesFile: 'overrides/empty.json',
       llm: () => ({
         criteria: [
           {
@@ -148,11 +150,11 @@ describe('Overrides', () => {
         'note is required',
         'reviewedBy is required',
         'criteria[0].field must be one of ' +
-          'class, class10Result, class12Result, class10Marks, latestMarks, ' +
+          'class, class10Result, class12Result, ' +
           'atar, sat, incomeBand, incomeAmount, gender, category, ' +
           'minority, disability, singleGirlChild, citizenship, ' +
           'countryOfResidence, region, homeState, residenceStatus, ' +
-          'citizenshipCountry, domicileState, schoolState, schoolType, ' +
+          'citizenshipCountry, schoolType, ' +
           'board, stream, ' +
           'fieldOfStudy, destination, destinationIsResidence, parentOccupation, examsQualified',
         'criteria[0].values must be a non-empty list of strings or numbers',
@@ -402,7 +404,7 @@ describe('Overrides', () => {
   });
 
   describe('seeding', () => {
-    it('starts empty from the repo file', async () => {
+    it('starts empty from an empty file', async () => {
       expect(await admin.list()).toEqual([]);
     });
 
@@ -429,6 +431,91 @@ describe('Overrides', () => {
 
       await harness.restart();
       expect(await admin.list()).toEqual([seeded]);
+    });
+  });
+
+  describe('after the old fields were removed', () => {
+    const lapsedEntry = (
+      contentHash: string,
+      overrideId: string,
+      note: string,
+      problems: string[],
+    ) => ({
+      reason: 'override lapsed',
+      id: expect.any(String),
+      name: ENGINEERING_NAME,
+      sourceUrl: ENGINEERING,
+      schemeName: ENGINEERING_NAME,
+      officialUrl: ENGINEERING,
+      contentHash,
+      overrideId,
+      problems,
+      note,
+    });
+
+    it('lapses a replacing Override that names a removed field, and reports it', async () => {
+      await harness.ingest();
+      const contentHash = await currentHash();
+      // Written before the field was removed; the endpoint no longer takes it.
+      const written = replace(contentHash, [
+        { field: 'gender', values: ['female'], sourceText: GIRLS_SENTENCE },
+        { field: 'domicileState', values: ['kerala'], sourceText: ON_PAGE },
+      ]);
+      const stored = await harness
+        .model('Override')
+        .create({ ...written, reviewedAt: DAY_1 });
+
+      const summary = await harness.ingest();
+
+      const problems = ['domicileState: field removed'];
+      expect(summary.counts.failed).toBe(0);
+      expect(await eligibleFor(ENGINEERING_GIRL)).toEqual([]);
+      expect(await overrideResult()).toEqual({
+        lastResult: 'lapsed',
+        problems,
+      });
+      expect(await report()).toEqual([
+        expect.objectContaining({ reason: 'low confidence' }),
+        lapsedEntry(contentHash, String(stored._id), written.note, problems),
+      ]);
+    });
+
+    it('lapses an approving Override once the extraction it approved is read again, and keeps it lapsed', async () => {
+      await harness.ingest();
+      const contentHash = await currentHash();
+      const added = await admin.post(approve(contentHash)).expect(201);
+      await harness.ingest();
+      expect(await eligibleFor(ENGINEERING_GIRL)).toHaveLength(1);
+
+      // Stored by an extraction from before the fields were removed.
+      await harness
+        .model('Scholarship')
+        .updateOne(
+          { schemeName: ENGINEERING_NAME },
+          { $unset: { extractionVersion: 1 } },
+        );
+      const summary = await harness.ingest();
+
+      const problems = ['extraction read again since the review'];
+      expect(summary.counts).toMatchObject({ extracted: 1, failed: 0 });
+      expect(await eligibleFor(ENGINEERING_GIRL)).toEqual([]);
+      const entry = lapsedEntry(
+        contentHash,
+        added.body.id as string,
+        approve(contentHash).note,
+        problems,
+      );
+      expect(await report()).toEqual([
+        expect.objectContaining({ reason: 'low confidence' }),
+        entry,
+      ]);
+
+      await harness.ingest();
+      expect(await eligibleFor(ENGINEERING_GIRL)).toEqual([]);
+      expect(await overrideResult()).toEqual({
+        lastResult: 'lapsed',
+        problems,
+      });
     });
   });
 

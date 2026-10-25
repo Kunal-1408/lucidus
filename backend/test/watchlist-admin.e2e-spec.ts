@@ -272,7 +272,7 @@ describe('Watchlist admin endpoints', () => {
       [
         'an unknown scholarship type',
         { ...GIRLS_ENTRY, scholarshipType: 'private' },
-        'scholarshipType must be one of government, corporate, university',
+        'scholarshipType must be one of government, corporate, university, foundation',
       ],
       [
         'a missing official URL',
@@ -370,6 +370,16 @@ describe('Watchlist admin endpoints', () => {
         url: 'https://example.org/many',
         holds: 'many',
         split: { splitSelector: 'h2' },
+      };
+      const res = await add(body).expect(201);
+      expect(res.body).toEqual({ id: expect.any(String), ...body });
+    });
+
+    it('accepts a foundation as the provider type', async () => {
+      const body = {
+        ...GIRLS_ENTRY,
+        url: 'https://example.org/foundation',
+        scholarshipType: 'foundation',
       };
       const res = await add(body).expect(201);
       expect(res.body).toEqual({ id: expect.any(String), ...body });

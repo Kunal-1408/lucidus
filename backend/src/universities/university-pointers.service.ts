@@ -3,10 +3,10 @@ import { join } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { legacyDestinationCode } from '../ingestion/normalise.js';
 import { UniversityPointer } from './university-pointer.schema.js';
 import {
   POINTER_COUNTRIES,
+  POINTER_COUNTRY_CODES,
   type PointerCountry,
   WORQNOW,
   type WorqNowClient,
@@ -122,7 +122,7 @@ export class UniversityPointersService {
     destination: unknown,
   ): Promise<UniversityPointerGroup[]> {
     const country = POINTER_COUNTRIES.find(
-      (c) => legacyDestinationCode(c) === destination,
+      (c) => POINTER_COUNTRY_CODES[c] === destination,
     );
     if (!country) return [];
     const found = await this.pointers.find({ country }).lean();

@@ -183,7 +183,6 @@ describe('Normalisation onto the fixed lists', () => {
     ['Applicants must be domiciled in Orissa.', ['odisha']],
   ])('reads the states in "%s" as the Home state', (text, slugs) => {
     expect(criterion(text, 'homeState')?.value).toEqual(slugs);
-    expect(criterion(text, 'domicileState')).toBeUndefined();
   });
 
   it('reads no disability Criterion from a seat reservation', () => {
@@ -307,6 +306,89 @@ describe('Normalisation onto the fixed lists', () => {
     ['A SAT score of 1700 is required.', 'sat'],
   ])('reads no test score from "%s"', (text, field) => {
     expect(criterion(text, field)).toBeUndefined();
+  });
+
+  it('groups a SAT score offered beside results on several Result scales with them', () => {
+    const text = [
+      'Entry requirements:',
+      'A-levels: AAA',
+      'IB Diploma: 39 points',
+      'American: SAT score ≥ 1450',
+    ].join('\n');
+    const grouped = extractByRules(text).criteria.map(
+      ({ field, value, alternativeGroup }) => ({
+        field,
+        value,
+        alternativeGroup,
+      }),
+    );
+    expect(grouped).toEqual([
+      {
+        field: 'class12Result',
+        value: { scale: 'ib_points', value: 39 },
+        alternativeGroup: 'class12Result',
+      },
+      {
+        field: 'class12Result',
+        value: { scale: 'a_level', value: ['A', 'A', 'A'] },
+        alternativeGroup: 'class12Result',
+      },
+      { field: 'sat', value: 1450, alternativeGroup: 'class12Result' },
+    ]);
+  });
+
+  it('groups a test score the sentence offers in place of a Class 12 result', () => {
+    const text = 'Applicants need AAA at A-level or an ATAR of 98.';
+    expect(
+      extractByRules(text).criteria.map((c) => [c.field, c.alternativeGroup]),
+    ).toEqual([
+      ['class12Result', 'class12Result'],
+      ['atar', 'class12Result'],
+    ]);
+  });
+
+  it.each([
+    'All applicants also need a SAT score of at least 1400.',
+    'A SAT score of at least 1400 is required as well.',
+    'In addition, a SAT score of at least 1400 is required.',
+  ])(
+    'keeps a test score asked as well as results on several Result scales standing alone: %s',
+    (asWell) => {
+      const text = `Applicants need IB 36 points or A-levels AAA.\n${asWell}`;
+      expect(
+        extractByRules(text)
+          .criteria.filter((c) => c.field !== 'class')
+          .map((c) => [c.field, c.alternativeGroup]),
+      ).toEqual([
+        ['class12Result', 'class12Result'],
+        ['class12Result', 'class12Result'],
+        ['sat', undefined],
+      ]);
+    },
+  );
+
+  it.each([
+    [
+      'a GPA and a SAT score, both asked',
+      'Applicants need a minimum GPA of 3.5.\nApplicants need a minimum SAT score of 1,400.',
+      ['class12Result', 'sat'],
+    ],
+    [
+      'a percentage "or equivalent" beside an ATAR',
+      'Students must have scored 80% marks in Class 12 or equivalent and an ATAR of 90.',
+      ['class12Result', 'atar'],
+    ],
+    [
+      'a SAT score with no Class 12 result',
+      'A minimum SAT score of 1,300.',
+      ['sat'],
+    ],
+  ])('keeps a test score standing alone: %s', (_, text, fields) => {
+    expect(
+      extractByRules(text)
+        .criteria.filter((c) => c.field !== 'class')
+        .map((c) => [c.field, c.alternativeGroup]),
+    ).toEqual(fields.map((field) => [field, undefined]));
   });
 
   it('still reads a scholarship reserved for students with disabilities', () => {

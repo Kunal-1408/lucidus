@@ -2,8 +2,25 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 export const OVERRIDE_ACTIONS = ['approve', 'replace'] as const;
 export type OverrideAction = (typeof OVERRIDE_ACTIONS)[number];
-export const OVERRIDE_RESULTS = ['applied', 'invalid', 'page changed'] as const;
+// Lapsed: it names a field Criteria no longer check, or approves an
+// extraction read again since; it stays lapsed until a reviewer replaces it.
+export const OVERRIDE_RESULTS = [
+  'applied',
+  'invalid',
+  'page changed',
+  'lapsed',
+] as const;
 export type OverrideResult = (typeof OVERRIDE_RESULTS)[number];
+
+// The results that skip an Override for the current text, each recorded with
+// its problems: invalid (fixable by a corrected Override) or lapsed.
+export type SkippedResult = Extract<OverrideResult, 'invalid' | 'lapsed'>;
+
+export function isSkipped(
+  result: OverrideResult | undefined,
+): result is SkippedResult {
+  return result === 'invalid' || result === 'lapsed';
+}
 
 // A corrected Criterion as the reviewer writes it: the field, its raw
 // value(s) as the fixed lists name them (as the LLM gives them), and the
@@ -18,6 +35,11 @@ export class ReplacementCriterion {
 
   @Prop({ required: true })
   sourceText: string;
+
+  // Replacement Criteria sharing a name are an Alternatives group, on any
+  // fields ("3.5 GPA" or a SAT score of 1400).
+  @Prop()
+  alternativeGroup?: string;
 }
 
 // A person's fix for one Scholarship, holding only for the page text (the
@@ -56,7 +78,7 @@ export class Override {
   @Prop({ type: String, enum: OVERRIDE_RESULTS })
   lastResult?: OverrideResult;
 
-  // Why it was skipped, when invalid.
+  // Why it was skipped, when invalid or lapsed.
   @Prop({ type: [String], default: undefined })
   problems?: string[];
 }

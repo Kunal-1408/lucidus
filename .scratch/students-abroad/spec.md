@@ -114,7 +114,7 @@ The Watchlist grows with sources for Students abroad (SPDC first, then the Gulf,
 62. As a Class 12 Student with an expected result just below a threshold, I want to see the scholarship as Within reach with a Goal, so that I know what to aim for.
 63. As a Student, I want marks rules for years I am not asked about (Class 7 or 8 marks, GCSE grades, weighted GPA, AP, Quebec's R score) shown as Extra requirements, so that I still see them without being wrongly matched.
 64. As a Student whose Residence status a scholarship checks, I want to be judged on it, so that awards for permanent residents or citizens of my country sort me correctly.
-65. As an Indian Student, I want my results for the existing scholarships unchanged by this work, so that nothing I relied on breaks.
+65. As an Indian Student, I want my results for the existing scholarships unchanged by this work, so that nothing I relied on breaks. One exception, by story 20: a Class 10 Student whose boards are upcoming gives no Class 10 result, so a Class 10 marks Criterion that once gave them a Within reach Goal now asks them in Tell us more.
 
 ### Validation at the backend
 
@@ -187,6 +187,7 @@ Other conditional questions: region needs a country; Residence status and Home s
 - New Criterion fields: country of residence (`in`), Residence status (`in`), Citizenship (`in`, now over `indian` / `oci` / `other`), Citizenship country (`in`), Home state (`in`, replacing `domicileState`), region (`in`), Class 10 result and Class 12 result (`gte`, changeable, carrying a scale), ATAR (`gte`, changeable), SAT (`gte`, changeable), income amount (`lte`, not changeable, carrying currency and period), Field of study group (`in`), destination (`in`, ISO codes), and a destination-is-residence check for home vs international awards.
 - A Criterion on a different scale than the Student's answer, or a different currency, is **unknown**, and its missing-field label names the result that would settle it. Nothing is converted, except a monthly income limit, which is compared as twelve times the month.
 - A scholarship accepting alternatives on several scales stores one Criterion per scale, grouped as alternatives; the group passes when any member passes, fails when all members that can be judged fail and none is unknown, and is unknown otherwise.
+- An Alternatives group may span fields: a Test score accepted in place of a Class 12 result ("A-levels AAA, IB 39 points, or SAT ≥ 1450") joins the result's group. Extraction groups them when the page lists the result on several scales and the score's sentence doesn't ask it as well ("also", "as well", "in addition", "all applicants"), when the result's sentence offers the score with an "or", or when the LLM says the score stands in for the result (the LLM is asked this even about a score the rules read, whose value the rules keep); otherwise the score stands alone (a GPA and a SAT score both asked). Known gap: on a page listing the result on several scales, a score asked as well in other words ("A SAT score of 1400 is required") is still grouped; a replace Override fixes it. A failing group takes the Goal of its first member that has one; a group left unknown names every unknown member in its missing fields. An Override may group any of its Criteria.
 - Within reach marks Goals keep today's rules (boards upcoming, gap of at most 5 on percentage); on other scales a Goal is offered only for percentage and IB points (gap of at most 2 points), never for grades or GPA.
 - Rupee income bands and their matching, categories, class-up and UG Goals, the two-Goal cap and deadline handling are unchanged.
 - The `region` on a Scholarship keeps meaning where the study happens. Where the Student must live is a Criterion on country of residence.
@@ -218,6 +219,8 @@ Other conditional questions: region needs a country; Residence status and Home s
 - Scholarships whose eligibility hinges only on admission to a named university (those stay University pointers).
 - Weighted GPA, AP, Quebec's R score and other scales beyond those listed, except as Extra requirements.
 - A school-state answer separate from where the Student lives.
+- An expected Class 10 result (pre-boards or predicted) while boards are upcoming (ticket 11).
+- A negative Criterion operator ("not living in India"); "for NRIs" checks Citizenship only, and a Student in India without a destination sees such a scholarship in Tell us more.
 - Any account or server-side storage of the Profile.
 - Sources the research could not verify on an official page (Saudi Arabia, Kuwait, Oman, Hamdan award, Oxford Crankstart, NUS) until an official page is found.
 

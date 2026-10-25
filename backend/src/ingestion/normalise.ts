@@ -5,9 +5,11 @@ import { CURRENCY_CODES, RUPEES } from '../match/currencies.js';
 import {
   type ALevelGrade,
   type BoardResult,
+  CLASSES,
   type IncomeLimit,
   type IncomePeriod,
   type IndianState,
+  isInRange,
   type Profile,
   RESULT_SCALE_RANGES,
   type ResultScale,
@@ -18,7 +20,6 @@ import {
 import {
   type BoardMarksField,
   isBoardMarksField,
-  isLegacyMarksField,
 } from '../scholarships/criterion-fields.js';
 
 const LAKH = 100_000;
@@ -30,7 +31,6 @@ export const MONEY =
   /(?:₹|\bRs\.?|\bINR)\s*([\d,]+(?:\.\d+)?)(?:\s*\/-)?(?:\s*(lakhs?|lacs?|crores?)\b)?|\b(\d+(?:\.\d+)?)\s*(lakhs?|lacs?|crores?)\b/i;
 
 const ROMAN_CLASS: Record<string, number> = { ix: 9, x: 10, xi: 11, xii: 12 };
-const CLASSES = [9, 10, 11, 12];
 
 // "IX", "10th", "Class 12" → 9, 10, 12; anything outside Class 9–12 is
 // dropped.
@@ -41,7 +41,7 @@ export function toClass(label: string): number | undefined {
     .replace(/(?:st|nd|rd|th)$/, '')
     .trim();
   const level = ROMAN_CLASS[bare] ?? Number(bare);
-  return CLASSES.includes(level) ? level : undefined;
+  return (CLASSES as readonly number[]).includes(level) ? level : undefined;
 }
 
 const asList = (raw: string | string[]) => (Array.isArray(raw) ? raw : [raw]);
@@ -135,8 +135,6 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
   homeState: STATES,
   residenceStatus: ['citizen', 'permanent_resident', 'visa'],
   citizenshipCountry: COUNTRY_CODES,
-  domicileState: STATES,
-  schoolState: STATES,
   schoolType: ['government', 'aided', 'private'],
   citizenship: ['indian', 'oci', 'other'],
   board: [
@@ -183,7 +181,7 @@ type ArrayElement<T> = T extends readonly (infer E)[] ? E : never;
 
 // Criterion fields a source states as yes or no. Boards upcoming is a yes /
 // no answer too, but never a Criterion.
-const YES_NO_CRITERION_FIELDS = [
+export const YES_NO_CRITERION_FIELDS = [
   'minority',
   'disability',
   'singleGirlChild',
@@ -196,28 +194,6 @@ const ISO_CODE_FIELDS = [
   'citizenshipCountry',
   'destination',
 ];
-
-// The destinations a Profile or Criterion named before they became ISO
-// codes, with the code each now is ("other" named no country). Stored
-// Criteria and Overrides may still hold them until ticket 09 re-extracts;
-// University pointers are still stored under them (frontend copy:
-// LEGACY_DESTINATIONS in frontend/src/app/profile-rules.ts).
-export const LEGACY_DESTINATIONS: Record<string, string> = {
-  india: 'IN',
-  uk: 'GB',
-  usa: 'US',
-  canada: 'CA',
-  australia: 'AU',
-  germany: 'DE',
-};
-
-// The ISO code an old destination name now is, or undefined for any other
-// value.
-export function legacyDestinationCode(value: unknown): string | undefined {
-  return typeof value === 'string' && Object.hasOwn(LEGACY_DESTINATIONS, value)
-    ? LEGACY_DESTINATIONS[value]
-    : undefined;
-}
 
 // The value a Criterion stores for a raw value a rule found, or undefined
 // when it falls outside the field's fixed list (the Criterion is dropped).
@@ -250,9 +226,6 @@ export function normaliseValue(
     ].sort((a, b) => a - b);
     return levels.length ? levels : undefined;
   }
-  if (isLegacyMarksField(field)) {
-    return toPercent(raw);
-  }
   if (isBoardMarksField(field)) {
     return toBoardResult(field, raw);
   }
@@ -260,7 +233,7 @@ export function normaliseValue(
     return toTestScore(field, raw);
   }
   if (ISO_CODE_FIELDS.includes(field)) {
-    const codes = asList(raw).map((code) => isoCode(field, code));
+    const codes = asList(raw).map((code) => code.trim().toUpperCase());
     return oneOf(codes, FIXED_LISTS[field], op);
   }
   if (YES_NO_CRITERION_FIELDS.includes(field)) {
@@ -269,21 +242,6 @@ export function normaliseValue(
   }
   const allowed = FIXED_LISTS[field];
   return allowed && oneOf(raw, allowed, op);
-}
-
-// An ISO code as a source or the LLM wrote it, upper-cased; an old
-// destination name is read as its code.
-function isoCode(field: string, raw: string): string {
-  const code = raw.trim();
-  const legacy =
-    field === 'destination' ? legacyDestinationCode(code) : undefined;
-  return legacy ?? code.toUpperCase();
-}
-
-// A percentage of marks, 0–100.
-function toPercent(raw: string | string[]): number | undefined {
-  const value = typeof raw === 'string' ? Number(raw) : NaN;
-  return value > 0 && value <= 100 ? value : undefined;
 }
 
 // A minimum ATAR ("99.90") or SAT score ("1400", "1,400"), dropped when it
@@ -296,8 +254,9 @@ function toTestScore(
   const text = raw.trim().replace(/,/g, '');
   if (!/^\d+(?:\.\d+)?$/.test(text)) return undefined;
   const value = Number(text);
-  const [min, max] = TEST_SCORE_RANGES[field];
-  return value > 0 && value >= min && value <= max ? value : undefined;
+  return value > 0 && isInRange(value, TEST_SCORE_RANGES[field])
+    ? value
+    : undefined;
 }
 
 // A Board marks threshold, written as the rules, the LLM guide and

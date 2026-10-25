@@ -1,12 +1,14 @@
+import { isTestScoreField } from '../match/profile.js';
 import {
   CRITERION_FIELDS,
   EXTRACTED_FIELDS,
   isBoardMarksField,
-  isLegacyMarksField,
+  isCriterionField,
 } from '../scholarships/criterion-fields.js';
-import type {
-  Criterion,
-  ExtraRequirement,
+import {
+  type Criterion,
+  type ExtraRequirement,
+  memberOf,
 } from '../scholarships/scholarship.schema.js';
 import {
   deadlineText,
@@ -16,6 +18,7 @@ import {
   marksExtraRequirements,
 } from './extraction-rules.js';
 import {
+  CLASS_12_GROUP,
   type Quoted,
   type LlmClient,
   type CriterionReading,
@@ -31,6 +34,11 @@ export interface Extraction {
   deadline?: string;
 }
 
+// How a section's extraction was come by: kept from the last run (the same
+// text, read by today's extraction), read again (the same text, stored by an
+// older extraction or without its extraction), or read for new text.
+export type ExtractionOrigin = 'stored' | 'read again' | 'new text';
+
 export const AMOUNT_NOT_STATED = 'See the official site for the amount';
 
 // Extracts a Scholarship from its cleaned text. The pipeline:
@@ -43,15 +51,24 @@ export async function extract(
 ): Promise<Extraction> {
   const byRules = extractByRules(text);
   const found = new Set(byRules.criteria.map((c) => c.field));
+  // Beside a Class 12 result, the Test scores the rules read are asked
+  // again, in the same call, only for whether each stands in for the result.
+  const askAgain = (f: string) =>
+    found.has('class12Result') && isTestScoreField(f);
   const answer = await llm.read({
     text: text.slice(0, LLM_TEXT_LIMIT),
-    fields: EXTRACTED_FIELDS.filter((f) => !found.has(f)),
+    fields: EXTRACTED_FIELDS.filter((f) => !found.has(f) || askAgain(f)),
     wantAmountText: byRules.amountText === AMOUNT_NOT_STATED,
     wantDeadline: byRules.deadline === undefined,
   });
   const fromLlm = answer.criteria
     .filter((c) => EXTRACTED_FIELDS.includes(c.field) && !found.has(c.field))
     .flatMap((reading) => alternatives(reading, text));
+  const groupedByLlm = new Set(
+    answer.criteria
+      .filter((c) => c.alternativeGroup === CLASS_12_GROUP)
+      .map((c) => c.field),
+  );
   // Extra requirements are never matched, so one whose sentence isn't on the
   // page is simply dropped rather than shown.
   // The rules' own Extra requirements come first; the LLM's copy of the same
@@ -71,7 +88,12 @@ export async function extract(
   const llmDeadline = quotedValue(text, answer.deadline);
   const deadline = byRules.deadline ?? (llmDeadline && toIsoDate(llmDeadline));
   return {
-    criteria: withDestinationForHome([...byRules.criteria, ...fromLlm]),
+    criteria: withDestinationForHome(
+      withTestScoresInPlaceOfResults(
+        [...byRules.criteria, ...fromLlm],
+        groupedByLlm,
+      ),
+    ),
     extraRequirements,
     amountText,
     deadline,
@@ -91,7 +113,7 @@ export function extractByRules(text: string): Extraction {
     .map((c) => ({ ...c, confidence: 'high' as const }));
   const deadline = deadlineText(sentences);
   return {
-    criteria: withDestinationForHome(criteria),
+    criteria: withDestinationForHome(withTestScoresInPlaceOfResults(criteria)),
     extraRequirements: marksExtraRequirements(eligibility),
     amountText: amountRule(sentences) ?? AMOUNT_NOT_STATED,
     deadline: deadline && toIsoDate(deadline),
@@ -105,6 +127,57 @@ export function extractByRules(text: string): Extraction {
 function withDestinationForHome(criteria: Criterion[]): Criterion[] {
   if (criteria.some((c) => c.field === 'destination')) return criteria;
   return criteria.filter((c) => c.field !== 'destinationIsResidence');
+}
+
+// "... or SAT ≥ 1450", "... or an ATAR of 98": "or equivalent" is not one.
+const OR_TEST_SCORE = /\bor\s+(?:an?\s+|the\s+)?(?:SAT|ATAR)\b/i;
+// "All applicants also need a SAT score", "... as well", "In addition, ...":
+// a score asked beside the result, not in its place.
+const AS_WELL = /\b(?:also|as well|in addition|all applicants)\b/i;
+
+// A Test score offered in place of a Class 12 result ("A-levels AAA, IB 39,
+// or SAT ≥ 1450") joins the result's Alternatives group, with every Class 12
+// result Criterion. It is offered in place of one (a) when the page lists the
+// result on several Result scales (one entry requirement per qualification)
+// and the score's sentence doesn't ask it as well, (b) when the result's
+// sentence offers it with an "or", or (c) when the LLM says so (its field in
+// groupedByLlm). Otherwise, or when there is no Class 12 result to stand in
+// for, it stands alone: a US page asking for a GPA and a SAT score asks for
+// both.
+function withTestScoresInPlaceOfResults(
+  criteria: Criterion[],
+  groupedByLlm: ReadonlySet<string> = new Set(),
+): Criterion[] {
+  const class12Results = criteria.filter((c) => c.field === 'class12Result');
+  const inPlaceOfResult = (c: Criterion) =>
+    isTestScoreField(c.field) &&
+    ((class12Results.length > 1 && !AS_WELL.test(c.sourceText)) ||
+      class12Results.some(
+        (r) =>
+          r.sourceText === c.sourceText && OR_TEST_SCORE.test(c.sourceText),
+      ) ||
+      groupedByLlm.has(c.field));
+  const testScoresInPlace = criteria.filter(inPlaceOfResult);
+  const groupApplies =
+    class12Results.length > 0 && testScoresInPlace.length > 0;
+  return criteria.map((c) => {
+    if (
+      groupApplies &&
+      (c.field === 'class12Result' || testScoresInPlace.includes(c))
+    )
+      return inGroup(c, CLASS_12_GROUP);
+    if (isTestScoreField(c.field)) return inGroup(c, undefined);
+    return c;
+  });
+}
+
+// A copy of a Criterion in the given Alternatives group, or in none.
+function inGroup(
+  criterion: Criterion,
+  alternativeGroup: string | undefined,
+): Criterion {
+  const { alternativeGroup: _replaced, ...rest } = criterion;
+  return { ...rest, ...memberOf(alternativeGroup) };
 }
 
 function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {
@@ -196,8 +269,10 @@ export function checkQuoted(
 
 // The normalised value of values read off the page (by the LLM or a
 // reviewer), or undefined unless every one is an allowed option (a list
-// field must not quietly lose one of the values it named).
+// field must not quietly lose one of the values it named). A field no
+// Criterion checks has no allowed options.
 export function readValue(field: string, values: string[]): unknown {
+  if (!isCriterionField(field)) return undefined;
   const { op } = CRITERION_FIELDS[field];
   const raw = values.map((v) => tidyReadValue(field, v.trim()));
   if (raw.length === 0) return undefined;
@@ -211,9 +286,7 @@ export function readValue(field: string, values: string[]): unknown {
 
 // The model and reviewers write a percentage with its sign ("60%").
 function tidyReadValue(field: string, raw: string): string {
-  return isBoardMarksField(field) || isLegacyMarksField(field)
-    ? raw.replace(/\s*%$/, '')
-    : raw;
+  return isBoardMarksField(field) ? raw.replace(/\s*%$/, '') : raw;
 }
 
 // A value the model says the source states, kept only when the value sits

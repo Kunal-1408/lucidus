@@ -43,11 +43,11 @@ The scale a result is given on: percentage, CGPA out of 10, GPA out of 4, IB poi
 _Avoid_: Grading system, conversion
 
 **Test score**:
-A score kept apart from Board marks: the ATAR (0–99.95), asked only of a Student living in Australia, and the SAT score (400–1600), asked only on the US high-school board or of a Student heading to the US. Neither is a Result scale, so neither is ever compared with Board marks.
+A score kept apart from Board marks: the ATAR (0–99.95), asked only of a Student living in Australia, and the SAT score (400–1600), asked only on the US high-school board or of a Student heading to the US. Neither is a Result scale, so neither is ever compared with Board marks, though a Scholarship may accept one in place of a Class 12 result (an Alternatives group).
 _Avoid_: Board result, marks (for a test score)
 
 **Alternatives group**:
-Criteria a Scholarship accepts in place of each other, one per Result scale ("36 IB points or AAA at A-level"). The group passes when any member passes, fails when every member that can be judged fails and none is unknown, and is otherwise unknown.
+Criteria a Scholarship accepts in place of each other, on one field or several ("A-levels AAA, IB 39 points, or SAT ≥ 1450"). The group passes when any member passes, fails when every member that can be judged fails and none is unknown, and is otherwise unknown.
 _Avoid_: `OR-criteria`, `either-or`
 
 **Field of study group**:
@@ -62,6 +62,10 @@ The Profile fields asked up front: class, country of residence and its state or 
 **Scholarship**:
 A funding opportunity offered by a provider, recorded from an official source. Never deleted; it becomes inactive when its source no longer lists it.
 _Avoid_: Scheme, grant, award, opportunity
+
+**Provider type**:
+Who offers a Scholarship: government, corporate, university or foundation (neither a company nor a state). Code names it `ProviderType`; the stored keys predate the term and keep their names so live data needs no migration: `scholarshipType` on a Watchlist entry, `type` on a Scholarship.
+_Avoid_: Scholarship type, category (that is the Student's)
 
 **Official source**:
 A page, PDF or data feed published by the scholarship's provider or a government portal. Aggregator sites are never sources.
@@ -104,7 +108,7 @@ The list of scholarships that need review, each with the criterion that made it 
 _Avoid_: Error log, flag list
 
 **Override**:
-A person's fix for one scholarship: either approving it as extracted or supplying corrected criteria. It holds only for the exact page text it was written against; if the source changes, the override lapses and the scholarship is checked again.
+A person's fix for one scholarship: either approving it as extracted or supplying corrected criteria. It holds only for the exact page text it was written against; if the source changes, the override lapses and the scholarship is checked again. It also lapses when it names a field Criteria no longer check, or approves an extraction that has since been read again.
 _Avoid_: Patch, manual edit, exception
 
 **Deadline status**:
