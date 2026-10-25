@@ -131,6 +131,25 @@ export interface IncomeLimit {
   value: number;
 }
 
+// The Field of study groups every subject belongs to; a subject the Student
+// types belongs to other (frontend copy: FIELD_OF_STUDY_GROUPS in
+// frontend/src/app/profile-fields.ts). science is Natural sciences and arts
+// is Arts and humanities, keeping the values saved Profiles and stored
+// Criteria already use.
+export type FieldOfStudyGroup =
+  | 'engineering'
+  | 'medicine'
+  | 'science'
+  | 'computing'
+  | 'commerce'
+  | 'law'
+  | 'arts'
+  | 'social_sciences'
+  | 'design'
+  | 'agriculture'
+  | 'education'
+  | 'other';
+
 export interface Profile {
   class?: 9 | 10 | 11 | 12;
   // Where the Student lives and who they are: an ISO 3166-1 alpha-2 country
@@ -163,16 +182,11 @@ export interface Profile {
   class10Result?: BoardResult;
   class12Result?: BoardResult;
   stream?: 'science' | 'commerce' | 'arts' | 'not_chosen';
-  fieldOfStudy?:
-    | 'engineering'
-    | 'medicine'
-    | 'science'
-    | 'commerce'
-    | 'arts'
-    | 'law'
-    | 'other';
-  destination?:
-    'india' | 'uk' | 'usa' | 'canada' | 'australia' | 'germany' | 'other';
+  // A Field of study group. The subject a Student picks or types stays in
+  // the form: Criteria name groups only.
+  fieldOfStudy?: FieldOfStudyGroup;
+  // Where the Student wants to study: an ISO 3166-1 alpha-2 country.
+  destination?: string;
   incomeBand?:
     | 'under_1l'
     | '1l_2l'

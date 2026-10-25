@@ -175,6 +175,45 @@ describe('Normalisation onto the fixed lists', () => {
     expect(criterion(text, 'disability')).toBeUndefined();
   });
 
+  it.each([
+    [
+      'The scholarship is only for students pursuing a B.Sc in physics or chemistry.',
+      ['science'],
+    ],
+    [
+      'Open only to students who study law, psychology or graphic design.',
+      ['law', 'social_sciences', 'design'],
+    ],
+    ['Applicants must be pursuing a degree in agriculture.', ['agriculture']],
+  ])('reads the Field of study groups in "%s"', (text, groups) => {
+    expect(criterion(text, 'fieldOfStudy')?.value).toEqual(groups);
+  });
+
+  it.each([
+    'Scholarships are provided for professional courses, such as Medical, Engineering etc.',
+    'Students interested in pursuing humanities are strongly encouraged to apply.',
+    'Meant for those who plan to pursue engineering after school.',
+  ])('reads no Field of study group from "%s"', (text) => {
+    expect(criterion(text, 'fieldOfStudy')).toBeUndefined();
+  });
+
+  it.each([
+    ['The award is open to home students only.', true],
+    ['This scholarship is for international students.', false],
+    ['Both home and international students may apply.', undefined],
+    ['International students may write to the admissions office.', undefined],
+  ])('reads "%s" as a home or international award', (text, home) => {
+    expect(criterion(text, 'destinationIsResidence')?.value).toBe(home);
+  });
+
+  it('reads where the Student must study, but never India', () => {
+    const abroad =
+      'Awarded to students who wish to study at a university in the United Kingdom.';
+    expect(criterion(abroad, 'destination')?.value).toEqual(['GB']);
+    const home = 'For students who will study at a college in India.';
+    expect(criterion(home, 'destination')).toBeUndefined();
+  });
+
   it('still reads a scholarship reserved for students with disabilities', () => {
     const text = 'This scholarship is reserved for students with disabilities.';
     expect(criterion(text, 'disability')?.value).toBe(true);

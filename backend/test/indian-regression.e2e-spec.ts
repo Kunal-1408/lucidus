@@ -30,6 +30,10 @@ const LIC_SPECIAL = 'Special Scholarship';
 const STATE_PRAGATI = 'Pragati Scholarship for Girls';
 const STATE_MERIT = 'Merit Scholarship for Class 9';
 const STATE_SCIENCE = 'Science Talent Award';
+// Was in the Review report, hidden, until ticket 07 read it as an award for
+// international students: with no destination given, each of these Profiles
+// is asked where they want to study. No Indian scheme's bucket changed.
+const PEARSON = 'Lester B. Pearson International Scholarship';
 
 const NEXT_CLASS = 'Eligible from next year: watch for the next round';
 
@@ -127,7 +131,7 @@ describe('Indian Profiles keep their results', () => {
         // The state page says "Class 12 with Science", which names no stream.
         eligible: [AICTE_PRAGATI, LIC_GENERAL, SANTOOR, STATE_SCIENCE],
         withinReach: {},
-        tellUsMore: [NMMSS],
+        tellUsMore: [PEARSON, NMMSS],
       },
     );
   });
@@ -144,7 +148,7 @@ describe('Indian Profiles keep their results', () => {
       {
         eligible: [AICTE_PRAGATI],
         withinReach: { [STATE_PRAGATI]: [NEXT_CLASS] },
-        tellUsMore: [NMMSS, LIC_SPECIAL],
+        tellUsMore: [PEARSON, NMMSS, LIC_SPECIAL],
       },
     );
   });
@@ -162,7 +166,7 @@ describe('Indian Profiles keep their results', () => {
       {
         eligible: [STATE_MERIT],
         withinReach: { [LIC_SPECIAL]: [NEXT_CLASS] },
-        tellUsMore: [],
+        tellUsMore: [PEARSON],
       },
     );
   });
@@ -186,7 +190,7 @@ describe('Indian Profiles keep their results', () => {
       {
         eligible: [],
         withinReach: { [STATE_SCIENCE]: [NEXT_CLASS] },
-        tellUsMore: [],
+        tellUsMore: [PEARSON],
       },
     );
   });
@@ -210,7 +214,7 @@ describe('Indian Profiles keep their results', () => {
         // class10Marks was replaced: with no Class 10 result to judge, the 60%
         // Class 10 Criteria are unknown.
         withinReach: {},
-        tellUsMore: [NMMSS, LIC_SPECIAL],
+        tellUsMore: [PEARSON, NMMSS, LIC_SPECIAL],
       },
     );
   });

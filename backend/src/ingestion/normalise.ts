@@ -146,20 +146,17 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
     'engineering',
     'medicine',
     'science',
+    'computing',
     'commerce',
-    'arts',
     'law',
+    'arts',
+    'social_sciences',
+    'design',
+    'agriculture',
+    'education',
     'other',
   ],
-  destination: [
-    'india',
-    'uk',
-    'usa',
-    'canada',
-    'australia',
-    'germany',
-    'other',
-  ],
+  destination: COUNTRY_CODES,
   gender: ['female', 'male', 'other'],
   category: ['general', 'sc', 'st', 'obc', 'ews', 'ebc', 'dnt'],
   parentOccupation: [
@@ -179,9 +176,31 @@ type ArrayElement<T> = T extends readonly (infer E)[] ? E : never;
 
 // Criterion fields a source states as yes or no. Boards upcoming is a yes /
 // no answer too, but never a Criterion.
-const YES_NO_CRITERION_FIELDS = ['minority', 'disability', 'singleGirlChild'];
+const YES_NO_CRITERION_FIELDS = [
+  'minority',
+  'disability',
+  'singleGirlChild',
+  'destinationIsResidence',
+];
 // Fields holding ISO codes, which a source or the LLM may write in any case.
-const ISO_CODE_FIELDS = ['countryOfResidence', 'region', 'citizenshipCountry'];
+const ISO_CODE_FIELDS = [
+  'countryOfResidence',
+  'region',
+  'citizenshipCountry',
+  'destination',
+];
+
+// The destinations a Profile or Criterion named before they became ISO
+// codes, with the code each now is ("other" named no country). Stored
+// Criteria and Overrides may still hold them until ticket 09 re-extracts.
+export const LEGACY_DESTINATIONS: Record<string, string> = {
+  india: 'IN',
+  uk: 'GB',
+  usa: 'US',
+  canada: 'CA',
+  australia: 'AU',
+  germany: 'DE',
+};
 
 // The value a Criterion stores for a raw value a rule found, or undefined
 // when it falls outside the field's fixed list (the Criterion is dropped).
@@ -221,7 +240,7 @@ export function normaliseValue(
     return toBoardResult(raw);
   }
   if (ISO_CODE_FIELDS.includes(field)) {
-    const codes = asList(raw).map((code) => code.trim().toUpperCase());
+    const codes = asList(raw).map((code) => isoCode(field, code));
     return oneOf(codes, FIXED_LISTS[field], op);
   }
   if (YES_NO_CRITERION_FIELDS.includes(field)) {
@@ -230,6 +249,15 @@ export function normaliseValue(
   }
   const allowed = FIXED_LISTS[field];
   return allowed && oneOf(raw, allowed, op);
+}
+
+// An ISO code as a source or the LLM wrote it, upper-cased; an old
+// destination name is read as its code.
+function isoCode(field: string, raw: string): string {
+  const code = raw.trim();
+  if (field === 'destination' && Object.hasOwn(LEGACY_DESTINATIONS, code))
+    return LEGACY_DESTINATIONS[code];
+  return code.toUpperCase();
 }
 
 // A percentage of marks, 0–100.

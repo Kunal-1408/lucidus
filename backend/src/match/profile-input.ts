@@ -39,7 +39,6 @@ const ONE_OF_FIELDS = [
   'board',
   'stream',
   'fieldOfStudy',
-  'destination',
   'gender',
   'category',
 ] as const;
@@ -121,10 +120,14 @@ function contradictions(raw: Record<string, unknown>): string[] {
   return reasons;
 }
 
-// Where the Student lives and their Citizenship (citizenship itself is a
-// plain fixed list above): ISO codes for the country, region and
-// Citizenship country, fixed lists for Home state and Residence status.
-const COUNTRY_FIELDS = ['countryOfResidence', 'citizenshipCountry'] as const;
+// Where the Student lives, their Citizenship (citizenship itself is a plain
+// fixed list above) and where they want to study: ISO codes for the
+// countries and the region, fixed lists for Home state and Residence status.
+const COUNTRY_FIELDS = [
+  'countryOfResidence',
+  'citizenshipCountry',
+  'destination',
+] as const;
 const RESIDENCE_ONE_OF_FIELDS = ['homeState', 'residenceStatus'] as const;
 
 function residenceAnswers(

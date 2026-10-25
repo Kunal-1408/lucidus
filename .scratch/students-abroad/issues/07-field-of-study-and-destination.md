@@ -8,11 +8,31 @@ See spec: "Profile" (field of study, destination), "Criteria and matching", glos
 
 **Status:** ready-for-agent
 
-- [ ] Profile holds a Field of study group and optionally a listed or typed subject; a typed subject counts as Other and is shown back to the Student
-- [ ] The field is a searchable list with its own free-text entry; no modal dialog
-- [ ] Destination is any country (ISO code); India stays an option
-- [ ] Saved Profiles migrate: old `fieldOfStudy` values map to their group, old destinations map to ISO codes
-- [ ] Extraction maps field-of-study wording to groups and records destination and the home / international condition
-- [ ] Matching: group Criteria judged on the group; home / international judged by comparing destination with country of residence
-- [ ] Backend validation rejects unknown groups and ISO codes
-- [ ] e2e: a home-student and an international-student fixture each sort a Student correctly; University pointers still follow destination; contract test and Indian regression scenarios still pass
+- [x] Profile holds a Field of study group and optionally a listed or typed subject; a typed subject counts as Other and is shown back to the Student
+- [x] The field is a searchable list with its own free-text entry; no modal dialog
+- [x] Destination is any country (ISO code); India stays an option
+- [x] Saved Profiles migrate: old `fieldOfStudy` values map to their group, old destinations map to ISO codes
+- [x] Extraction maps field-of-study wording to groups and records destination and the home / international condition
+- [x] Matching: group Criteria judged on the group; home / international judged by comparing destination with country of residence
+- [x] Backend validation rejects unknown groups and ISO codes
+- [x] e2e: a home-student and an international-student fixture each sort a Student correctly; University pointers still follow destination; contract test and Indian regression scenarios still pass
+
+## Comments
+
+**2026-10-25 (agent):** Built on `feat/abroad-07-field-and-destination-2`, finishing the work an earlier agent stashed (`abroad-07-wip-carryover`); every box is met.
+
+Profile (both copies): `fieldOfStudy` is one of 12 Field of study groups (`FieldOfStudyGroup` in `match/profile.ts`, `FIELDS_OF_STUDY` in `profile-fields.ts`): engineering, medicine, science, computing, commerce, law, arts, social_sciences, design, agriculture, education, other. `science` (Natural sciences) and `arts` (Arts and humanities) keep the values saved Profiles and stored Criteria already use, so old field-of-study answers migrate unchanged. `destination` is an ISO 3166-1 alpha-2 code from `COUNTRIES`; `DESTINATIONS` is gone. The frontend Profile also holds `subject`, the listed or typed subject. It stays on the device: `profileForMatch` drops it, since Criteria name groups only.
+
+Frontend rules (`profile-rules.ts`): `findSubjects(query)` searches `SUBJECTS` (its own file, `frontend/src/app/subjects.ts`, 69 subjects) by any part of the name. `subjectAnswer(text)` gives a listed subject with its group, a typed one with group `other`, and an empty one clears the subject but keeps the group. `subjectNote(profile)` is shown back under the field ("Counted as Natural sciences.", or "\"Puppetry\" is not on our list, so it is counted as Other."). `withSubjectClears` (part of `applyChange`) drops a subject when the Student picks a group it doesn't belong to. Migration (`withDestinationCode` in `migrateSavedProfile`): `india`, `uk`, `usa`, `canada`, `australia`, `germany` become IN, GB, US, CA, AU, DE; `other`, which named no country, is dropped. The page has a search input with a `<datalist>` (native search plus free text, no dialog) and the group select beneath it; destination is a select over `COUNTRIES`. The initial bundle is now 457 kB, under the 500 kB warning.
+
+Backend validation (`profile-input.ts`): `destination` moved to `COUNTRY_FIELDS` (`destination must be an ISO 3166-1 alpha-2 country code`, so `uk` is now rejected); `fieldOfStudy` is checked against the new `FIXED_LISTS` groups.
+
+Matching (`matcher.ts`): group Criteria are plain `in` Criteria. The new Criterion field `destinationIsResidence` (`eq`, never changeable, a yes/no field) is answered in `derivedAnswer` as `destination === countryOfResidence` and is unknown unless both are given. Its missing label is "the country you live in and where you want to study". Stored destination Criteria that still hold old names (`uk`) are read as their codes through `LEGACY_DESTINATIONS` (`normalise.ts`) until 09 re-extracts. University pointers (`university-pointers.service.ts`) look up the ISO destination through `POINTER_COUNTRY_CODES` (`worqnow.ts`). Pointers are still stored and returned under `uk`/`usa`/`canada`/`australia`, so the frontend is unchanged.
+
+Extraction (`extraction-rules.ts`): a `fieldOfStudy` keyword rule maps subject wording to groups, but only when the sentence restricts the award ("only", "must", "is for", "open to" before a study word). Subjects named as examples ("such as", "etc"), as an encouragement or for the amount paid give nothing. That keeps Santoor and the CSSS guidelines unchanged. `destinationIsResidence` is read from "for/open to/only … home or domestic students" (yes) and "… international or overseas students" (no); a sentence naming both, or one that only mentions them, gives nothing. `destinationRule` (in `RESIDENCE_RULES`) reads the countries in "study at a university in …", never India. The LLM field guide describes `fieldOfStudy`, `destination` and `destinationIsResidence`. Codes are upper-cased in `normaliseValue`, and old destination names are read as codes.
+
+Tests: rules in `profile-rules.spec.ts` ("field of study", "migrateSavedProfile: field of study and destination"); extractor unit tests for groups, home/international and destination; `backend/test/field-destination.e2e-spec.ts` over `fixtures/study/*.html` (UK home-student, US international-student, engineering-and-computing) for pass, fail, unknown, the missing label and 400s. `university-pointers.e2e-spec.ts` now sends ISO codes. The contract test checks `destination` against `COUNTRIES` and lists `destinationIsResidence` as Criterion-only, since the Matcher derives it. The overrides e2e list of Criterion fields gained `destinationIsResidence`.
+
+Changed on purpose, for the spec owner: the demo Pearson page (`utoronto-pearson.html`) used to give no rule Criteria and went to the Review report. It now gives `destinationIsResidence: false` ("award for international students") and is visible. So the Indian regression scenarios pin it in Tell us more for each Profile, which gives no destination; no Indian scheme's bucket changed. The demo e2e now checks it is shown to a Student in India going to Canada and hidden from one in Canada. Known gap: a home/international Criterion without a destination Criterion (Pearson names Canada only in passing) passes any Student going abroad, wherever they are going.
+
+For 08: SAT is asked "for the US high-school board or a US destination", so key it off `profile.destination === 'US'` (an ISO code now; never `usa`) in `visibleQuestions`, and clear it through `withoutUnasked` when the destination changes. The destination field is the last question in the core form. 05 touches the same `Profile`, `QUESTIONS`, `FIELD_GUIDE`, `KEYWORD_FIELDS`, `CRITERION_FIELDS` and contract-test lists, so expect small conflicts there. Tests that hard-code the Criterion field list need `destinationIsResidence` added. 09 should delete `LEGACY_DESTINATIONS` (both copies) and the `destinationCode` fallback in the Matcher after re-extraction.

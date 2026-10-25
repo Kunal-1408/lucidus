@@ -8,8 +8,8 @@ import {
   CATEGORIES,
   CITIZENSHIPS,
   CLASSES,
-  DESTINATIONS,
   EXAMS,
+  FieldOfStudyGroup,
   FIELDS_OF_STUDY,
   GENDERS,
   INCOME_BANDS,
@@ -27,8 +27,11 @@ import {
   BoardMarksQuestion,
   boardMarksLabel,
   checkAnswer,
+  findSubjects,
   incomeCurrency,
   profileForMatch,
+  subjectAnswer,
+  subjectNote,
   visibleQuestions,
 } from '../profile-rules';
 import { ProfileStore } from '../profile-store';
@@ -72,7 +75,6 @@ export class ProfilePage {
   protected readonly boards = BOARDS;
   protected readonly streams = STREAMS;
   protected readonly fieldsOfStudy = FIELDS_OF_STUDY;
-  protected readonly destinations = DESTINATIONS;
   protected readonly parentOccupations = PARENT_OCCUPATIONS;
   protected readonly exams = EXAMS;
   protected readonly countries = COUNTRIES;
@@ -100,6 +102,20 @@ export class ProfilePage {
   );
   // Why the last amount typed was not saved.
   protected readonly incomeError = signal<string | undefined>(undefined);
+  // What the Student has typed into the subject search so far.
+  protected readonly subjectQuery = signal('');
+  protected readonly subjectOptions = computed(() => findSubjects(this.subjectQuery()));
+  protected readonly subjectNote = computed(() => subjectNote(this.profile()));
+
+  protected groupLabel(group: FieldOfStudyGroup): string {
+    return FIELDS_OF_STUDY.find((option) => option.value === group)?.label ?? '';
+  }
+
+  // A listed subject sets its group; any other subject counts as Other.
+  protected setSubject(value: string) {
+    this.subjectQuery.set('');
+    this.update(subjectAnswer(value));
+  }
 
   protected setClass(value: string) {
     this.update({ class: value ? (Number(value) as Profile['class']) : undefined });

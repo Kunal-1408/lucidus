@@ -34,7 +34,7 @@ describe('Match request Profile validation', () => {
       class12Result: { scale: 'percentage', value: 88 },
       stream: 'science',
       fieldOfStudy: 'engineering',
-      destination: 'india',
+      destination: 'IN',
       incomeBand: '1l_2l',
       gender: 'female',
       category: 'obc',

@@ -159,25 +159,25 @@ export const STREAMS = [
   { value: 'not_chosen', label: 'Not chosen yet' },
 ] as const;
 
+// The Field of study groups every subject belongs to (SUBJECTS in
+// subjects.ts); a subject the Student types belongs to other. science and
+// arts keep the values saved Profiles and stored Criteria already use.
 export const FIELDS_OF_STUDY = [
   { value: 'engineering', label: 'Engineering' },
-  { value: 'medicine', label: 'Medicine' },
-  { value: 'science', label: 'Science' },
-  { value: 'commerce', label: 'Commerce' },
-  { value: 'arts', label: 'Arts and humanities' },
+  { value: 'medicine', label: 'Medicine and health' },
+  { value: 'science', label: 'Natural sciences' },
+  { value: 'computing', label: 'Computing' },
+  { value: 'commerce', label: 'Commerce and business' },
   { value: 'law', label: 'Law' },
+  { value: 'arts', label: 'Arts and humanities' },
+  { value: 'social_sciences', label: 'Social sciences' },
+  { value: 'design', label: 'Design and architecture' },
+  { value: 'agriculture', label: 'Agriculture' },
+  { value: 'education', label: 'Education' },
   { value: 'other', label: 'Other' },
 ] as const;
 
-export const DESTINATIONS = [
-  { value: 'india', label: 'India' },
-  { value: 'uk', label: 'UK' },
-  { value: 'usa', label: 'USA' },
-  { value: 'canada', label: 'Canada' },
-  { value: 'australia', label: 'Australia' },
-  { value: 'germany', label: 'Germany' },
-  { value: 'other', label: 'Other' },
-] as const;
+export type FieldOfStudyGroup = ValueOf<typeof FIELDS_OF_STUDY>;
 
 export const PARENT_OCCUPATIONS = [
   { value: 'defence', label: 'Defence or ex-servicemen' },
@@ -234,8 +234,13 @@ export interface Profile {
   class10Result?: BoardResult;
   class12Result?: BoardResult;
   stream?: ValueOf<typeof STREAMS>;
-  fieldOfStudy?: ValueOf<typeof FIELDS_OF_STUDY>;
-  destination?: ValueOf<typeof DESTINATIONS>;
+  fieldOfStudy?: FieldOfStudyGroup;
+  // The subject the Student picked from SUBJECTS or typed (then the group is
+  // other). Kept on this device only: a Match request sends the group.
+  subject?: string;
+  // Where the Student wants to study: an ISO 3166-1 alpha-2 country
+  // (COUNTRIES in countries.ts).
+  destination?: string;
   incomeBand?: ValueOf<typeof INCOME_BANDS>;
   // Only for a Student living outside India, who gives an amount in place of
   // a rupee band.
