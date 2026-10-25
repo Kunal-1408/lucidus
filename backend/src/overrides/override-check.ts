@@ -4,7 +4,10 @@ import {
   type ExtractionOrigin,
 } from '../ingestion/extractor.js';
 import { isCriterionField } from '../scholarships/criterion-fields.js';
-import type { Criterion } from '../scholarships/scholarship.schema.js';
+import {
+  type Criterion,
+  memberOf,
+} from '../scholarships/scholarship.schema.js';
 import type { Override, SkippedResult } from './override.schema.js';
 
 // A person's check of a Scholarship that an Override applies: who and when,
@@ -63,7 +66,7 @@ export function checkOverride(
           value,
           changeable,
           sourceText,
-          ...(alternativeGroup && { alternativeGroup }),
+          ...memberOf(alternativeGroup),
           confidence: 'high',
         });
       }
@@ -75,7 +78,7 @@ export function checkOverride(
       if (checked.ok) {
         criteria.push({
           ...checked.criterion,
-          ...(alternativeGroup && { alternativeGroup }),
+          ...memberOf(alternativeGroup),
           confidence: 'high',
         });
       } else {

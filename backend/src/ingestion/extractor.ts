@@ -1,13 +1,14 @@
-import { TEST_SCORE_RANGES } from '../match/profile.js';
+import { isTestScoreField } from '../match/profile.js';
 import {
   CRITERION_FIELDS,
   EXTRACTED_FIELDS,
   isBoardMarksField,
   isCriterionField,
 } from '../scholarships/criterion-fields.js';
-import type {
-  Criterion,
-  ExtraRequirement,
+import {
+  type Criterion,
+  type ExtraRequirement,
+  memberOf,
 } from '../scholarships/scholarship.schema.js';
 import {
   deadlineText,
@@ -17,6 +18,7 @@ import {
   marksExtraRequirements,
 } from './extraction-rules.js';
 import {
+  CLASS_12_GROUP,
   type Quoted,
   type LlmClient,
   type CriterionReading,
@@ -49,15 +51,24 @@ export async function extract(
 ): Promise<Extraction> {
   const byRules = extractByRules(text);
   const found = new Set(byRules.criteria.map((c) => c.field));
+  // Beside a Class 12 result, the Test scores the rules read are asked
+  // again, in the same call, only for whether each stands in for the result.
+  const askAgain = (f: string) =>
+    found.has('class12Result') && isTestScoreField(f);
   const answer = await llm.read({
     text: text.slice(0, LLM_TEXT_LIMIT),
-    fields: EXTRACTED_FIELDS.filter((f) => !found.has(f)),
+    fields: EXTRACTED_FIELDS.filter((f) => !found.has(f) || askAgain(f)),
     wantAmountText: byRules.amountText === AMOUNT_NOT_STATED,
     wantDeadline: byRules.deadline === undefined,
   });
   const fromLlm = answer.criteria
     .filter((c) => EXTRACTED_FIELDS.includes(c.field) && !found.has(c.field))
     .flatMap((reading) => alternatives(reading, text));
+  const groupedByLlm = new Set(
+    answer.criteria
+      .filter((c) => c.alternativeGroup === CLASS_12_GROUP)
+      .map((c) => c.field),
+  );
   // Extra requirements are never matched, so one whose sentence isn't on the
   // page is simply dropped rather than shown.
   // The rules' own Extra requirements come first; the LLM's copy of the same
@@ -78,7 +89,10 @@ export async function extract(
   const deadline = byRules.deadline ?? (llmDeadline && toIsoDate(llmDeadline));
   return {
     criteria: withDestinationForHome(
-      withTestScoresInPlaceOfResults([...byRules.criteria, ...fromLlm]),
+      withTestScoresInPlaceOfResults(
+        [...byRules.criteria, ...fromLlm],
+        groupedByLlm,
+      ),
     ),
     extraRequirements,
     amountText,
@@ -115,35 +129,44 @@ function withDestinationForHome(criteria: Criterion[]): Criterion[] {
   return criteria.filter((c) => c.field !== 'destinationIsResidence');
 }
 
-// The Alternatives group a Test score offered in place of a Class 12 result
-// joins: the Class 12 result's own, so stored groups keep their name.
-const CLASS_12_GROUP = 'class12Result';
 // "... or SAT ≥ 1450", "... or an ATAR of 98": "or equivalent" is not one.
 const OR_TEST_SCORE = /\bor\s+(?:an?\s+|the\s+)?(?:SAT|ATAR)\b/i;
+// "All applicants also need a SAT score", "... as well", "In addition, ...":
+// a score asked beside the result, not in its place.
+const AS_WELL = /\b(?:also|as well|in addition|all applicants)\b/i;
 
 // A Test score offered in place of a Class 12 result ("A-levels AAA, IB 39,
 // or SAT ≥ 1450") joins the result's Alternatives group, with every Class 12
-// result Criterion. It is offered in place of one when the page lists the
-// result on several Result scales (one entry requirement per qualification),
-// when the result's sentence offers it with an "or", or when the LLM says so.
-// Otherwise, or when there is no Class 12 result to stand in for, it stands
-// alone: a US page asking for a GPA and a SAT score asks for both.
-function withTestScoresInPlaceOfResults(criteria: Criterion[]): Criterion[] {
-  const results = criteria.filter((c) => c.field === 'class12Result');
+// result Criterion. It is offered in place of one (a) when the page lists the
+// result on several Result scales (one entry requirement per qualification)
+// and the score's sentence doesn't ask it as well, (b) when the result's
+// sentence offers it with an "or", or (c) when the LLM says so (its field in
+// groupedByLlm). Otherwise, or when there is no Class 12 result to stand in
+// for, it stands alone: a US page asking for a GPA and a SAT score asks for
+// both.
+function withTestScoresInPlaceOfResults(
+  criteria: Criterion[],
+  groupedByLlm: ReadonlySet<string> = new Set(),
+): Criterion[] {
+  const class12Results = criteria.filter((c) => c.field === 'class12Result');
   const inPlaceOfResult = (c: Criterion) =>
-    c.field in TEST_SCORE_RANGES &&
-    (c.alternativeGroup === CLASS_12_GROUP ||
-      results.length > 1 ||
-      results.some(
+    isTestScoreField(c.field) &&
+    ((class12Results.length > 1 && !AS_WELL.test(c.sourceText)) ||
+      class12Results.some(
         (r) =>
           r.sourceText === c.sourceText && OR_TEST_SCORE.test(c.sourceText),
-      ));
-  const joining = criteria.filter(inPlaceOfResult);
-  const grouped = results.length > 0 && joining.length > 0;
+      ) ||
+      groupedByLlm.has(c.field));
+  const testScoresInPlace = criteria.filter(inPlaceOfResult);
+  const groupApplies =
+    class12Results.length > 0 && testScoresInPlace.length > 0;
   return criteria.map((c) => {
-    if (grouped && (c.field === 'class12Result' || joining.includes(c)))
+    if (
+      groupApplies &&
+      (c.field === 'class12Result' || testScoresInPlace.includes(c))
+    )
       return inGroup(c, CLASS_12_GROUP);
-    if (c.field in TEST_SCORE_RANGES) return inGroup(c, undefined);
+    if (isTestScoreField(c.field)) return inGroup(c, undefined);
     return c;
   });
 }
@@ -153,16 +176,8 @@ function inGroup(
   criterion: Criterion,
   alternativeGroup: string | undefined,
 ): Criterion {
-  const { field, op, value, changeable, sourceText, confidence } = criterion;
-  return {
-    field,
-    op,
-    value,
-    changeable,
-    sourceText,
-    confidence,
-    ...(alternativeGroup && { alternativeGroup }),
-  };
+  const { alternativeGroup: _replaced, ...rest } = criterion;
+  return { ...rest, ...memberOf(alternativeGroup) };
 }
 
 function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {
@@ -180,16 +195,10 @@ function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {
 }
 
 // Several results the LLM gives for one Board marks field are alternatives
-// on different Result scales: one Criterion each, grouped. A Test score the
-// LLM says is offered in place of the Class 12 result keeps that group
-// (withTestScoresInPlaceOfResults decides whether it stands).
+// on different Result scales: one Criterion each, grouped.
 function alternatives(reading: CriterionReading, text: string): Criterion[] {
   if (!isBoardMarksField(reading.field) || reading.values.length < 2) {
-    const criterion = fromCriterionReading(reading, text);
-    return reading.field in TEST_SCORE_RANGES &&
-      reading.alternativeGroup === CLASS_12_GROUP
-      ? [inGroup(criterion, CLASS_12_GROUP)]
-      : [criterion];
+    return [fromCriterionReading(reading, text)];
   }
   return reading.values.map((value) => {
     const member = fromCriterionReading({ ...reading, values: [value] }, text);

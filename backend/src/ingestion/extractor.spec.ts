@@ -348,6 +348,26 @@ describe('Normalisation onto the fixed lists', () => {
   });
 
   it.each([
+    'All applicants also need a SAT score of at least 1400.',
+    'A SAT score of at least 1400 is required as well.',
+    'In addition, a SAT score of at least 1400 is required.',
+  ])(
+    'keeps a test score asked as well as results on several Result scales standing alone: %s',
+    (asWell) => {
+      const text = `Applicants need IB 36 points or A-levels AAA.\n${asWell}`;
+      expect(
+        extractByRules(text)
+          .criteria.filter((c) => c.field !== 'class')
+          .map((c) => [c.field, c.alternativeGroup]),
+      ).toEqual([
+        ['class12Result', 'class12Result'],
+        ['class12Result', 'class12Result'],
+        ['sat', undefined],
+      ]);
+    },
+  );
+
+  it.each([
     [
       'a GPA and a SAT score, both asked',
       'Applicants need a minimum GPA of 3.5.\nApplicants need a minimum SAT score of 1,400.',

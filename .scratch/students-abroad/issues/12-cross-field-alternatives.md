@@ -33,3 +33,11 @@ See spec: "Criteria and matching"; glossary terms Alternatives group and Test sc
 - e2e `backend/test/cross-field-alternatives.e2e-spec.ts`: `scales/a-level-ib-or-sat.html` ("Applicants need A-levels AAA, IB 39 points, or SAT ≥ 1450"; the rules need "points" to read IB) Eligible for A-level, IB, SAT Students; approve keeps the group; `scales/gpa-or-sat.html` grouped by a replace Override.
 - Stored data: `EXTRACTION_VERSION` 3, so the next run re-extracts every Scholarship; approve Overrides on them lapse (09 rule).
 - Known gap: per-scale list + a SAT asked *as well* ("IB 36 or AAA; all applicants also need SAT 1400") is grouped wrongly by (a). Low risk; a replace Override fixes it.
+
+**2026-10-25 (agent, review fixes):** on `fix/abroad-12-review` from `integrate/abroad-wave-3` (3958b2f).
+
+- (c) now fires when the rules read the score: beside a Class 12 result, rules-read ATAR/SAT also go in `LlmRequest.fields`; the LLM's `alternativeGroup` decides grouping, rules' value kept. Same single LLM call per extraction (count unchanged; field list +1–2). e2e: `scales/gpa-or-sat-read-by-llm.html` Eligible for SAT and GPA Students, no Override.
+- (a) skips a score whose sentence says "also" / "as well" / "in addition" / "all applicants". e2e `scales/ib-or-a-level-and-sat.html`: SAT stands alone. Residual gap (other wording) named in the spec bullet.
+- Refactors: `CLASS_12_GROUP` in llm.ts (schema enum, `CriterionReading.alternativeGroup` narrowed); `isTestScoreField` in match/profile.ts; `memberOf` helper (scholarship.schema.ts) for the group spread; `inGroup` rest-spread; LLM grouping decided once (`groupedByLlm` set passed to `withTestScoresInPlaceOfResults`; `alternatives()` no longer groups Test scores); renames `class12Results` / `testScoresInPlace` / `groupApplies`; matcher.spec group named `class12Result`.
+- Not done: e2e `hashOf` via the Saved endpoint. `SavedCard` doesn't expose `contentHash` (only stored), and no public endpoint returns a hash for a Scholarship outside the Review report; left reading the store.
+- `EXTRACTION_VERSION` stays 3 (nothing deployed since).

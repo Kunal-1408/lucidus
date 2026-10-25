@@ -1,16 +1,40 @@
 import type { WatchlistEntry } from '../src/watchlist/watchlist-entry.schema.js';
-import { ADMIN_TOKEN, Harness, startApp } from './harness.js';
+import { ADMIN_TOKEN, Harness, type LlmServed, startApp } from './harness.js';
 
 // Alternatives across fields: a page accepting a Class 12 result on several
-// Result scales or a SAT score, read by the rules alone, and a page the rules
+// Result scales or a SAT score, read by the rules alone; a page the rules
 // leave ungrouped (a GPA, and a SAT score "in its place") that a reviewer
-// groups through an Override. Each is matched through the endpoint.
+// groups through an Override; the same page grouped by the LLM's reading; and
+// a page asking a SAT score as well as a result on several scales. Each is
+// matched through the endpoint.
 const A_LEVEL_IB_OR_SAT = 'Example Transatlantic Award';
 const GPA_OR_SAT = 'Example Prairie Merit Award';
+const GPA_OR_SAT_READ_BY_LLM = 'Example Lakeside Merit Award';
+const IB_OR_A_LEVEL_AND_SAT = 'Example Harbour Award';
 const PAGES = {
   [A_LEVEL_IB_OR_SAT]: 'scales/a-level-ib-or-sat.html',
   [GPA_OR_SAT]: 'scales/gpa-or-sat.html',
+  [GPA_OR_SAT_READ_BY_LLM]: 'scales/gpa-or-sat-read-by-llm.html',
+  [IB_OR_A_LEVEL_AND_SAT]: 'scales/ib-or-a-level-and-sat.html',
 };
+
+// The Lakeside page's SAT sentence, which the fake LLM, when asked for the
+// SAT score, reads as offered in place of the GPA.
+const LAKESIDE_SAT_SENTENCE =
+  'Applicants without a GPA may send a SAT score of at least 1400 in its place.';
+const llm: LlmServed = (request) =>
+  request.text.includes(LAKESIDE_SAT_SENTENCE) && request.fields.includes('sat')
+    ? {
+        criteria: [
+          {
+            field: 'sat',
+            values: ['1400'],
+            quote: LAKESIDE_SAT_SENTENCE,
+            alternativeGroup: 'class12Result',
+          },
+        ],
+      }
+    : {};
 type Name = keyof typeof PAGES;
 
 const urlOf = (name: string) =>
@@ -56,9 +80,10 @@ describe('Alternatives across fields, through the Match endpoint', () => {
       now: new Date('2026-07-20T09:00:00Z'),
       watchlist: ENTRIES,
       overridesFile: 'overrides/empty.json',
+      llm,
     });
     const summary = await harness.ingest();
-    expect(summary.counts.extracted).toBe(2);
+    expect(summary.counts.extracted).toBe(4);
   });
 
   afterEach(() => harness.close());
@@ -214,6 +239,36 @@ describe('Alternatives across fields, through the Match endpoint', () => {
       expect(res.body.message).toEqual([
         'criteria[0].alternativeGroup must be a string',
       ]);
+    });
+  });
+
+  describe('the same page, where the LLM reads the SAT score as offered in place of the GPA', () => {
+    it('is Eligible for a SAT Student and a GPA Student, with no Override', async () => {
+      expect((await placed(SAT_STUDENT, GPA_OR_SAT_READ_BY_LLM)).bucket).toBe(
+        'eligible',
+      );
+      const gpaStudent = {
+        class: 12,
+        board: 'us_high_school',
+        class12Result: gpa(3.7),
+      };
+      expect((await placed(gpaStudent, GPA_OR_SAT_READ_BY_LLM)).bucket).toBe(
+        'eligible',
+      );
+    });
+  });
+
+  describe('a page asking "IB 36 or AAA; all applicants also need SAT 1400"', () => {
+    it('asks an IB Student for the SAT score as well', async () => {
+      const { bucket, card } = await placed(IB_STUDENT, IB_OR_A_LEVEL_AND_SAT);
+      expect(bucket).toBe('tellUsMore');
+      expect(card?.missing).toEqual([{ field: 'sat', label: 'SAT score' }]);
+    });
+
+    it('asks a SAT Student for a Class 12 result as well', async () => {
+      const { bucket, card } = await placed(SAT_STUDENT, IB_OR_A_LEVEL_AND_SAT);
+      expect(bucket).toBe('tellUsMore');
+      expect(card?.missing.map((m) => m.field)).toEqual(['class12Result']);
     });
   });
 });

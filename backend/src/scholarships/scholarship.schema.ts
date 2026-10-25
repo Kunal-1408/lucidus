@@ -38,6 +38,14 @@ export class Criterion {
   alternativeGroup?: string;
 }
 
+// The alternativeGroup to spread into a Criterion: the group, or nothing for
+// one that stands alone (so no empty key is stored).
+export function memberOf(
+  alternativeGroup: string | undefined,
+): Pick<Criterion, 'alternativeGroup'> {
+  return alternativeGroup ? { alternativeGroup } : {};
+}
+
 // Mirrored in frontend/src/app/api.ts.
 @Schema({ _id: false })
 export class ExtraRequirement {
