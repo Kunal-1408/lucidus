@@ -12,7 +12,7 @@ See spec: "Criteria and matching"; glossary terms Alternatives group and Test sc
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The spec owner picks an option and the spec (and glossary, if groups span fields) is updated to match
 - [x] If groups span fields: extraction rules, LLM guide, extractor grouping, Overrides and the Matcher built test-first; e2e over a fixture with "A-levels AAA, IB 39, or SAT ≥ 1450" that is Eligible for an A-level Student, an IB Student and a SAT Student
@@ -43,3 +43,5 @@ See spec: "Criteria and matching"; glossary terms Alternatives group and Test sc
 - `EXTRACTION_VERSION` stays 3 (nothing deployed since).
 
 **2026-10-25 (agent):** Merged into `integrate/abroad-wave-3` (3958b2f), review fixes (dafe5e5). Every box met; `npm run check` passes (backend 618, 1 skipped; frontend 122). Before deploy: `REAL_LLM=1 npx vitest run anthropic-llm` once (new optional `alternativeGroup` in the LLM schema). Status stays until merged to main + deploy + smoke check; then `Status: done`.
+
+**2026-10-26 (agent):** Deployed at 1399ae0; smoke check passes (commit, app page, Match, admin 401, 27/27 seed entries live). Closed.

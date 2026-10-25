@@ -35,3 +35,5 @@ See spec: "Ingestion", Further Notes, and `.scratch/students-abroad/research-wat
 - Provider type: GLOSSARY term added; stored keys `scholarshipType` (Watchlist) / `type` (Scholarship) kept, glossary says why
 
 **2026-10-25 (agent):** Merged into `integrate/abroad-wave-3` (bf7218d), Wave 3 review fixes (e51cd4a). Boxes met but the post-deploy one. SPDC false positive for a Student in India with destination IN accepted by the spec owner (2026-10-25). SPDC Override awaits operator confirm. Status stays until merged to main + deploy + ingestion run; then `Status: done`.
+
+**2026-10-26 (agent):** Smoke check at 1399ae0 passes, 27/27 seed entries live. Review report after ingestion: Imperial Bursary (low confidence `incomeBand`, see 09) and Nanyang Scholarship (no criteria). Loran, Schulich, Gates and the SPDC Override do not appear. Operator's `ingest` summary (each new source ok) not yet recorded; box and Status stay until it is.
