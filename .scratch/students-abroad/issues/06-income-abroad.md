@@ -6,7 +6,7 @@ See spec: "Profile" (family income), "Criteria and matching".
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Profile gains an income amount plus ISO 4217 currency, shown only when the country isn't India, currency defaulting to the country's
 - [x] Changing country clears whichever income answer no longer applies
@@ -38,3 +38,5 @@ New rules reach stored data through ticket 09's re-extraction: Scholarships alre
 **2026-10-25 (agent, review fixes on `fix/abroad-wave-2-review`):** The spec owner accepted both extras this ticket built beyond the spec: an income amount given in INR is judged against a rupee `incomeBand` limit, and backend validation rejects (400) a rupee band sent for a Student living abroad. Story 42: `foreignIncomeRule` now takes the period from the income limit phrase alone (the words naming the income just before "income", the cue, the figure and a period right after it), not the whole sentence, so "income under £30,000 … will receive £500 a month" stays a yearly limit; unit tests cover it. A limit in another currency than the Student's income now names the currency that would settle it, as Result scales do: "family income in USD", and "family income in INR" for a rupee limit when the Student gave another currency. `IncomeLimit` is `IncomeAmount & { period }` and the Matcher reads it through `asIncomeLimit`, without the `Partial<IncomeLimit>` cast. One `RUPEES` and one `CURRENCY_CODES`, both in `match/currencies.ts`, used by `normalise.ts`, the Matcher and `profile-input.ts`. The contract test's `formMoney` import is `formCurrencies`. The income e2e expects "family income in USD" for the Dubai Student.
 
 **2026-10-25 (agent):** Merged into `integrate/abroad-wave-2` (0704c9a), with the Wave 2 code-review fixes (9f2fa8f). Every box is met; `npm run check` passes (backend 593 tests, 1 skipped; frontend 121 tests). Status stays as is until the branch is merged to main and the deploy and smoke check pass; then set `Status: done`.
+
+**2026-10-25 (agent):** live via PR #14 (764b1d8). Smoke: 5/5 pass. Live `/api/match`: 400 for `incomeAmount` with country IN; 200 for Dubai, USD 60,000 (7 Tell us more: `incomeAmount` Criteria arrive with 09's re-extraction). `Status: done`.

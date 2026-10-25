@@ -6,7 +6,7 @@ See spec: "Which questions appear" (board narrowing), "Criteria and matching", g
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Scales: percentage, CGPA /10 (Class 10, CBSE), GPA /4, IB points (whole numbers 0–45), A-level grades (A*–E); each range-checked, invalid answers refused
 - [x] Board presets the scale (CBSE/CISCE/State percentage; Cambridge/UK A-level grades; IB IB points; US GPA); the Student may change it; changing board or scale clears the result
@@ -40,3 +40,5 @@ New rules reach stored data through ticket 09's re-extraction: Scholarships alre
 **2026-10-25 (agent, review fixes on `fix/abroad-wave-2-review`):** Story 32: `boardMarksLabel(question, profile, scale?)` now labels the Class 12 result for the scale it is answered on (the picked one, else `resultScale`): "High-school GPA" on GPA (so a US Student never reads "Class 12 marks"), "IB Diploma points" / "Predicted IB Diploma points" on IB points, "A-level grades" / "Predicted A-level grades" on A-level grades, and the Class 12 board result labels on percentage as before; the page passes `scaleOf(question)`. "A change of scale clears its result" moved from the page's `setScale` into the rules as `applyScaleChange(profile, question, scale)` (clears the result only when it is on another scale), with rules tests. Matcher: `conditions()` / `judge(condition)` are now `criterionGroups()` / `judgeGroup(group)` (GLOSSARY avoids "condition"); `MAX_MARKS_GAP` / `MAX_IB_POINTS_GAP` are `MAX_MARKS_GOAL_RISE` / `MAX_IB_POINTS_GOAL_RISE` (GLOSSARY avoids "gap"); `boardMarksGoal` reads its maxima from `RESULT_SCALE_RANGES`. One A-level grade check, `isALevelGrades` in `match/profile.ts`, used by the Matcher and `profile-input.ts`. In `extraction-rules.ts`, `minimumOn`'s `n` is `minimum` and `figure` is `minimumFound`. The cross-field case (a SAT score offered in place of A-levels or IB) moved to ticket 12. `npm run check` passes (see ticket 08's comment of the same date for counts).
 
 **2026-10-25 (agent):** Merged into `integrate/abroad-wave-2` (0805e29), with the Wave 2 code-review fixes (9f2fa8f). Every box is met; `npm run check` passes (backend 593 tests, 1 skipped; frontend 121 tests). Status stays as is until the branch is merged to main and the deploy and smoke check pass; then set `Status: done`. Open for the spec owner: an A-level Student below the grades on an IB-or-A-level page lands in Tell us more asking for IB points, as the spec's group rule says, not hidden.
+
+**2026-10-25 (agent):** live via PR #14 (764b1d8). Smoke: 5/5 pass, deployed commit included, 16/16 seed entries on Watchlist. Live `/api/match`: 400 for IB 46 ("whole number from 0 to 45"). Marks Criteria still old until 09 re-extracts. `Status: done`.
