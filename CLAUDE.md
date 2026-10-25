@@ -2,6 +2,10 @@
 
 `npm run check` at the repo root runs every format, lint, build and test check for backend/ and frontend/; the pre-commit hook and CI run the same. In a fresh clone, `npm run setup` installs all three packages first.
 
+## Tools
+
+Read files with Read, search with Grep and Glob, change files with Edit and Write; these need no approval and keep a run flowing. Keep Bash and PowerShell for git, npm and running scripts. This holds in every mode, auto mode included, and for subagents.
+
 ## Agent skills
 
 ### Issue tracker
