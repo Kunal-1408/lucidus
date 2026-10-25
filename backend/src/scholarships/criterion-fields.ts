@@ -12,8 +12,6 @@ export const CRITERION_FIELDS: Record<
   // Board marks: the value is a result on its Result scale.
   class10Result: { op: 'gte', changeable: true },
   class12Result: { op: 'gte', changeable: true },
-  class10Marks: { op: 'gte', changeable: true },
-  latestMarks: { op: 'gte', changeable: true },
   // Test scores apart from Board marks: a minimum ATAR, a minimum SAT score.
   atar: { op: 'gte', changeable: true },
   sat: { op: 'gte', changeable: true },
@@ -32,10 +30,6 @@ export const CRITERION_FIELDS: Record<
   homeState: { op: 'in', changeable: false },
   residenceStatus: { op: 'in', changeable: false },
   citizenshipCountry: { op: 'in', changeable: false },
-  // Replaced by homeState: only Criteria stored before it existed use it,
-  // and extraction no longer writes it (see LEGACY_FIELDS).
-  domicileState: { op: 'in', changeable: false },
-  schoolState: { op: 'in', changeable: false },
   schoolType: { op: 'in', changeable: false },
   board: { op: 'in', changeable: false },
   stream: { op: 'in', changeable: false },
@@ -58,23 +52,11 @@ export function isBoardMarksField(field: string): field is BoardMarksField {
   return (BOARD_MARKS_FIELDS as readonly string[]).includes(field);
 }
 
-// The percentage marks fields Board marks replaced, still read for stored
-// Criteria and Overrides until ticket 09 removes them.
-export const LEGACY_MARKS_FIELDS = ['class10Marks', 'latestMarks'] as const;
-
-export function isLegacyMarksField(field: string): boolean {
-  return (LEGACY_MARKS_FIELDS as readonly string[]).includes(field);
+// Whether a Criterion can check this field; stored Criteria and Overrides
+// may still name a field since removed.
+export function isCriterionField(field: string): boolean {
+  return Object.hasOwn(CRITERION_FIELDS, field);
 }
 
-// Fields stored Criteria and Overrides may still name, but that extraction
-// no longer produces: Board marks replaced the marks fields, Home state the
-// domicile state. Ticket 09 removes them.
-export const LEGACY_FIELDS: readonly string[] = [
-  ...LEGACY_MARKS_FIELDS,
-  'domicileState',
-];
-
 // The fields extraction (rules, the LLM, JSON sources) reads Criteria for.
-export const EXTRACTED_FIELDS = Object.keys(CRITERION_FIELDS).filter(
-  (field) => !LEGACY_FIELDS.includes(field),
-);
+export const EXTRACTED_FIELDS = Object.keys(CRITERION_FIELDS);

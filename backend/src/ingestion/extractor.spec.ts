@@ -183,7 +183,6 @@ describe('Normalisation onto the fixed lists', () => {
     ['Applicants must be domiciled in Orissa.', ['odisha']],
   ])('reads the states in "%s" as the Home state', (text, slugs) => {
     expect(criterion(text, 'homeState')?.value).toEqual(slugs);
-    expect(criterion(text, 'domicileState')).toBeUndefined();
   });
 
   it('reads no disability Criterion from a seat reservation', () => {

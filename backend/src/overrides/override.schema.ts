@@ -2,7 +2,14 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 export const OVERRIDE_ACTIONS = ['approve', 'replace'] as const;
 export type OverrideAction = (typeof OVERRIDE_ACTIONS)[number];
-export const OVERRIDE_RESULTS = ['applied', 'invalid', 'page changed'] as const;
+// Lapsed: it names a field Criteria no longer check, or approves an
+// extraction read again since; it stays lapsed until a reviewer replaces it.
+export const OVERRIDE_RESULTS = [
+  'applied',
+  'invalid',
+  'page changed',
+  'lapsed',
+] as const;
 export type OverrideResult = (typeof OVERRIDE_RESULTS)[number];
 
 // A corrected Criterion as the reviewer writes it: the field, its raw
@@ -56,7 +63,7 @@ export class Override {
   @Prop({ type: String, enum: OVERRIDE_RESULTS })
   lastResult?: OverrideResult;
 
-  // Why it was skipped, when invalid.
+  // Why it was skipped, when invalid or lapsed.
   @Prop({ type: [String], default: undefined })
   problems?: string[];
 }

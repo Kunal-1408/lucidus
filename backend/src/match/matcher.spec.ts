@@ -76,9 +76,9 @@ describe('Matcher: never-changeable fields', () => {
       { citizenship: 'other' },
     ],
     [
-      'domicile',
-      { field: 'domicileState', value: 'kerala' },
-      { domicileState: 'goa' },
+      'Home state',
+      { field: 'homeState', op: 'in', value: ['kerala'] },
+      { countryOfResidence: 'AE', homeState: 'goa' },
     ],
     [
       'income',
@@ -257,107 +257,62 @@ describe('Matcher: list answers and yes/no answers', () => {
   });
 });
 
+const percent = (value: number) => ({ scale: 'percentage' as const, value });
+const resultAtLeast = (
+  field: 'class10Result' | 'class12Result',
+  value: number,
+  changeable = true,
+) => scholarship([{ field, op: 'gte', value: percent(value), changeable }]);
+// A Class 12 Student with this percentage, boards upcoming or not.
+const class12 = (value: number, boardsUpcoming?: boolean): Profile => ({
+  class: 12,
+  class12Result: percent(value),
+  ...(boardsUpcoming !== undefined && { boardsUpcoming }),
+});
+
 describe('Matcher: marks', () => {
-  const latestAtLeast = (value: number) =>
-    scholarship([{ field: 'latestMarks', op: 'gte', value, changeable: true }]);
-
-  it('is Within reach with a Goal when boards are upcoming and the gap is small', () => {
-    const profile: Profile = { latestMarks: 76, boardsUpcoming: true };
-    const card = cardFor(profile, latestAtLeast(80));
-    expect(bucketOf(profile, latestAtLeast(80))).toBe('withinReach');
-    expect(card.goals).toEqual(['Score 80% to unlock this']);
-  });
-
   it.each<[string, Profile, number, string]>([
-    [
-      'gap of exactly 5',
-      { latestMarks: 75, boardsUpcoming: true },
-      80,
-      'withinReach',
-    ],
-    ['gap of 6', { latestMarks: 74, boardsUpcoming: true }, 80, 'hidden'],
-    [
-      'boards already taken',
-      { latestMarks: 79, boardsUpcoming: false },
-      80,
-      'hidden',
-    ],
-    [
-      'not known whether boards are upcoming',
-      { latestMarks: 79 },
-      80,
-      'hidden',
-    ],
-    [
-      'target above 100',
-      { latestMarks: 97, boardsUpcoming: true },
-      101,
-      'hidden',
-    ],
-    [
-      'target of exactly 100',
-      { latestMarks: 96, boardsUpcoming: true },
-      100,
-      'withinReach',
-    ],
+    ['gap of exactly 5', class12(75, true), 80, 'withinReach'],
+    ['gap of 6', class12(74, true), 80, 'hidden'],
+    ['boards already taken', class12(79, false), 80, 'hidden'],
+    ['not known whether boards are upcoming', class12(79), 80, 'hidden'],
+    ['target above 100', class12(97, true), 101, 'hidden'],
+    ['target of exactly 100', class12(96, true), 100, 'withinReach'],
   ])('marks shortfall with %s', (_, profile, target, bucket) => {
-    expect(bucketOf(profile, latestAtLeast(target))).toBe(bucket);
-  });
-
-  it('treats a marks fail the Criterion says is not changeable as a hard fail', () => {
-    const s = scholarship([
-      { field: 'latestMarks', op: 'gte', value: 80, changeable: false },
-    ]);
-    expect(bucketOf({ latestMarks: 78, boardsUpcoming: true }, s)).toBe(
-      'hidden',
+    expect(bucketOf(profile, resultAtLeast('class12Result', target))).toBe(
+      bucket,
     );
   });
 
-  it('checks the marks field the Criterion names', () => {
-    const profile: Profile = { class10Marks: 70, latestMarks: 90 };
-    const onClass10 = scholarship([
-      { field: 'class10Marks', op: 'gte', value: 80, changeable: true },
-    ]);
-    expect(bucketOf(profile, latestAtLeast(80))).toBe('eligible');
-    expect(bucketOf(profile, onClass10)).toBe('hidden');
-  });
-
-  it('phrases a Class 10 marks Goal for Class 10 marks', () => {
-    const s = scholarship([
-      { field: 'class10Marks', op: 'gte', value: 80, changeable: true },
-    ]);
-    const card = cardFor({ class10Marks: 77, boardsUpcoming: true }, s);
-    expect(card.goals).toEqual(['Score 80% in Class 10 to unlock this']);
+  it('treats a marks fail the Criterion says is not changeable as a hard fail', () => {
+    const s = resultAtLeast('class12Result', 80, false);
+    expect(bucketOf(class12(78, true), s)).toBe('hidden');
   });
 
   it('keeps a Within reach card with unknowns Within reach and lists the missing fields', () => {
     const s = scholarship([
-      { field: 'latestMarks', op: 'gte', value: 80, changeable: true },
+      {
+        field: 'class12Result',
+        op: 'gte',
+        value: percent(80),
+        changeable: true,
+      },
       { field: 'category', value: 'sc' },
     ]);
-    const profile: Profile = { latestMarks: 78, boardsUpcoming: true };
-    expect(bucketOf(profile, s)).toBe('withinReach');
-    expect(cardFor(profile, s).missing).toEqual([
+    expect(bucketOf(class12(78, true), s)).toBe('withinReach');
+    expect(cardFor(class12(78, true), s).missing).toEqual([
       { field: 'category', label: 'category' },
     ]);
   });
 
   it('gives Eligible and Tell us more cards no Goals', () => {
-    expect(cardFor({ latestMarks: 90 }, latestAtLeast(80)).goals).toEqual([]);
-    expect(cardFor({}, latestAtLeast(80)).goals).toEqual([]);
+    const s = resultAtLeast('class12Result', 80);
+    expect(cardFor(class12(90), s).goals).toEqual([]);
+    expect(cardFor({}, s).goals).toEqual([]);
   });
 });
 
 describe('Matcher: Board marks', () => {
-  const percent = (value: number) => ({ scale: 'percentage' as const, value });
-  const resultAtLeast = (
-    field: 'class10Result' | 'class12Result',
-    value: number,
-  ) =>
-    scholarship([
-      { field, op: 'gte', value: percent(value), changeable: true },
-    ]);
-
   it('passes, fails and asks on the result the Criterion names', () => {
     const profile: Profile = {
       class: 12,
@@ -626,40 +581,31 @@ describe('Matcher: class and UG admission', () => {
 });
 
 describe('Matcher: the two-Goal cap', () => {
-  const profile: Profile = {
-    class: 10,
-    class10Marks: 78,
-    latestMarks: 78,
-    boardsUpcoming: true,
-  };
+  const profile = class12(78, true);
   const classUp = {
     field: 'class',
     op: 'in' as const,
-    value: [11],
+    value: ['ug'],
     changeable: true,
   };
-  const marks = (field: string) => ({
-    field,
+  const marks = (value: number) => ({
+    field: 'class12Result',
     op: 'gte' as const,
-    value: 80,
+    value: percent(value),
     changeable: true,
   });
 
   it('keeps a card with two Goals Within reach', () => {
-    const s = scholarship([classUp, marks('latestMarks')]);
+    const s = scholarship([classUp, marks(80)]);
     expect(bucketOf(profile, s)).toBe('withinReach');
     expect(cardFor(profile, s).goals).toEqual([
-      NEXT_YEAR,
-      'Score 80% to unlock this',
+      UG_GOAL,
+      'Score 80% in Class 12 to unlock this',
     ]);
   });
 
   it('leaves out a card with three Goals', () => {
-    const s = scholarship([
-      classUp,
-      marks('latestMarks'),
-      marks('class10Marks'),
-    ]);
+    const s = scholarship([classUp, marks(80), marks(82)]);
     expect(bucketOf(profile, s)).toBe('hidden');
   });
 
@@ -688,11 +634,14 @@ describe('Matcher: Deadline status', () => {
     expect(bucketOf(eligibleProfile, closed([{}]))).toBe('hidden');
     expect(bucketOf({}, closed([{}]))).toBe('hidden');
     const marks = closed([
-      { field: 'latestMarks', op: 'gte', value: 80, changeable: true },
+      {
+        field: 'class12Result',
+        op: 'gte',
+        value: percent(80),
+        changeable: true,
+      },
     ]);
-    expect(bucketOf({ latestMarks: 78, boardsUpcoming: true }, marks)).toBe(
-      'hidden',
-    );
+    expect(bucketOf(class12(78, true), marks)).toBe('hidden');
     const ug = closed([{ field: 'class', value: 'ug', changeable: true }]);
     expect(bucketOf({ class: 12 }, ug)).toBe('hidden');
   });
@@ -724,27 +673,16 @@ describe('Matcher: sort order', () => {
     expect(names(r.eligible)).toEqual(['August', 'September', 'None']);
   });
 
-  it('sorts next-class cards after the rest of Within reach, each by deadline', () => {
-    const nextClass = {
-      field: 'class',
-      op: 'in' as const,
-      value: [11],
-      changeable: true,
-    };
+  it('sorts Within reach cards by deadline, next-class cards too', () => {
     const marks = {
-      field: 'latestMarks',
+      field: 'class12Result',
       op: 'gte' as const,
-      value: 80,
+      value: percent(80),
       changeable: true,
     };
-    const r = match(
-      { class: 10, latestMarks: 78, boardsUpcoming: true },
+    const marksCards = match(
+      class12(78, true),
       [
-        scholarship([nextClass], { name: 'Next, none' }),
-        scholarship([nextClass], {
-          name: 'Next, past',
-          deadline: '2026-06-01',
-        }),
         scholarship([marks], { name: 'Marks, none' }),
         scholarship([marks], {
           name: 'Marks, December',
@@ -754,10 +692,29 @@ describe('Matcher: sort order', () => {
       ],
       TODAY,
     );
-    expect(names(r.withinReach)).toEqual([
+    expect(names(marksCards.withinReach)).toEqual([
       'Marks, August',
       'Marks, December',
       'Marks, none',
+    ]);
+    const nextClass = {
+      field: 'class',
+      op: 'in' as const,
+      value: [11],
+      changeable: true,
+    };
+    const nextClassCards = match(
+      { class: 10 },
+      [
+        scholarship([nextClass], { name: 'Next, none' }),
+        scholarship([nextClass], {
+          name: 'Next, past',
+          deadline: '2026-06-01',
+        }),
+      ],
+      TODAY,
+    );
+    expect(names(nextClassCards.withinReach)).toEqual([
       'Next, past',
       'Next, none',
     ]);
@@ -784,11 +741,11 @@ describe('Matcher: missing fields', () => {
     const s = scholarship([
       { field: 'incomeBand', op: 'lte', value: 250000 },
       { field: 'incomeBand', op: 'gte', value: 100000 },
-      { field: 'domicileState', value: 'kerala' },
+      { field: 'schoolType', op: 'in', value: ['government'] },
     ]);
     expect(cardFor({}, s).missing).toEqual([
       { field: 'incomeBand', label: 'family income' },
-      { field: 'domicileState', label: 'home state' },
+      { field: 'schoolType', label: 'school type' },
     ]);
   });
 });
@@ -819,23 +776,8 @@ describe('Matcher: where the Student lives and their Citizenship', () => {
       { countryOfResidence: 'AE' },
       'tellUsMore',
     ],
-    [
-      'an old Profile giving a domicile state',
-      { domicileState: 'kerala' },
-      'eligible',
-    ],
   ])('Home state: %s', (_, profile, bucket) => {
     expect(bucketOf(profile, homeState(['kerala']))).toBe(bucket);
-  });
-
-  it('judges an old domicile Criterion on the Home state', () => {
-    const domicile = scholarship([
-      { field: 'domicileState', op: 'in', value: ['kerala'] },
-    ]);
-    expect(bucketOf(inIndia('IN-KL'), domicile)).toBe('eligible');
-    expect(
-      bucketOf({ countryOfResidence: 'AE', homeState: 'goa' }, domicile),
-    ).toBe('hidden');
   });
 
   it('judges country of residence, region and Residence status as given', () => {

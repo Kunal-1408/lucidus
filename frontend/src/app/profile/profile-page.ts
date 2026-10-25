@@ -31,7 +31,6 @@ import {
   checkAnswer,
   findSubjects,
   incomeCurrency,
-  profileForMatch,
   readResult,
   resultScale,
   shownResult,
@@ -51,8 +50,6 @@ type ChoiceField =
   | 'homeState'
   | 'residenceStatus'
   | 'citizenshipCountry'
-  | 'domicileState'
-  | 'schoolState'
   | 'schoolType'
   | 'citizenship'
   | 'board'
@@ -116,9 +113,6 @@ export class ProfilePage {
   // The scale the Student picked for each Board marks question, if any.
   private readonly pickedScales = signal<Partial<Record<BoardMarksQuestion, ResultScale>>>({});
   protected readonly shownResult = shownResult;
-  // School state defaults to the Home state of a Student in India until the
-  // Student changes it; abroad there is no default.
-  protected readonly schoolState = computed(() => profileForMatch(this.profile()).schoolState);
   // The currency of the family income amount: one picked before any amount
   // is typed, else the answer's, else the country's own.
   private readonly pickedCurrency = signal<string | undefined>(undefined);
