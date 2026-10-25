@@ -2,7 +2,9 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
 export type SourceType = 'html' | 'pdf' | 'json';
-// Who offers a Scholarship; a foundation is neither a company nor a state.
+// The Provider type: who offers a Scholarship; a foundation is neither a
+// company nor a state. Stored as scholarshipType here and type on a
+// Scholarship, keys older than the term (see GLOSSARY.md).
 export const PROVIDER_TYPES = [
   'government',
   'corporate',

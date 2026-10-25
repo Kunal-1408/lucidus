@@ -28,3 +28,12 @@ See spec: "Ingestion", "Audit".
 - `scripts/admin.mjs audit`
 - saved-Profile migration on load now only drops unknown questions and a non-country destination; old domicile/marks/destination names no longer mapped (Visitors not seen since Wave 1/2 lose those answers)
 - removed field names stay in tests only, as stored-data inputs
+
+**2026-10-25 (agent):** Wave 3 review fixes on `fix/abroad-wave-3-review`.
+- saved-Profile migration restored (spec "Migration on load", stories 54/55): `domicileState` → `IN` + ISO region (= Home state); old destinations `india`/`uk`/`usa`/`canada`/`australia`/`germany` → ISO codes; `class10Marks` → `class10Result` percentage; `latestMarks`, `schoolState` dropped. Old keys live only in `migrateSavedProfile` (`OLD_DESTINATIONS` private) and its tests. Previous bullet above superseded
+- audit: low Criteria now checked by value too, read as approve would (`approvedValue`); unreadable raw value → new problem `raw value outside the allowed options`
+- audit entry: `id`/`name`/`schemeName` → `scholarshipId`/`scholarshipName`/`sourceUrl` (name = the Override key's name)
+- one home: `CLASSES`, `INCOME_PERIODS`, `isInRange` in match/profile.ts; `UG` exported from matcher.ts; audit, normalise, profile-input use them
+- `SkippedResult` + `isSkipped` (override.schema.ts): invalid/lapsed handled once in ingestion, override-check, review report (`SkippedOverrideEntry`, replaces Invalid/LapsedOverrideEntry; JSON unchanged)
+- reuse decision: `reusable()` in ingestion.service.ts returns `ExtractionOrigin` (`stored` / `read again` / `new text`, extractor.ts); `checkOverride` takes the origin instead of `readAgain`
+- kept: approve Overrides lapse on re-extraction (spec owner's call)

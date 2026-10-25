@@ -63,6 +63,10 @@ The Profile fields asked up front: class, country of residence and its state or 
 A funding opportunity offered by a provider, recorded from an official source. Never deleted; it becomes inactive when its source no longer lists it.
 _Avoid_: Scheme, grant, award, opportunity
 
+**Provider type**:
+Who offers a Scholarship: government, corporate, university or foundation (neither a company nor a state). Code names it `ProviderType`; the stored keys predate the term and keep their names so live data needs no migration: `scholarshipType` on a Watchlist entry, `type` on a Scholarship.
+_Avoid_: Scholarship type, category (that is the Student's)
+
 **Official source**:
 A page, PDF or data feed published by the scholarship's provider or a government portal. Aggregator sites are never sources.
 _Avoid_: Site, `aggregator`, listing

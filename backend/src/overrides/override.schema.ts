@@ -12,6 +12,16 @@ export const OVERRIDE_RESULTS = [
 ] as const;
 export type OverrideResult = (typeof OVERRIDE_RESULTS)[number];
 
+// The results that skip an Override for the current text, each recorded with
+// its problems: invalid (fixable by a corrected Override) or lapsed.
+export type SkippedResult = Extract<OverrideResult, 'invalid' | 'lapsed'>;
+
+export function isSkipped(
+  result: OverrideResult | undefined,
+): result is SkippedResult {
+  return result === 'invalid' || result === 'lapsed';
+}
+
 // A corrected Criterion as the reviewer writes it: the field, its raw
 // value(s) as the fixed lists name them (as the LLM gives them), and the
 // sentence on the page it comes from. The code sets op and changeability.

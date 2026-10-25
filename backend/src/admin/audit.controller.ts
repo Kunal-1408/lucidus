@@ -9,12 +9,12 @@ import { Scholarship } from '../scholarships/scholarship.schema.js';
 import { AdminTokenGuard } from './admin-token.guard.js';
 
 // A stored Criterion no valid Profile could ever satisfy, with its
-// Scholarship and the sentence it came from.
+// Scholarship and the sentence it came from. The Scholarship's name and
+// source URL are the key an Override for it is written under.
 export interface AuditEntry {
-  id: string;
-  name: string;
+  scholarshipId: string;
+  scholarshipName: string;
   sourceUrl: string;
-  schemeName: string;
   field: string;
   value: unknown;
   sourceText: string;
@@ -45,10 +45,9 @@ export class AuditController {
         if (!problem) return [];
         return [
           {
-            id: scholarship._id.toHexString(),
-            name: scholarship.name,
+            scholarshipId: scholarship._id.toHexString(),
+            scholarshipName: scholarship.name,
             sourceUrl: scholarship.sourceUrl,
-            schemeName: scholarship.schemeName,
             field: criterion.field,
             value: criterion.value,
             sourceText: criterion.sourceText,

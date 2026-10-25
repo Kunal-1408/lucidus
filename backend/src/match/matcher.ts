@@ -322,7 +322,7 @@ const MAX_MARKS_GOAL_RISE = 5;
 // The same on IB points; never on A-level grades, a CGPA or a GPA.
 const MAX_IB_POINTS_GOAL_RISE = 2;
 // The class value a Criterion uses to require undergraduate admission.
-const UG = 'ug';
+export const UG = 'ug';
 const NEXT_CLASS_GOAL = 'Eligible from next year: watch for the next round';
 const UG_GOAL = 'Get admitted to an undergraduate course to unlock this';
 
