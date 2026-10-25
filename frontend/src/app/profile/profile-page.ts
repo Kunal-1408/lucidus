@@ -24,6 +24,7 @@ import {
 } from '../profile-fields';
 import {
   applyChange,
+  applyScaleChange,
   BOARD_MARKS_FIELDS,
   BoardMarksQuestion,
   boardMarksLabel,
@@ -38,6 +39,7 @@ import {
   subjectAnswer,
   TEST_SCORE_RANGES,
   subjectNote,
+  TestScoreField,
   visibleQuestions,
 } from '../profile-rules';
 import { ProfileStore } from '../profile-store';
@@ -62,7 +64,6 @@ type ChoiceField =
   | 'category';
 type YesNoField = 'boardsUpcoming' | 'minority' | 'disability' | 'singleGirlChild';
 type MultiField = 'parentOccupation' | 'examsQualified';
-type TestScore = keyof typeof TEST_SCORE_RANGES;
 
 // The test scores, each asked as a number in its range.
 const TEST_SCORES = (
@@ -102,7 +103,7 @@ export class ProfilePage {
   protected readonly boardMarksLabel = boardMarksLabel;
   protected readonly testScores = TEST_SCORES;
   // Why the last score typed into a test score field was not saved.
-  protected readonly scoreErrors = signal<Partial<Record<TestScore, string>>>({});
+  protected readonly scoreErrors = signal<Partial<Record<TestScoreField, string>>>({});
 
   protected readonly profile = this.store.profile;
   protected readonly shown = computed(() => visibleQuestions(this.profile()));
@@ -187,11 +188,12 @@ export class ProfilePage {
     return RESULT_SCALES.filter((option) => SLOT_SCALES[question].includes(option.value));
   }
 
-  // A change of scale clears the result, which was on the old scale.
-  protected setScale(question: BoardMarksQuestion, scale: string) {
-    this.pickedScales.update((picked) => ({ ...picked, [question]: scale as ResultScale }));
+  // The rules clear a result on the old scale (applyScaleChange).
+  protected setScale(question: BoardMarksQuestion, value: string) {
+    const scale = value as ResultScale;
+    this.pickedScales.update((picked) => ({ ...picked, [question]: scale }));
     this.marksErrors.update((errors) => ({ ...errors, [question]: undefined }));
-    this.update({ [question]: undefined });
+    this.store.profile.update((p) => applyScaleChange(p, question, scale));
   }
 
   // A change of board resets the scales to the new board's presets (the
@@ -212,7 +214,7 @@ export class ProfilePage {
 
   // An empty field clears the score; a score out of range is not saved and
   // the field says why.
-  protected setTestScore(question: TestScore, typed: string) {
+  protected setTestScore(question: TestScoreField, typed: string) {
     const score = typed.trim() === '' ? undefined : Number(typed);
     const error = score === undefined ? undefined : checkAnswer(question, score);
     this.scoreErrors.update((errors) => ({ ...errors, [question]: error }));

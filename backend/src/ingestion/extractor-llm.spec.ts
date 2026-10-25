@@ -139,6 +139,29 @@ describe('Extractor with the LLM for what the rules miss', () => {
     ]);
   });
 
+  it('keeps a home or international award from the LLM only beside a destination', async () => {
+    const overseas = 'Meant for overseas learners.';
+    const canada = 'Tenable at Canadian institutions.';
+    const home = {
+      field: 'destinationIsResidence',
+      values: ['no'],
+      quote: overseas,
+    };
+    const fieldsOf = async (answer: Partial<LlmAnswer>) =>
+      (
+        await extract([overseas, canada].join('\n'), fakeLlm(answer).llm)
+      ).criteria.map((c) => c.field);
+    expect(await fieldsOf({ criteria: [home] })).toEqual([]);
+    expect(
+      await fieldsOf({
+        criteria: [
+          home,
+          { field: 'destination', values: ['CA'], quote: canada },
+        ],
+      }),
+    ).toEqual(['destinationIsResidence', 'destination']);
+  });
+
   it('sets the same op on an LLM Criterion as the rules set for its field', async () => {
     const ladies = 'Only young ladies may apply.';
     const passport = 'Applicants must hold a passport issued by India.';

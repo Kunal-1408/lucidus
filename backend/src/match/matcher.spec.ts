@@ -203,6 +203,23 @@ describe('Matcher: family income as an amount in a currency', () => {
       { field: 'incomeAmount', label: 'family income' },
     ]);
   });
+
+  it('names the currency that would settle a limit in another currency', () => {
+    const card = cardFor(abroad('GBP', 50000), limit(5000, 'USD', 'monthly'));
+    expect(card.missing).toEqual([
+      { field: 'incomeAmount', label: 'family income in USD' },
+    ]);
+  });
+
+  it('names rupees for a rupee limit a Student abroad gave another currency for', () => {
+    const rupeeLimit = scholarship([
+      { field: 'incomeBand', op: 'lte', value: 250000 },
+    ]);
+    const card = cardFor(abroad('AED', 1000), rupeeLimit);
+    expect(card.missing).toEqual([
+      { field: 'incomeBand', label: 'family income in INR' },
+    ]);
+  });
 });
 
 describe('Matcher: list answers and yes/no answers', () => {

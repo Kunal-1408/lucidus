@@ -1,7 +1,7 @@
 // Normalisation: turns the raw values the rules (and, later, the LLM) find
 // into the exact values the Matcher compares against the Profile.
 import { COUNTRIES, REGIONS } from '../match/countries.js';
-import { CURRENCIES } from '../match/currencies.js';
+import { CURRENCY_CODES, RUPEES } from '../match/currencies.js';
 import {
   type ALevelGrade,
   type BoardResult,
@@ -13,6 +13,7 @@ import {
   type ResultScale,
   SLOT_SCALES,
   TEST_SCORE_RANGES,
+  type TestScoreField,
 } from '../match/profile.js';
 import {
   type BoardMarksField,
@@ -198,7 +199,9 @@ const ISO_CODE_FIELDS = [
 
 // The destinations a Profile or Criterion named before they became ISO
 // codes, with the code each now is ("other" named no country). Stored
-// Criteria and Overrides may still hold them until ticket 09 re-extracts.
+// Criteria and Overrides may still hold them until ticket 09 re-extracts;
+// University pointers are still stored under them (frontend copy:
+// LEGACY_DESTINATIONS in frontend/src/app/profile-rules.ts).
 export const LEGACY_DESTINATIONS: Record<string, string> = {
   india: 'IN',
   uk: 'GB',
@@ -207,6 +210,14 @@ export const LEGACY_DESTINATIONS: Record<string, string> = {
   australia: 'AU',
   germany: 'DE',
 };
+
+// The ISO code an old destination name now is, or undefined for any other
+// value.
+export function legacyDestinationCode(value: unknown): string | undefined {
+  return typeof value === 'string' && Object.hasOwn(LEGACY_DESTINATIONS, value)
+    ? LEGACY_DESTINATIONS[value]
+    : undefined;
+}
 
 // The value a Criterion stores for a raw value a rule found, or undefined
 // when it falls outside the field's fixed list (the Criterion is dropped).
@@ -264,9 +275,9 @@ export function normaliseValue(
 // destination name is read as its code.
 function isoCode(field: string, raw: string): string {
   const code = raw.trim();
-  if (field === 'destination' && Object.hasOwn(LEGACY_DESTINATIONS, code))
-    return LEGACY_DESTINATIONS[code];
-  return code.toUpperCase();
+  const legacy =
+    field === 'destination' ? legacyDestinationCode(code) : undefined;
+  return legacy ?? code.toUpperCase();
 }
 
 // A percentage of marks, 0–100.
@@ -278,7 +289,7 @@ function toPercent(raw: string | string[]): number | undefined {
 // A minimum ATAR ("99.90") or SAT score ("1400", "1,400"), dropped when it
 // is outside the score's range or no minimum at all.
 function toTestScore(
-  field: 'atar' | 'sat',
+  field: TestScoreField,
   raw: string | string[],
 ): number | undefined {
   if (typeof raw !== 'string') return undefined;
@@ -412,11 +423,9 @@ const CURRENCY_SIGNS: Record<string, string> = {
   '£': 'GBP',
   '€': 'EUR',
 };
-const CURRENCY_CODES = CURRENCIES.map((currency) => currency.value);
-const RUPEES = 'INR';
 // A currency sign or an upper-case ISO 4217 code, then a figure:
 // "US$ 5000", "£62,215", "AED 250,000".
-const FOREIGN_MONEY =
+export const FOREIGN_MONEY =
   /([A-Z]{1,2}\$|£|€|\b[A-Z]{3}\b)\s*\(?\s*(\d[\d,]*(?:\.\d+)?)/g;
 const MONTHLY = /\bmonth(?:ly)?\b|\bper mensem\b/i;
 

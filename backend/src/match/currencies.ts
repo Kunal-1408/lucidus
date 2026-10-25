@@ -167,6 +167,13 @@ export const CURRENCIES: readonly Currency[] = [
   { value: 'ZMW', label: 'Zambian Kwacha (ZMW)' },
 ];
 
+// Every ISO 4217 code above.
+export const CURRENCY_CODES = CURRENCIES.map((currency) => currency.value);
+
+// India's currency. A rupee income limit is a rupee band limit (incomeBand),
+// never an income amount limit.
+export const RUPEES = 'INR';
+
 // Each country's currency, by ISO 3166-1 alpha-2 code. A country with no
 // currency of its own (Antarctica) has none.
 export const COUNTRY_CURRENCIES: Readonly<Record<string, string>> = {

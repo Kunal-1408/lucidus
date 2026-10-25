@@ -36,9 +36,9 @@ const FIELD_GUIDE: Record<string, string> = {
     'the countries the Student must be a citizen of, other than India, each an ISO 3166-1 alpha-2 code such as "US"',
   fieldOfStudy: `the broad groups of subjects the Student must study, one or more of: ${FIXED_LISTS.fieldOfStudy.join(', ')} (science is the natural sciences, arts is arts and humanities, other is any subject outside these groups)`,
   destination:
-    'the countries the Student must study in, each an ISO 3166-1 alpha-2 code such as "GB" or "US"; leave it out when the text only says "India"',
+    'the countries the Student must study in, each an ISO 3166-1 alpha-2 code such as "GB" or "US", including the country an award for home or international students names ("international students in Canada" is "CA"); "IN" only when the text restricts study to India, not when it mentions India in passing',
   destinationIsResidence:
-    '"yes" when only home (domestic) students of the country of study may apply, "no" when only international (overseas) students may apply',
+    '"yes" when only home (domestic) students of the country of study may apply, "no" when only international (overseas) students may apply; it is kept only when the text also names the country of study (destination)',
 };
 
 function guideFor(field: string): string {

@@ -74,19 +74,23 @@ function unaskedTestScores(profile: Profile): Question[] {
   return unasked;
 }
 
+// The Profile fields holding a Test score (backend copy: TestScoreField in
+// backend/src/match/profile.ts).
+export type TestScoreField = 'atar' | 'sat';
+
 // The range of each test score (backend copy: TEST_SCORE_RANGES in
 // backend/src/match/profile.ts).
-export const TEST_SCORE_RANGES: Record<'atar' | 'sat', [min: number, max: number]> = {
+export const TEST_SCORE_RANGES: Record<TestScoreField, [min: number, max: number]> = {
   atar: [0, 99.95],
   sat: [400, 1600],
 };
 
-const OUT_OF_RANGE_SCORE: Record<keyof typeof TEST_SCORE_RANGES, string> = {
+const OUT_OF_RANGE_SCORE: Record<TestScoreField, string> = {
   atar: 'Enter an ATAR from 0 to 99.95.',
   sat: 'Enter a SAT score from 400 to 1600.',
 };
 
-function checkTestScore(question: keyof typeof TEST_SCORE_RANGES, answer: unknown) {
+function checkTestScore(question: TestScoreField, answer: unknown) {
   const [min, max] = TEST_SCORE_RANGES[question];
   const inRange = typeof answer === 'number' && answer >= min && answer <= max;
   return inRange ? undefined : OUT_OF_RANGE_SCORE[question];
@@ -200,13 +204,33 @@ export function shownResult(result: BoardResult | undefined): string | number {
   return result.scale === 'a_level' ? result.value.join('') : result.value;
 }
 
-// How a Board marks question is put to the Student: a Class 12 Student whose
-// boards are upcoming gives the result they expect.
-export function boardMarksLabel(question: BoardMarksQuestion, profile: Profile): string {
+// How a Board marks question is put to the Student, on the scale it is
+// answered on (the one picked, else resultScale's): a Class 12 result reads
+// as the result that scale gives (a US Student's GPA is a high-school GPA,
+// not Class 12 marks), and a Class 12 Student whose boards are upcoming gives
+// the result they expect.
+const CLASS_12_LABELS: Record<ResultScale, { done: string; upcoming: string }> = {
+  percentage: {
+    done: 'Class 12 board result',
+    upcoming: 'Expected Class 12 result (pre-boards or predicted)',
+  },
+  cgpa_10: {
+    done: 'Class 12 board result',
+    upcoming: 'Expected Class 12 result (pre-boards or predicted)',
+  },
+  gpa_4: { done: 'High-school GPA', upcoming: 'High-school GPA' },
+  ib_points: { done: 'IB Diploma points', upcoming: 'Predicted IB Diploma points' },
+  a_level: { done: 'A-level grades', upcoming: 'Predicted A-level grades' },
+};
+
+export function boardMarksLabel(
+  question: BoardMarksQuestion,
+  profile: Profile,
+  scale: ResultScale = resultScale(question, profile),
+): string {
   if (question === 'class10Result') return 'Class 10 board result';
-  return profile.class === 12 && profile.boardsUpcoming === true
-    ? 'Expected Class 12 result (pre-boards or predicted)'
-    : 'Class 12 board result';
+  const labels = CLASS_12_LABELS[scale];
+  return profile.class === 12 && profile.boardsUpcoming === true ? labels.upcoming : labels.done;
 }
 
 // The Profile after a change: the changed answers applied, and every answer
@@ -217,9 +241,21 @@ export function applyChange(profile: Profile, change: Partial<Profile>): Profile
   );
 }
 
+// The Profile after the Student picks a scale for a Board marks question: a
+// result on another scale is cleared, so it is never read on the new one.
+export function applyScaleChange(
+  profile: Profile,
+  question: BoardMarksQuestion,
+  scale: ResultScale,
+): Profile {
+  if (profile[question] === undefined || profile[question].scale === scale) return profile;
+  const { [question]: _cleared, ...kept } = profile;
+  return kept;
+}
+
 // A change of board clears both results, unless the change gives them again,
-// so a result is never read on the board's new scale. (A change of scale
-// clears its result too: the page sends the result as cleared.)
+// so a result is never read on the board's new scale (a change of scale is
+// applyScaleChange).
 function withBoardClears(before: Profile, next: Profile, change: Partial<Profile>): Profile {
   if (!('board' in change) || change.board === before.board) return next;
   const cleared = { ...next };
@@ -348,7 +384,7 @@ export function migrateSavedProfile(saved: Record<string, unknown>): Profile {
 // The destinations the form offered before every country, with the code each
 // now is (backend copy: LEGACY_DESTINATIONS in
 // backend/src/ingestion/normalise.ts).
-const LEGACY_DESTINATIONS: Record<string, string> = {
+export const LEGACY_DESTINATIONS: Record<string, string> = {
   india: 'IN',
   uk: 'GB',
   usa: 'US',

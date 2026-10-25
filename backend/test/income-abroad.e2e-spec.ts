@@ -89,7 +89,7 @@ describe('Family income abroad, through the Match endpoint', () => {
     expect(await bucketOf(profile)).toBe(bucket);
   });
 
-  it('asks for the family income it needs', async () => {
+  it('asks for the family income it needs, in the currency that would settle it', async () => {
     const res = await harness
       .http()
       .post('/api/match')
@@ -99,7 +99,7 @@ describe('Family income abroad, through the Match endpoint', () => {
       res.body.tellUsMore as { name: string; missing: unknown[] }[]
     ).find((c) => c.name === NAME);
     expect(card?.missing).toEqual([
-      { field: 'incomeAmount', label: 'family income' },
+      { field: 'incomeAmount', label: 'family income in USD' },
     ]);
   });
 });

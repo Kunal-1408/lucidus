@@ -71,7 +71,7 @@ export async function extract(
   const llmDeadline = quotedValue(text, answer.deadline);
   const deadline = byRules.deadline ?? (llmDeadline && toIsoDate(llmDeadline));
   return {
-    criteria: [...byRules.criteria, ...fromLlm],
+    criteria: withDestinationForHome([...byRules.criteria, ...fromLlm]),
     extraRequirements,
     amountText,
     deadline,
@@ -91,11 +91,20 @@ export function extractByRules(text: string): Extraction {
     .map((c) => ({ ...c, confidence: 'high' as const }));
   const deadline = deadlineText(sentences);
   return {
-    criteria,
+    criteria: withDestinationForHome(criteria),
     extraRequirements: marksExtraRequirements(eligibility),
     amountText: amountRule(sentences) ?? AMOUNT_NOT_STATED,
     deadline: deadline && toIsoDate(deadline),
   };
+}
+
+// A home or international award (destinationIsResidence) is kept only beside
+// the destination it is home or international to. Alone it would pass a
+// Student going anywhere abroad: Pearson's award for international students
+// in Canada would show to a Student in India going to the UK.
+function withDestinationForHome(criteria: Criterion[]): Criterion[] {
+  if (criteria.some((c) => c.field === 'destination')) return criteria;
+  return criteria.filter((c) => c.field !== 'destinationIsResidence');
 }
 
 function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {

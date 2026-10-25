@@ -104,8 +104,9 @@ describe('The demo Watchlist', () => {
   });
 
   // Until ticket 07 the rules read nothing on this page and it went to the
-  // Review report; "an award for international students" is now read.
-  it('reads the Pearson page as an award for international students', async () => {
+  // Review report; "an award for international students" is now read, with
+  // the country it names ("for international students in Canada").
+  it('reads the Pearson page as an award for international students in Canada', async () => {
     await harness.ingest();
     const pearson = 'Lester B. Pearson International Scholarship';
     const shownTo = async (profile: object) => {
@@ -125,6 +126,9 @@ describe('The demo Watchlist', () => {
     ).toContain(pearson);
     expect(
       await shownTo({ countryOfResidence: 'CA', destination: 'CA' }),
+    ).not.toContain(pearson);
+    expect(
+      await shownTo({ countryOfResidence: 'IN', destination: 'GB' }),
     ).not.toContain(pearson);
   });
 

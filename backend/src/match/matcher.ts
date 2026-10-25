@@ -7,8 +7,9 @@ import {
   type BoardMarksField,
   isBoardMarksField,
 } from '../scholarships/criterion-fields.js';
-import { LEGACY_DESTINATIONS } from '../ingestion/normalise.js';
+import { legacyDestinationCode } from '../ingestion/normalise.js';
 import { INDIA } from './countries.js';
+import { RUPEES } from './currencies.js';
 import {
   A_LEVEL_GRADES,
   type ALevelGrade,
@@ -16,7 +17,9 @@ import {
   type IncomeAmount,
   type IncomeLimit,
   type IndianState,
+  isALevelGrades,
   type Profile,
+  RESULT_SCALE_RANGES,
   type ResultScale,
   STATE_REGIONS,
 } from './profile.js';
@@ -160,7 +163,9 @@ function place(
   s: MatchableScholarship,
   today: string,
 ): Placed | undefined {
-  const judged = conditions(s.criteria).map((c) => judge(c, profile));
+  const judged = criterionGroups(s.criteria).map((group) =>
+    judgeGroup(group, profile),
+  );
   const fails = judged.filter((j) => j.outcome === 'fail');
   const unknown = judged.flatMap((j) => j.unknown);
   const missing = missingFields(unknown, profile);
@@ -175,7 +180,7 @@ function place(
     };
   }
   if (fails.length > MAX_GOALS) return undefined;
-  // A failing alternatives group takes the Goal of the first member that
+  // A failing Alternatives group takes the Goal of the first member that
   // has one.
   const goals = fails.map((j) =>
     j.failing.map((c) => goalFor(c, profile)).find((g) => g !== undefined),
@@ -191,9 +196,10 @@ function place(
   };
 }
 
-// The conditions a Scholarship sets, in order: each Criterion that stands
-// alone, and each alternatives group with all its members.
-function conditions(criteria: Criterion[]): Criterion[][] {
+// A Scholarship's Criteria as they are judged, in order: each Criterion that
+// stands alone as a group of one, and each Alternatives group with all its
+// members.
+function criterionGroups(criteria: Criterion[]): Criterion[][] {
   const groups = new Map<string, Criterion[]>();
   const result: Criterion[][] = [];
   for (const criterion of criteria) {
@@ -222,10 +228,11 @@ interface Judged {
   failing: Criterion[];
 }
 
-// A condition passes when any member passes, fails when every member fails,
-// and is otherwise unknown (a Criterion standing alone is a group of one).
-function judge(condition: Criterion[], profile: Profile): Judged {
-  const outcomes = condition.map((c) => ({ c, o: evaluate(c, profile) }));
+// An Alternatives group passes when any member passes, fails when every
+// member fails, and is otherwise unknown (a Criterion standing alone is a
+// group of one).
+function judgeGroup(group: Criterion[], profile: Profile): Judged {
+  const outcomes = group.map((c) => ({ c, o: evaluate(c, profile) }));
   const membersWith = (o: Outcome) =>
     outcomes.filter((x) => x.o === o).map((x) => x.c);
   const unknown = membersWith('unknown');
@@ -238,21 +245,53 @@ function judge(condition: Criterion[], profile: Profile): Judged {
 
 // The answers that would settle the unknown Criteria, each named once. A
 // Board marks Criterion on another scale than the Student's result names the
-// scale it needs.
+// scale it needs, and an income limit in another currency than the Student's
+// income names the currency it needs ("family income in USD").
 function missingFields(unknown: Criterion[], profile: Profile): MissingField[] {
   const missing = new Map<string, MissingField>();
   for (const criterion of unknown) {
     const { field } = criterion;
-    let label = FIELD_LABELS[field] ?? field;
-    if (isBoardMarksField(field)) {
-      const target = asBoardResult(criterion.value);
-      const answer = profile[field];
-      if (target && answer && target.scale !== answer.scale)
-        label = `${label} in ${SCALE_LABELS[target.scale]}`;
-    }
-    missing.set(label, { field, label });
+    const label = FIELD_LABELS[field] ?? field;
+    const needs =
+      neededScale(criterion, profile) ?? neededCurrency(criterion, profile);
+    const named = needs ? `${label} in ${needs}` : label;
+    missing.set(named, { field, label: named });
   }
   return [...missing.values()];
+}
+
+// The Result scale a Board marks Criterion needs, when the Student's result
+// is on another.
+function neededScale(
+  criterion: Criterion,
+  profile: Profile,
+): string | undefined {
+  const { field } = criterion;
+  if (!isBoardMarksField(field)) return undefined;
+  const target = asBoardResult(criterion.value);
+  const answer = profile[field];
+  return target && answer && target.scale !== answer.scale
+    ? SCALE_LABELS[target.scale]
+    : undefined;
+}
+
+// The currency an income limit is in, when the Student's income is in
+// another: a rupee limit (incomeBand) is in INR.
+function neededCurrency(
+  criterion: Criterion,
+  profile: Profile,
+): string | undefined {
+  const income = profile.incomeAmount;
+  if (income === undefined) return undefined;
+  const currency =
+    criterion.field === 'incomeBand'
+      ? RUPEES
+      : criterion.field === 'incomeAmount'
+        ? asIncomeAmount(criterion.value)?.currency
+        : undefined;
+  return currency !== undefined && currency !== income.currency
+    ? currency
+    : undefined;
 }
 
 const CLOSING_SOON_DAYS = 30;
@@ -282,10 +321,11 @@ function bySortOrder(a: Placed, b: Placed): number {
 
 // More Goals than this and a scholarship is no longer honestly within reach.
 const MAX_GOALS = 2;
-// A marks shortfall counts only while boards are upcoming, and only this big.
-const MAX_MARKS_GAP = 5;
+// A marks Goal is offered only while boards are upcoming, and only for a
+// rise of at most this many percentage points.
+const MAX_MARKS_GOAL_RISE = 5;
 // The same on IB points; never on A-level grades, a CGPA or a GPA.
-const MAX_IB_POINTS_GAP = 2;
+const MAX_IB_POINTS_GOAL_RISE = 2;
 // The class value a Criterion uses to require undergraduate admission.
 const UG = 'ug';
 const NEXT_CLASS_GOAL = 'Eligible from next year: watch for the next round';
@@ -303,8 +343,9 @@ function goalFor(criterion: Criterion, profile: Profile): string | undefined {
     profile.boardsUpcoming === true
   ) {
     const target = Number(value);
-    const gap = target - Number(profile[field]);
-    if (target > 100 || gap > MAX_MARKS_GAP) return undefined;
+    const rise = target - Number(profile[field]);
+    const [, maxPercent] = RESULT_SCALE_RANGES.percentage;
+    if (target > maxPercent || rise > MAX_MARKS_GOAL_RISE) return undefined;
     return field === 'class10Marks'
       ? `Score ${target}% in Class 10 to unlock this`
       : `Score ${target}% to unlock this`;
@@ -320,12 +361,12 @@ function goalFor(criterion: Criterion, profile: Profile): string | undefined {
   return undefined;
 }
 
-// Today's marks rule on Board marks: a percentage shortfall of at most 5,
-// or one of at most 2 IB points, is a Goal while the boards for that result
-// are still upcoming. Only a Class
-// 12 result can be: a Class 12 Student's upcoming boards are Class 12's
-// (their Class 10 result is final), and a Class 10 Student with boards
-// upcoming gives no Class 10 result (the Board marks grid).
+// Today's marks rule on Board marks: a rise of at most 5 percentage points,
+// or of at most 2 IB points, is a Goal while the boards for that result are
+// still upcoming. Only a Class 12 result can be: a Class 12 Student's
+// upcoming boards are Class 12's (their Class 10 result is final), and a
+// Class 10 Student with boards upcoming gives no Class 10 result (the Board
+// marks grid).
 function boardMarksGoal(
   criterion: Criterion,
   profile: Profile,
@@ -337,13 +378,15 @@ function boardMarksGoal(
   if (!target || !answer) return undefined;
   if (profile.boardsUpcoming !== true || profile.class !== 12) return undefined;
   if (target.scale === 'percentage' && answer.scale === 'percentage') {
-    if (target.value > 100 || target.value - answer.value > MAX_MARKS_GAP)
-      return undefined;
+    const [, max] = RESULT_SCALE_RANGES.percentage;
+    const rise = target.value - answer.value;
+    if (target.value > max || rise > MAX_MARKS_GOAL_RISE) return undefined;
     return `Score ${target.value}% in Class 12 to unlock this`;
   }
   if (target.scale === 'ib_points' && answer.scale === 'ib_points') {
-    if (target.value > 45 || target.value - answer.value > MAX_IB_POINTS_GAP)
-      return undefined;
+    const [, max] = RESULT_SCALE_RANGES.ib_points;
+    const rise = target.value - answer.value;
+    if (target.value > max || rise > MAX_IB_POINTS_GOAL_RISE) return undefined;
     return `Score ${target.value} IB points to unlock this`;
   }
   return undefined;
@@ -354,17 +397,11 @@ function asBoardResult(value: unknown): BoardResult | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const { scale, value: result } = value as Record<string, unknown>;
   if (scale === 'a_level') {
-    return Array.isArray(result) && result.every(isALevelGrade)
-      ? { scale, value: result }
-      : undefined;
+    return isALevelGrades(result) ? { scale, value: result } : undefined;
   }
   return typeof scale === 'string' && typeof result === 'number'
     ? { scale: scale as Exclude<ResultScale, 'a_level'>, value: result }
     : undefined;
-}
-
-function isALevelGrade(grade: unknown): grade is ALevelGrade {
-  return (A_LEVEL_GRADES as readonly unknown[]).includes(grade);
 }
 
 // A result passes a threshold on its own scale; on another scale it can't be
@@ -469,7 +506,11 @@ function compare(criterion: Criterion, answer: unknown): Outcome {
   if (criterion.field === 'incomeBand' && asIncomeAmount(answer)) {
     // A rupee limit is a yearly limit in INR.
     if (op !== 'lte') return 'unknown';
-    const limit = { currency: RUPEES, period: 'yearly', value: Number(value) };
+    const limit: IncomeLimit = {
+      currency: RUPEES,
+      period: 'yearly',
+      value: Number(value),
+    };
     return compareIncomeAmount(limit, answer);
   }
   if (criterion.field === 'incomeBand' && (op === 'lte' || op === 'gte')) {
@@ -477,8 +518,12 @@ function compare(criterion: Criterion, answer: unknown): Outcome {
   }
   const answers = Array.isArray(answer) ? answer : [answer];
   const listed = op === 'in' && Array.isArray(value) ? value : [value];
+  // A stored destination Criterion may still name a destination as the
+  // Profile did before ISO codes (until ticket 09 re-extracts).
   const allowed =
-    criterion.field === 'destination' ? listed.map(destinationCode) : listed;
+    criterion.field === 'destination'
+      ? listed.map((v) => legacyDestinationCode(v) ?? v)
+      : listed;
   const passes =
     op === 'eq' || op === 'in'
       ? answers.some((a) => allowed.includes(a))
@@ -490,7 +535,6 @@ function compare(criterion: Criterion, answer: unknown): Outcome {
   return passes ? 'pass' : 'fail';
 }
 
-const RUPEES = 'INR';
 const MONTHS_IN_A_YEAR = 12;
 
 // An income amount, or undefined when the value isn't one.
@@ -502,25 +546,25 @@ function asIncomeAmount(value: unknown): IncomeAmount | undefined {
     : undefined;
 }
 
+// An income limit, or undefined when the value isn't one; a limit stating no
+// period is yearly, as income limits usually are.
+function asIncomeLimit(value: unknown): IncomeLimit | undefined {
+  const amount = asIncomeAmount(value);
+  if (!amount) return undefined;
+  const { period } = value as Record<string, unknown>;
+  return { ...amount, period: period === 'monthly' ? 'monthly' : 'yearly' };
+}
+
 // A yearly income against a limit in the same currency, a monthly limit
 // counted as twelve months. In another currency it can't be judged, since
 // incomes are never converted.
 function compareIncomeAmount(threshold: unknown, answer: unknown): Outcome {
-  const limit = asIncomeAmount(threshold);
+  const limit = asIncomeLimit(threshold);
   const income = asIncomeAmount(answer);
   if (!limit || !income || limit.currency !== income.currency) return 'unknown';
-  const period = (threshold as Partial<IncomeLimit>).period;
   const yearly =
-    period === 'monthly' ? limit.value * MONTHS_IN_A_YEAR : limit.value;
+    limit.period === 'monthly' ? limit.value * MONTHS_IN_A_YEAR : limit.value;
   return income.value <= yearly ? 'pass' : 'fail';
-}
-
-// A stored destination Criterion may still name a destination as the Profile
-// did before ISO codes (until ticket 09 re-extracts).
-function destinationCode(value: unknown): unknown {
-  return typeof value === 'string' && Object.hasOwn(LEGACY_DESTINATIONS, value)
-    ? LEGACY_DESTINATIONS[value]
-    : value;
 }
 
 function compareIncome(

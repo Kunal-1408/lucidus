@@ -33,6 +33,9 @@ const STATE_SCIENCE = 'Science Talent Award';
 // Was in the Review report, hidden, until ticket 07 read it as an award for
 // international students: with no destination given, each of these Profiles
 // is asked where they want to study. No Indian scheme's bucket changed.
+// Since the Wave 2 review it also holds the country it names (Canada), and
+// home or international is read only beside that destination; with no
+// destination given both stay unknown, so it stays in Tell us more.
 const PEARSON = 'Lester B. Pearson International Scholarship';
 
 const NEXT_CLASS = 'Eligible from next year: watch for the next round';

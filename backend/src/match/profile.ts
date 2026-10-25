@@ -108,6 +108,17 @@ export type ResultScale =
 export const A_LEVEL_GRADES = ['A*', 'A', 'B', 'C', 'D', 'E'] as const;
 export type ALevelGrade = (typeof A_LEVEL_GRADES)[number];
 
+// A-level grades as a result holds them: one or more, each from A* to E.
+export function isALevelGrades(value: unknown): value is ALevelGrade[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((grade) =>
+      (A_LEVEL_GRADES as readonly unknown[]).includes(grade),
+    )
+  );
+}
+
 // A Board marks result: a value on its Result scale, a number on every
 // scale but A-level grades, which are a list of grades ("A*AB"). A
 // Criterion on a Board marks field holds its threshold in the same shape
@@ -140,11 +151,15 @@ export const RESULT_SCALE_RANGES: Record<
   ib_points: [0, 45],
 };
 
-// The range of each test score, kept apart from Board marks: the ATAR is a
-// rank, the SAT a test score, neither a Result scale (frontend copy:
-// TEST_SCORE_RANGES in frontend/src/app/profile-rules.ts).
+// The Profile fields holding a Test score, kept apart from Board marks
+// (frontend copy: TestScoreField in frontend/src/app/profile-rules.ts).
+export type TestScoreField = 'atar' | 'sat';
+
+// The range of each test score: the ATAR is a rank, the SAT a test score,
+// neither a Result scale (frontend copy: TEST_SCORE_RANGES in
+// frontend/src/app/profile-rules.ts).
 export const TEST_SCORE_RANGES: Record<
-  'atar' | 'sat',
+  TestScoreField,
   [min: number, max: number]
 > = {
   atar: [0, 99.95],
@@ -176,15 +191,11 @@ export type IncomePeriod = 'monthly' | 'yearly';
 
 // An income limit on a Criterion: at most this amount, in this currency,
 // per this period.
-export interface IncomeLimit {
-  currency: string;
-  period: IncomePeriod;
-  value: number;
-}
+export type IncomeLimit = IncomeAmount & { period: IncomePeriod };
 
 // The Field of study groups every subject belongs to; a subject the Student
-// types belongs to other (frontend copy: FIELD_OF_STUDY_GROUPS in
-// frontend/src/app/profile-fields.ts). science is Natural sciences and arts
+// types belongs to other (frontend copy: FieldOfStudyGroup, the values of
+// FIELDS_OF_STUDY in frontend/src/app/profile-fields.ts). science is Natural sciences and arts
 // is Arts and humanities, keeping the values saved Profiles and stored
 // Criteria already use.
 export type FieldOfStudyGroup =

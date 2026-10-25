@@ -6,17 +6,10 @@ export const WORQNOW = Symbol('WORQNOW');
 
 // The destinations WorqNow covers. The pointers are stored and returned
 // under these names, which the Profile used before destinations became ISO
-// codes.
+// codes; each one's ISO code is its LEGACY_DESTINATIONS entry
+// (ingestion/normalise.ts).
 export const POINTER_COUNTRIES = ['uk', 'usa', 'canada', 'australia'] as const;
 export type PointerCountry = (typeof POINTER_COUNTRIES)[number];
-
-// The ISO 3166-1 alpha-2 destination each pointer country is.
-export const POINTER_COUNTRY_CODES: Record<PointerCountry, string> = {
-  uk: 'GB',
-  usa: 'US',
-  canada: 'CA',
-  australia: 'AU',
-};
 
 export interface WorqNowUniversity {
   code: string;

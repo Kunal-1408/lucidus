@@ -12,19 +12,19 @@ import {
   LEGACY_MARKS_FIELDS,
 } from '../scholarships/criterion-fields.js';
 import { INDIA } from './countries.js';
-import { CURRENCIES } from './currencies.js';
+import { CURRENCY_CODES } from './currencies.js';
 import { INCOME_BANDS } from './matcher.js';
 import {
-  A_LEVEL_GRADES,
-  type ALevelGrade,
   type BoardResult,
   type IncomeAmount,
+  isALevelGrades,
   NO_CLASS_10_EXAM_BOARDS,
   NO_CLASS_12_EXAM_BOARDS,
   type Profile,
   RESULT_SCALE_RANGES,
   SLOT_SCALES,
   TEST_SCORE_RANGES,
+  type TestScoreField,
 } from './profile.js';
 
 export type ProfileParseResult =
@@ -51,7 +51,7 @@ const ONE_OF_FIELDS = [
 ] as const;
 const LIST_FIELDS = ['parentOccupation', 'examsQualified'] as const;
 // Test scores, each a number in its range (TEST_SCORE_RANGES).
-const TEST_SCORE_FIELDS = ['atar', 'sat'] as const;
+const TEST_SCORE_FIELDS: readonly TestScoreField[] = ['atar', 'sat'];
 
 // Checks the Profile sent in a Match request against the rules the form
 // applies (the frontend's copy is frontend/src/app/profile-rules.ts):
@@ -247,16 +247,6 @@ function boardResult(
   return value === undefined ? undefined : { scale, value };
 }
 
-function isALevelGrades(value: unknown): value is ALevelGrade[] {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every((grade) =>
-      (A_LEVEL_GRADES as readonly unknown[]).includes(grade),
-    )
-  );
-}
-
 // The Board marks grid, as the form applies it: a Class 10 result from
 // Class 10 once its boards are done, a Class 12 result only in Class 12,
 // and boards upcoming only in a class that ends in board exams. A Student
@@ -291,8 +281,6 @@ function boardMarksContradictions(raw: Record<string, unknown>): string[] {
 
 // Family income abroad: an amount of 0 or more in an ISO 4217 currency
 // (frontend copy: checkIncomeAmount in frontend/src/app/profile-rules.ts).
-const CURRENCY_CODES = CURRENCIES.map((currency) => currency.value);
-
 function incomeAmount(
   raw: Record<string, unknown>,
   reasons: string[],
