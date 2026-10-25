@@ -40,3 +40,5 @@ Only the four conditions above. Anything else found while building (a Criterion 
   - Extraction rules still produce `stream` (extraction-rules.ts:489), `schoolType` (:389), `parentOccupation` (:580) and `nmms` (:601) Criteria; unchanged.
   - Board `other` hides the stream, so a Student on an Indian board not listed (e.g. NIOS) who picks `other` loses it.
 - Process: the original worktree was cleaned up after a dropped connection (no work lost); rebuilt in `.claude/worktrees/abroad-13-indian-only` from the same branch.
+
+**2026-10-26 (spec owner, via agent):** Accepted gap, no ticket: a Criterion on `stream`, `schoolType`, `parentOccupation` or `examsQualified: nmms` stays unknown for a Student not asked it, so its scholarship lands in Tell us more naming a question the form doesn't show them. Stored Scholarships not re-extracted for this (CODING_STANDARDS "New rules reach stored data": gap named here). Revisit only if it shows up in use.
