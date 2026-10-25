@@ -116,7 +116,16 @@ function replacementCriteria(
       reasons.push(`${label}.values must be allowed options for ${field}`);
     }
     const sourceText = text(raw, 'sourceText', reasons, `${label}.sourceText`);
-    return { field: field!, values: values!, sourceText: sourceText! };
+    const alternativeGroup =
+      raw.alternativeGroup === undefined
+        ? undefined
+        : text(raw, 'alternativeGroup', reasons, `${label}.alternativeGroup`);
+    return {
+      field: field!,
+      values: values!,
+      sourceText: sourceText!,
+      ...(alternativeGroup && { alternativeGroup }),
+    };
   });
 }
 

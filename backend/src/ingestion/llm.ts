@@ -36,6 +36,10 @@ export interface CriterionReading {
   // ("11"), a percentage ("60") or a money figure ("Rs. 2.5 lakh").
   values: string[];
   quote: string;
+  // The Alternatives group it belongs to, when the source accepts it in
+  // place of other Criteria. The LLM names only "class12Result", for a Test
+  // score offered in place of a Class 12 result; a reviewer names any group.
+  alternativeGroup?: string;
 }
 
 export interface Quoted {

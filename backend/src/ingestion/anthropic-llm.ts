@@ -54,6 +54,7 @@ Rules:
 - criteria: one entry per requested field the text restricts, using only the values allowed for that field. Leave a field out when the text doesn't restrict it.
 - extraRequirements: conditions on who may apply that none of the profile fields listed can answer (for example "top 1% in your board", "not receiving another scholarship", "born after 2010"). Write each as a short phrase for the Student. Documents to submit are not requirements.
 - Marks: only a Class 10 or Class 12 board exam result is a criterion. Marks required in any other year (for example Class 7 or Class 8), GCSE or IGCSE grades, and results on any other scale (a weighted GPA, AP exam scores, Quebec's R score) are extraRequirements. A minimum ATAR or SAT score is not Board marks: it is the atar or sat criterion.
+- Alternatives: when the text accepts an ATAR or SAT score in place of a Class 12 result ("A-levels AAA, IB 39, or SAT 1450"), give that atar or sat criterion alternativeGroup "class12Result". Leave alternativeGroup out everywhere else, including when the text asks for the score as well as the result.
 - amountText: what the Scholarship pays, copied as the text words it (for example "full tuition" or "₹10,000 per month"), with its quote; null when the text doesn't say or it wasn't asked for.
 - deadline: the last date a Student can apply, copied exactly as the text writes the date, with its quote; null when the text doesn't say or it wasn't asked for.`;
 
@@ -80,6 +81,9 @@ const SCHEMA = {
           field: { type: 'string', enum: EXTRACTED_FIELDS },
           values: { type: 'array', items: { type: 'string' } },
           quote: { type: 'string' },
+          // Optional: only on a Test score offered in place of a Class 12
+          // result.
+          alternativeGroup: { type: 'string', enum: ['class12Result'] },
         },
       },
     },
