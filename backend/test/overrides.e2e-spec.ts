@@ -149,7 +149,7 @@ describe('Overrides', () => {
         'reviewedBy is required',
         'criteria[0].field must be one of ' +
           'class, class10Result, class12Result, class10Marks, latestMarks, ' +
-          'incomeBand, incomeAmount, gender, category, ' +
+          'atar, sat, incomeBand, incomeAmount, gender, category, ' +
           'minority, disability, singleGirlChild, citizenship, ' +
           'countryOfResidence, region, homeState, residenceStatus, ' +
           'citizenshipCountry, domicileState, schoolState, schoolType, ' +

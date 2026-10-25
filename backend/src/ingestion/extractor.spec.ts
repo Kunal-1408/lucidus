@@ -56,6 +56,10 @@ describe('Extractor rules on a myScheme page (NMMSS)', () => {
     ]);
   });
 
+  it('reads no SAT score from the Scholastic Aptitude Test cut-off', () => {
+    expect(criterion(nmmss, 'sat')).toBeUndefined();
+  });
+
   it('shows the Class 8 marks rule as an Extra requirement', () => {
     expect(extractByRules(nmmss).extraRequirements).toEqual([
       {
@@ -212,6 +216,40 @@ describe('Normalisation onto the fixed lists', () => {
     expect(criterion(abroad, 'destination')?.value).toEqual(['GB']);
     const home = 'For students who will study at a college in India.';
     expect(criterion(home, 'destination')).toBeUndefined();
+  });
+
+  it.each([
+    ['Have achieved an ATAR of at least 99.90.', 'atar', 99.9],
+    [
+      'Students must be predicted by their school to achieve an ATAR of 95 or higher.',
+      'atar',
+      95,
+    ],
+    ['American: SAT score ≥ 1450.', 'sat', 1450],
+    [
+      'Minimum 98 percent with 2 APs at grade 5 or SAT composite score of 1200.',
+      'sat',
+      1200,
+    ],
+    ['Applicants need a minimum SAT score of 1,300.', 'sat', 1300],
+  ])('reads "%s" as a minimum %s, changeable', (text, field, value) => {
+    expect(criterion(text, field)).toMatchObject({
+      field,
+      op: 'gte',
+      value,
+      changeable: true,
+    });
+  });
+
+  it.each([
+    [
+      'Submit standardized test scores from the SAT or ACT (no minimum score).',
+      'sat',
+    ],
+    ['An ATAR of 120 is required.', 'atar'],
+    ['A SAT score of 1700 is required.', 'sat'],
+  ])('reads no test score from "%s"', (text, field) => {
+    expect(criterion(text, field)).toBeUndefined();
   });
 
   it('still reads a scholarship reserved for students with disabilities', () => {

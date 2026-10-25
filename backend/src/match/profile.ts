@@ -140,6 +140,17 @@ export const RESULT_SCALE_RANGES: Record<
   ib_points: [0, 45],
 };
 
+// The range of each test score, kept apart from Board marks: the ATAR is a
+// rank, the SAT a test score, neither a Result scale (frontend copy:
+// TEST_SCORE_RANGES in frontend/src/app/profile-rules.ts).
+export const TEST_SCORE_RANGES: Record<
+  'atar' | 'sat',
+  [min: number, max: number]
+> = {
+  atar: [0, 99.95],
+  sat: [400, 1600],
+};
+
 // Board narrowing (frontend copies of the same names in
 // frontend/src/app/profile-rules.ts): Cambridge/UK, IB and US high school
 // have no Class 10 board exam, so no Class 10 result and no boards upcoming
@@ -221,6 +232,11 @@ export interface Profile {
   boardsUpcoming?: boolean;
   class10Result?: BoardResult;
   class12Result?: BoardResult;
+  // Test scores apart from Board marks: the ATAR only for a Student living
+  // in Australia, the SAT score only on the US high-school board or for a
+  // Student heading to the US (ranges in TEST_SCORE_RANGES).
+  atar?: number;
+  sat?: number;
   stream?: 'science' | 'commerce' | 'arts' | 'not_chosen';
   // A Field of study group. The subject a Student picks or types stays in
   // the form: Criteria name groups only.

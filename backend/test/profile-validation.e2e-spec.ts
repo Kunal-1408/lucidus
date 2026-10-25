@@ -365,4 +365,56 @@ describe('Match request Profile validation', () => {
       expect(res.body.message).toEqual([reason]);
     });
   });
+
+  describe('ATAR and SAT', () => {
+    it.each([
+      ['an ATAR in Australia', { countryOfResidence: 'AU', atar: 99.95 }],
+      ['an ATAR of 0', { countryOfResidence: 'AU', atar: 0 }],
+      ['a SAT score on the US board', { board: 'us_high_school', sat: 1600 }],
+      ['a SAT score heading to the US', { destination: 'US', sat: 400 }],
+    ])('matches %s', async (_, profile) => {
+      await matchWith(profile).expect(200);
+    });
+
+    it.each([
+      [
+        'an ATAR over 99.95',
+        { countryOfResidence: 'AU', atar: 100 },
+        'atar must be from 0 to 99.95',
+      ],
+      [
+        'an ATAR that is no number',
+        { countryOfResidence: 'AU', atar: '95' },
+        'atar must be from 0 to 99.95',
+      ],
+      [
+        'an ATAR outside Australia',
+        { countryOfResidence: 'NZ', atar: 90 },
+        'atar is only asked when countryOfResidence is AU',
+      ],
+      [
+        'an ATAR without a country',
+        { atar: 90 },
+        'atar is only asked when countryOfResidence is AU',
+      ],
+      [
+        'a SAT score under 400',
+        { destination: 'US', sat: 399 },
+        'sat must be from 400 to 1600',
+      ],
+      [
+        'a SAT score over 1600',
+        { board: 'us_high_school', sat: 1610 },
+        'sat must be from 400 to 1600',
+      ],
+      [
+        'a SAT score off the US board and not heading to the US',
+        { board: 'cbse', destination: 'GB', sat: 1400 },
+        'sat is only asked for the us_high_school board or when destination is US',
+      ],
+    ])('answers 400 for %s, naming the field', async (_, profile, reason) => {
+      const res = await matchWith(profile).expect(400);
+      expect(res.body.message).toEqual([reason]);
+    });
+  });
 });

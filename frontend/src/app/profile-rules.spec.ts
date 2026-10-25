@@ -578,3 +578,63 @@ describe('migrateSavedProfile: field of study and destination', () => {
     },
   );
 });
+
+// ATAR and SAT: test scores apart from Board marks, each asked only where it
+// applies.
+describe('ATAR and SAT', () => {
+  const asked = (profile: Profile, question: Question) => visibleQuestions(profile).has(question);
+
+  it('asks for the ATAR only of a Student living in Australia', () => {
+    expect(asked({ countryOfResidence: 'AU' }, 'atar')).toBe(true);
+    expect(asked({ countryOfResidence: 'IN' }, 'atar')).toBe(false);
+    expect(asked({ countryOfResidence: 'NZ', destination: 'AU' }, 'atar')).toBe(false);
+    expect(asked({}, 'atar')).toBe(false);
+  });
+
+  it('asks for the SAT score only on the US high-school board or of a Student heading to the US', () => {
+    expect(asked({ board: 'us_high_school' }, 'sat')).toBe(true);
+    expect(asked({ destination: 'US' }, 'sat')).toBe(true);
+    expect(asked({ board: 'cbse', destination: 'US' }, 'sat')).toBe(true);
+    expect(asked({ countryOfResidence: 'US' }, 'sat')).toBe(false);
+    expect(asked({ board: 'cbse', destination: 'GB' }, 'sat')).toBe(false);
+    expect(asked({}, 'sat')).toBe(false);
+  });
+
+  it('clears the ATAR when the Student leaves Australia', () => {
+    expect(
+      applyChange({ countryOfResidence: 'AU', atar: 95.5 }, { countryOfResidence: 'NZ' }),
+    ).toEqual({ countryOfResidence: 'NZ' });
+    expect(applyChange({ countryOfResidence: 'AU', atar: 95.5 }, { class: 12 })).toEqual({
+      countryOfResidence: 'AU',
+      atar: 95.5,
+      class: 12,
+    });
+  });
+
+  it('clears the SAT score once neither the board nor the destination asks for it', () => {
+    expect(applyChange({ destination: 'US', sat: 1400 }, { destination: 'CA' })).toEqual({
+      destination: 'CA',
+    });
+    expect(applyChange({ board: 'us_high_school', sat: 1400 }, { board: 'ib' })).toEqual({
+      board: 'ib',
+    });
+    expect(
+      applyChange({ board: 'us_high_school', destination: 'US', sat: 1400 }, { board: 'ib' }),
+    ).toEqual({ board: 'ib', destination: 'US', sat: 1400 });
+  });
+
+  it('refuses an ATAR outside 0 to 99.95', () => {
+    expect(checkAnswer('atar', 0)).toBeUndefined();
+    expect(checkAnswer('atar', 99.95)).toBeUndefined();
+    expect(checkAnswer('atar', 99.96)).toBe('Enter an ATAR from 0 to 99.95.');
+    expect(checkAnswer('atar', -1)).toBe('Enter an ATAR from 0 to 99.95.');
+    expect(checkAnswer('atar', Number.NaN)).toBe('Enter an ATAR from 0 to 99.95.');
+  });
+
+  it('refuses a SAT score outside 400 to 1600', () => {
+    expect(checkAnswer('sat', 400)).toBeUndefined();
+    expect(checkAnswer('sat', 1600)).toBeUndefined();
+    expect(checkAnswer('sat', 399)).toBe('Enter a SAT score from 400 to 1600.');
+    expect(checkAnswer('sat', 1610)).toBe('Enter a SAT score from 400 to 1600.');
+  });
+});

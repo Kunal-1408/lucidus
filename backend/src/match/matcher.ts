@@ -96,6 +96,8 @@ const FIELD_LABELS: Record<string, string> = {
   class10Result: 'Class 10 result',
   class12Result: 'Class 12 result',
   boardsUpcoming: 'whether your boards are upcoming',
+  atar: 'ATAR',
+  sat: 'SAT score',
   stream: 'stream',
   fieldOfStudy: 'intended field of study',
   destination: 'study destination',

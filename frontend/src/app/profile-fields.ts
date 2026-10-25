@@ -246,6 +246,11 @@ export interface Profile {
   boardsUpcoming?: boolean;
   class10Result?: BoardResult;
   class12Result?: BoardResult;
+  // Test scores apart from Board marks: the ATAR (0–99.95) only for a Student
+  // living in Australia, the SAT score (400–1600) only on the US high-school
+  // board or for a Student heading to the US.
+  atar?: number;
+  sat?: number;
   stream?: ValueOf<typeof STREAMS>;
   fieldOfStudy?: FieldOfStudyGroup;
   // The subject the Student picked from SUBJECTS or typed (then the group is

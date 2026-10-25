@@ -157,6 +157,27 @@
     }
   }
 
+  @for (score of testScores; track score.question) {
+    @if (shown().has(score.question)) {
+      <label>
+        {{ score.label }}
+        <input
+          type="number"
+          [min]="score.min"
+          [max]="score.max"
+          [step]="score.step"
+          inputmode="decimal"
+          [value]="profile()[score.question] ?? ''"
+          [attr.aria-invalid]="scoreErrors()[score.question] ? true : null"
+          (change)="setTestScore(score.question, $any($event.target).value)"
+        />
+        @if (scoreErrors()[score.question]; as error) {
+          <span class="field-error" role="alert">{{ error }}</span>
+        }
+      </label>
+    }
+  }
+
   <label>
     Gender
     <select (change)="setChoice('gender', $any($event.target).value)">

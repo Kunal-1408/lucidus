@@ -34,6 +34,8 @@ const QUESTIONS: readonly Question[] = [
   'boardsUpcoming',
   'class10Result',
   'class12Result',
+  'atar',
+  'sat',
   'stream',
   'fieldOfStudy',
   'subject',
@@ -58,7 +60,36 @@ export function visibleQuestions(profile: Profile): ReadonlySet<Question> {
   if (profile.gender !== 'female') hidden.add('singleGirlChild');
   if (profile.class === 9 || profile.class === 10) hidden.add('stream');
   for (const question of unaskedForResidence(profile)) hidden.add(question);
+  for (const question of unaskedTestScores(profile)) hidden.add(question);
   return new Set(QUESTIONS.filter((question) => !hidden.has(question)));
+}
+
+// The ATAR is asked only of a Student living in Australia; the SAT score only
+// on the US high-school board or of a Student heading to the US (backend
+// copy: testScoreContradictions in backend/src/match/profile-input.ts).
+function unaskedTestScores(profile: Profile): Question[] {
+  const unasked: Question[] = [];
+  if (profile.countryOfResidence !== 'AU') unasked.push('atar');
+  if (profile.board !== 'us_high_school' && profile.destination !== 'US') unasked.push('sat');
+  return unasked;
+}
+
+// The range of each test score (backend copy: TEST_SCORE_RANGES in
+// backend/src/match/profile.ts).
+export const TEST_SCORE_RANGES: Record<'atar' | 'sat', [min: number, max: number]> = {
+  atar: [0, 99.95],
+  sat: [400, 1600],
+};
+
+const OUT_OF_RANGE_SCORE: Record<keyof typeof TEST_SCORE_RANGES, string> = {
+  atar: 'Enter an ATAR from 0 to 99.95.',
+  sat: 'Enter a SAT score from 400 to 1600.',
+};
+
+function checkTestScore(question: keyof typeof TEST_SCORE_RANGES, answer: unknown) {
+  const [min, max] = TEST_SCORE_RANGES[question];
+  const inRange = typeof answer === 'number' && answer >= min && answer <= max;
+  return inRange ? undefined : OUT_OF_RANGE_SCORE[question];
 }
 
 // The Board marks grid: the results a Student's class has sat or is about to
@@ -248,6 +279,7 @@ export function checkAnswer(question: Question, answer: unknown): string | undef
     return checkBoardResult(question as BoardMarksQuestion, answer);
   }
   if (question === 'incomeAmount') return checkIncomeAmount(answer);
+  if (question === 'atar' || question === 'sat') return checkTestScore(question, answer);
   return undefined;
 }
 
