@@ -160,6 +160,36 @@ describe('Extractor with the LLM for what the rules miss', () => {
     ]);
   });
 
+  it('groups a test score the rules read when the LLM reads it as offered in place of the Class 12 result, keeping the rules’ value', async () => {
+    const gpa = 'Applicants need a minimum GPA of 3.5.';
+    const sat =
+      'Home-schooled applicants may send a SAT score of at least 1400 in its place.';
+    const { llm } = fakeLlm({
+      criteria: [
+        {
+          field: 'sat',
+          values: ['1300'],
+          quote: sat,
+          alternativeGroup: 'class12Result',
+        },
+      ],
+    });
+    const { criteria } = await extract([gpa, sat].join('\n'), llm);
+    expect(
+      criteria
+        .filter((c) => c.field === 'class12Result' || c.field === 'sat')
+        .map((c) => [c.field, c.value, c.confidence, c.alternativeGroup]),
+    ).toEqual([
+      [
+        'class12Result',
+        { scale: 'gpa_4', value: 3.5 },
+        'high',
+        'class12Result',
+      ],
+      ['sat', 1400, 'high', 'class12Result'],
+    ]);
+  });
+
   it('keeps a test score alone when there is no Class 12 result it stands in for', async () => {
     const sat =
       'Applicants may send a Scholastic Assessment Test score of 1400 instead.';

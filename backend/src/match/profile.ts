@@ -174,6 +174,10 @@ export const TEST_SCORE_RANGES: Record<
   sat: [400, 1600],
 };
 
+export function isTestScoreField(field: string): field is TestScoreField {
+  return Object.keys(TEST_SCORE_RANGES).includes(field);
+}
+
 // Board narrowing (frontend copies of the same names in
 // frontend/src/app/profile-rules.ts): Cambridge/UK, IB and US high school
 // have no Class 10 board exam, so no Class 10 result and no boards upcoming

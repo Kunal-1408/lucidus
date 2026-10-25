@@ -1,7 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Injectable } from '@nestjs/common';
 import { EXTRACTED_FIELDS } from '../scholarships/criterion-fields.js';
-import type { LlmAnswer, LlmClient, LlmRequest } from './llm.js';
+import {
+  CLASS_12_GROUP,
+  type LlmAnswer,
+  type LlmClient,
+  type LlmRequest,
+} from './llm.js';
 import { FIXED_LISTS } from './normalise.js';
 
 export const LLM_MODEL = 'claude-haiku-5-5';
@@ -83,7 +88,7 @@ const SCHEMA = {
           quote: { type: 'string' },
           // Optional: only on a Test score offered in place of a Class 12
           // result.
-          alternativeGroup: { type: 'string', enum: ['class12Result'] },
+          alternativeGroup: { type: 'string', enum: [CLASS_12_GROUP] },
         },
       },
     },

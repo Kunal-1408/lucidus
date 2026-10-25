@@ -29,4 +29,4 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 
 - A-level Student below grades on IB-or-A-level page → Tell us more asking IB points, not hidden (05)
 - Pearson: Tell us more for every Indian Profile without destination (07)
-- result on 2+ scales + SAT/ATAR asked as well → grouped as alternatives anyway; Override to fix (12)
+- result on 2+ scales + SAT/ATAR asked as well without "also"/"as well"/"in addition"/"all applicants" → grouped as alternatives anyway; Override to fix (12)

@@ -1,6 +1,7 @@
 import { readValue } from '../ingestion/extractor.js';
 import { isObject, oneOf, text } from '../input-checks.js';
 import { CRITERION_FIELDS } from '../scholarships/criterion-fields.js';
+import { memberOf } from '../scholarships/scholarship.schema.js';
 import {
   OVERRIDE_ACTIONS,
   type Override,
@@ -124,7 +125,7 @@ function replacementCriteria(
       field: field!,
       values: values!,
       sourceText: sourceText!,
-      ...(alternativeGroup && { alternativeGroup }),
+      ...memberOf(alternativeGroup),
     };
   });
 }

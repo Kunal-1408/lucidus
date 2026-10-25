@@ -391,11 +391,15 @@ describe('Matcher: Result scales', () => {
     changeable: true,
     ...(alternativeGroup && { alternativeGroup }),
   });
-  const ib36 = atLeast(result('ib_points', 36), 'class12Result', 'class12');
+  const ib36 = atLeast(
+    result('ib_points', 36),
+    'class12Result',
+    'class12Result',
+  );
   const aaa = atLeast(
     result('a_level', ['A', 'A', 'A']),
     'class12Result',
-    'class12',
+    'class12Result',
   );
 
   it.each([
@@ -455,7 +459,7 @@ describe('Matcher: Result scales', () => {
     const ibOrHigherIb = () =>
       scholarship([
         ib36,
-        atLeast(result('ib_points', 40), 'class12Result', 'class12'),
+        atLeast(result('ib_points', 40), 'class12Result', 'class12Result'),
       ]);
 
     it('passes when any one alternative passes', () => {
@@ -510,7 +514,7 @@ describe('Matcher: Result scales', () => {
           op: 'gte',
           value: 1450,
           changeable: true,
-          alternativeGroup: 'class12',
+          alternativeGroup: 'class12Result',
         },
         ib36,
       ]);
