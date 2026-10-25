@@ -209,7 +209,28 @@
   }
 
   <label>
-    What do you want to study?
+    What do you want to study? Search, or type your own
+    <input
+      type="search"
+      list="subject-options"
+      autocomplete="off"
+      placeholder="e.g. marine"
+      [value]="profile().subject ?? ''"
+      (input)="subjectQuery.set($any($event.target).value)"
+      (change)="setSubject($any($event.target).value)"
+    />
+    <datalist id="subject-options">
+      @for (s of subjectOptions(); track s.label) {
+        <option [value]="s.label">{{ groupLabel(s.group) }}</option>
+      }
+    </datalist>
+    @if (subjectNote(); as note) {
+      <span class="field-note">{{ note }}</span>
+    }
+  </label>
+
+  <label>
+    Field of study group
     <select (change)="setChoice('fieldOfStudy', $any($event.target).value)">
       <option value="">N.A</option>
       @for (f of fieldsOfStudy; track f.value) {
@@ -224,9 +245,9 @@
     Where do you want to study?
     <select (change)="setChoice('destination', $any($event.target).value)">
       <option value="">N.A</option>
-      @for (d of destinations; track d.value) {
-        <option [value]="d.value" [selected]="profile().destination === d.value">
-          {{ d.label }}
+      @for (c of countries; track c.value) {
+        <option [value]="c.value" [selected]="profile().destination === c.value">
+          {{ c.label }}
         </option>
       }
     </select>

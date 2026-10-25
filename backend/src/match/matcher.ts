@@ -7,6 +7,7 @@ import {
   type BoardMarksField,
   isBoardMarksField,
 } from '../scholarships/criterion-fields.js';
+import { LEGACY_DESTINATIONS } from '../ingestion/normalise.js';
 import { INDIA } from './countries.js';
 import {
   type BoardResult,
@@ -95,6 +96,7 @@ const FIELD_LABELS: Record<string, string> = {
   stream: 'stream',
   fieldOfStudy: 'intended field of study',
   destination: 'study destination',
+  destinationIsResidence: 'the country you live in and where you want to study',
   incomeBand: 'family income',
   incomeAmount: 'family income',
   gender: 'gender',
@@ -296,8 +298,15 @@ export const INCOME_BANDS: Record<string, [number, number]> = {
 // the region they live in, and an old domicile state is the Home state (in
 // either direction, so old Profiles and old Criteria keep matching); an
 // Indian citizen is a citizen of India. An OCI card holder's country of
-// citizenship is not known.
+// citizenship is not known. A Student studies at home when their
+// destination is the country they live in, which needs both answers.
 function derivedAnswer(profile: Profile, field: string): unknown {
+  if (field === 'destinationIsResidence') {
+    const { destination, countryOfResidence } = profile;
+    if (destination === undefined || countryOfResidence === undefined)
+      return undefined;
+    return destination === countryOfResidence;
+  }
   const homeState =
     profile.homeState ?? homeStateInIndia(profile) ?? profile.domicileState;
   if (field === 'homeState') return homeState;
@@ -352,7 +361,9 @@ function compare(criterion: Criterion, answer: unknown): Outcome {
     return compareIncome(op, Number(value), String(answer));
   }
   const answers = Array.isArray(answer) ? answer : [answer];
-  const allowed = op === 'in' && Array.isArray(value) ? value : [value];
+  const listed = op === 'in' && Array.isArray(value) ? value : [value];
+  const allowed =
+    criterion.field === 'destination' ? listed.map(destinationCode) : listed;
   const passes =
     op === 'eq' || op === 'in'
       ? answers.some((a) => allowed.includes(a))
@@ -387,6 +398,14 @@ function compareIncomeAmount(threshold: unknown, answer: unknown): Outcome {
   const yearly =
     period === 'monthly' ? limit.value * MONTHS_IN_A_YEAR : limit.value;
   return income.value <= yearly ? 'pass' : 'fail';
+}
+
+// A stored destination Criterion may still name a destination as the Profile
+// did before ISO codes (until ticket 09 re-extracts).
+function destinationCode(value: unknown): unknown {
+  return typeof value === 'string' && Object.hasOwn(LEGACY_DESTINATIONS, value)
+    ? LEGACY_DESTINATIONS[value]
+    : value;
 }
 
 function compareIncome(

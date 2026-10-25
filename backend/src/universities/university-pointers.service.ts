@@ -6,6 +6,7 @@ import { Model, Types } from 'mongoose';
 import { UniversityPointer } from './university-pointer.schema.js';
 import {
   POINTER_COUNTRIES,
+  POINTER_COUNTRY_CODES,
   type PointerCountry,
   WORQNOW,
   type WorqNowClient,
@@ -115,12 +116,14 @@ export class UniversityPointersService {
     await this.pointers.deleteMany({ _id: { $in: old.map((p) => p._id) } });
   }
 
-  // The pointers for a destination, or none when WorqNow doesn't cover it
-  // or lists no universities there.
+  // The pointers for a destination (an ISO country code), or none when
+  // WorqNow doesn't cover it or lists no universities there.
   async forDestination(
     destination: unknown,
   ): Promise<UniversityPointerGroup[]> {
-    const country = POINTER_COUNTRIES.find((c) => c === destination);
+    const country = POINTER_COUNTRIES.find(
+      (c) => POINTER_COUNTRY_CODES[c] === destination,
+    );
     if (!country) return [];
     const found = await this.pointers.find({ country }).lean();
     if (found.length === 0) return [];

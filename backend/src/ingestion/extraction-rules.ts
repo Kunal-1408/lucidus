@@ -352,6 +352,66 @@ const KEYWORD_FIELDS: KeywordField[] = [
     ],
   },
   {
+    // The subjects a source restricts an award to, read as the Field of
+    // study groups they belong to. Subjects named as examples, as an
+    // encouragement or for the amount paid restrict nothing, and a stream is
+    // not a field of study (above).
+    field: 'fieldOfStudy',
+    cue: /\b(?:only|must|exclusively|(?:is|are) (?:only )?(?:for|open to)|open (?:only )?to|restricted to|limited to)\b[^.]*\b(?:pursu(?:e|es|ing)|stud(?:y|ies|ying)|courses?|degrees?|programmes?|programs?|disciplines?)\b/i,
+    skip: /\bstreams?\b|\bsuch as\b|\betc\b|\bencouraged\b|\bwill (?:get|receive)\b/i,
+    options: [
+      ['engineering', /\bengineering\b|\bB\.?\s?Tech\b/i],
+      [
+        'medicine',
+        /\bmedicine\b|\bmedical (?:studies|courses?|degrees?|education|sciences?)\b|\bMBBS\b|\bnursing\b|\bpharmacy\b|\bdentistry\b/i,
+      ],
+      [
+        'science',
+        /\b(?:natural|pure|basic) sciences?\b|\bphysics\b|\bchemistry\b|\bbiology\b|\bmathematics\b|\bB\.?\s?Sc\b/i,
+      ],
+      [
+        'computing',
+        /\bcomputer science\b|\bcomputing\b|\binformation technology\b/i,
+      ],
+      [
+        'commerce',
+        /\bcommerce\b|\bbusiness (?:studies|administration)\b|\baccount(?:ancy|ing)\b|\bB\.?\s?Com\b|\bBBA\b/i,
+      ],
+      [
+        'law',
+        /\bLL\.?B\b|\blegal studies\b|\blaw (?:degrees?|courses?)\b|\b(?:in|of) law\b|\b(?:stud(?:y|ying)|pursu(?:e|ing)) law\b/i,
+      ],
+      [
+        'arts',
+        /\bhumanities\b|\b(?:liberal|fine|performing) arts\b|\bliterature\b|\bphilosophy\b/i,
+      ],
+      [
+        'social_sciences',
+        /\bsocial sciences?\b|\beconomics\b|\bpsychology\b|\bsociology\b|\bpolitical science\b/i,
+      ],
+      [
+        'design',
+        /\b(?:fashion|graphic|product|interior) design\b|\barchitecture\b|\bB\.?\s?Arch\b|\bB\.?\s?Des\b/i,
+      ],
+      ['agriculture', /\bagricultur(?:e|al)\b|\bhorticulture\b|\bfisheries\b/i],
+      ['education', /\bteacher training\b|\bB\.?\s?Ed\b/i],
+    ],
+  },
+  {
+    // Home-student awards are for Students studying in the country they
+    // live in, international-student awards for the others. A sentence
+    // naming both restricts nothing, nor does one that only mentions them
+    // ("international students may write to the office").
+    field: 'destinationIsResidence',
+    cue: /\b(?:for|open to|only|must be|eligible|restricted to|limited to)\b[^.]*\b(?:home|domestic|international|overseas) students?\b|\b(?:home|domestic|international|overseas) students? only\b/i,
+    beyondOptions:
+      /\b(?:home|domestic)\b[^.]*\b(?:international|overseas)\b|\b(?:international|overseas)\b[^.]*\b(?:home|domestic)\b/i,
+    options: [
+      ['yes', /\b(?:home|domestic) students?\b/i],
+      ['no', /\b(?:international|overseas) students?\b/i],
+    ],
+  },
+  {
     field: 'parentOccupation',
     options: [
       [
@@ -531,13 +591,29 @@ const citizenshipCountryRule: FieldRule = (sentences) => {
   return undefined;
 };
 
+// "to study at a university in the United States": where the Student must
+// study. As for residence, India is never read: an Indian source's "study in
+// India" is not a condition, and schools are where a Student lives.
+const STUDY_ABROAD =
+  /\bstud(?:y|ying)\b[^.]*\b(?:universit(?:y|ies)|colleges?|higher education)\b|\b(?:universit(?:y|ies)|colleges?)\s+in\b/i;
+
+const destinationRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const { plain, countries } = placesIn(sentence);
+    if (STUDY_ABROAD.test(plain) && !LIVES.test(plain) && countries.length)
+      return found('destination', countries, sentence);
+  }
+  return undefined;
+};
+
 const RESIDENCE_RULES = [
   countryOfResidenceRule,
   regionRule,
   residenceStatusRule,
   citizenshipCountryRule,
+  destinationRule,
 ];
-const RESIDENCE_WORDS = [LIVES, PERMANENT_RESIDENT, CITIZEN];
+const RESIDENCE_WORDS = [LIVES, PERMANENT_RESIDENT, CITIZEN, STUDY_ABROAD];
 
 const DEADLINE_CUE =
   /\b(?:last date|deadline|closing date|apply (?:by|before)|open till|closes?(?: on)?|on or before|due date)\b/i;

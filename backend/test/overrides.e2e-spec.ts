@@ -154,7 +154,7 @@ describe('Overrides', () => {
           'countryOfResidence, region, homeState, residenceStatus, ' +
           'citizenshipCountry, domicileState, schoolState, schoolType, ' +
           'board, stream, ' +
-          'fieldOfStudy, destination, parentOccupation, examsQualified',
+          'fieldOfStudy, destination, destinationIsResidence, parentOccupation, examsQualified',
         'criteria[0].values must be a non-empty list of strings or numbers',
         'criteria[0].sourceText is required',
       ]);

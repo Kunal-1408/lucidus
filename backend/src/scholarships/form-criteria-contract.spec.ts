@@ -33,7 +33,7 @@ const FORM_LISTS: Record<string, readonly FormOption[]> = {
   board: form.BOARDS,
   stream: form.STREAMS,
   fieldOfStudy: form.FIELDS_OF_STUDY,
-  destination: form.DESTINATIONS,
+  destination: formPlaces.COUNTRIES,
   incomeBand: form.INCOME_BANDS,
   gender: form.GENDERS,
   category: form.CATEGORIES,
@@ -53,6 +53,8 @@ const FORM_ONLY_FIELDS: Record<string, string> = {
     'not a condition a Scholarship sets: it only lets a marks shortfall become a Goal',
 };
 const CRITERION_ONLY_FIELDS: Record<string, string> = {
+  destinationIsResidence:
+    'home vs international awards: the Matcher answers it by comparing destination with countryOfResidence, so the form never asks it',
   class10Marks:
     'replaced by Board marks; kept readable for stored Criteria and Overrides until ticket 09, never extracted',
   latestMarks:

@@ -32,6 +32,11 @@ const FIELD_GUIDE: Record<string, string> = {
     'one or more of: indian (Indian citizens, including NRIs), oci (OCI or PIO card holders), other (another nationality)',
   citizenshipCountry:
     'the countries the Student must be a citizen of, other than India, each an ISO 3166-1 alpha-2 code such as "US"',
+  fieldOfStudy: `the broad groups of subjects the Student must study, one or more of: ${FIXED_LISTS.fieldOfStudy.join(', ')} (science is the natural sciences, arts is arts and humanities, other is any subject outside these groups)`,
+  destination:
+    'the countries the Student must study in, each an ISO 3166-1 alpha-2 code such as "GB" or "US"; leave it out when the text only says "India"',
+  destinationIsResidence:
+    '"yes" when only home (domestic) students of the country of study may apply, "no" when only international (overseas) students may apply',
 };
 
 function guideFor(field: string): string {

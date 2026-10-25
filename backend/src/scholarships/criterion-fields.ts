@@ -38,6 +38,10 @@ export const CRITERION_FIELDS: Record<
   stream: { op: 'in', changeable: false },
   fieldOfStudy: { op: 'in', changeable: false },
   destination: { op: 'in', changeable: false },
+  // Home-student awards (true: the Student studies in the country they live
+  // in) and international-student awards (false). No Profile answer holds
+  // it: the Matcher compares destination with country of residence.
+  destinationIsResidence: { op: 'eq', changeable: false },
   parentOccupation: { op: 'in', changeable: false },
   examsQualified: { op: 'in', changeable: false },
 };

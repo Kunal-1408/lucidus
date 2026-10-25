@@ -4,9 +4,12 @@ import {
   boardMarksLabel,
   checkAnswer,
   incomeCurrency,
+  findSubjects,
   migrateSavedProfile,
   profileForMatch,
   Question,
+  subjectAnswer,
+  subjectNote,
   visibleQuestions,
 } from './profile-rules';
 
@@ -374,4 +377,95 @@ describe('migrateSavedProfile: Home state', () => {
     const profile = { countryOfResidence: 'GB', region: 'GB-ENG', class: 11 };
     expect(migrateSavedProfile(profile)).toEqual(profile);
   });
+});
+
+describe('field of study', () => {
+  it('finds subjects by any part of their name, ignoring case', () => {
+    const found = findSubjects('marine').map((s) => s.label);
+    expect(found).toContain('Marine biology');
+    expect(found).toContain('Marine engineering');
+    expect(found).not.toContain('Law');
+  });
+
+  it('puts every subject in a Field of study group', () => {
+    expect(findSubjects('Marine biology')).toEqual([{ label: 'Marine biology', group: 'science' }]);
+    expect(findSubjects('Mechanical engineering')).toEqual([
+      { label: 'Mechanical engineering', group: 'engineering' },
+    ]);
+  });
+
+  it('answers with the group of a listed subject, however it is typed', () => {
+    expect(subjectAnswer('marine biology')).toEqual({
+      fieldOfStudy: 'science',
+      subject: 'Marine biology',
+    });
+  });
+
+  it('counts a subject the Student types as Other, keeping their words', () => {
+    expect(subjectAnswer('  Puppetry ')).toEqual({ fieldOfStudy: 'other', subject: 'Puppetry' });
+  });
+
+  it('clears the subject, keeping the group, when the subject field is emptied', () => {
+    expect(
+      applyChange({ fieldOfStudy: 'science', subject: 'Marine biology' }, subjectAnswer(' ')),
+    ).toEqual({ fieldOfStudy: 'science' });
+  });
+
+  it('shows the Student how their subject is used', () => {
+    expect(subjectNote({ fieldOfStudy: 'science', subject: 'Marine biology' })).toBe(
+      'Counted as Natural sciences.',
+    );
+    expect(subjectNote({ fieldOfStudy: 'other', subject: 'Puppetry' })).toBe(
+      '"Puppetry" is not on our list, so it is counted as Other.',
+    );
+    expect(subjectNote({ fieldOfStudy: 'law' })).toBeUndefined();
+  });
+
+  it('clears a subject outside the group the Student picks', () => {
+    const marine = { fieldOfStudy: 'science', subject: 'Marine biology' } as const;
+    expect(applyChange(marine, { fieldOfStudy: 'law' })).toEqual({ fieldOfStudy: 'law' });
+    expect(applyChange(marine, { fieldOfStudy: undefined })).toEqual({});
+    expect(
+      applyChange({ fieldOfStudy: 'other', subject: 'Puppetry' }, { fieldOfStudy: 'arts' }),
+    ).toEqual({
+      fieldOfStudy: 'arts',
+    });
+    expect(applyChange(marine, { gender: 'female' })).toEqual({ ...marine, gender: 'female' });
+  });
+
+  it('sends the group in a Match request, never the subject', () => {
+    expect(profileForMatch({ fieldOfStudy: 'other', subject: 'Puppetry' })).toEqual({
+      fieldOfStudy: 'other',
+    });
+  });
+});
+
+describe('migrateSavedProfile: field of study and destination', () => {
+  it.each([
+    ['india', 'IN'],
+    ['uk', 'GB'],
+    ['usa', 'US'],
+    ['canada', 'CA'],
+    ['australia', 'AU'],
+    ['germany', 'DE'],
+  ])('turns a saved destination of %s into %s', (saved, code) => {
+    expect(migrateSavedProfile({ destination: saved })).toEqual({ destination: code });
+  });
+
+  it('drops a saved destination of other, which named no country', () => {
+    expect(migrateSavedProfile({ destination: 'other', gender: 'male' })).toEqual({
+      gender: 'male',
+    });
+  });
+
+  it('keeps a destination that is already a country code', () => {
+    expect(migrateSavedProfile({ destination: 'SG' })).toEqual({ destination: 'SG' });
+  });
+
+  it.each(['engineering', 'medicine', 'science', 'commerce', 'arts', 'law', 'other'])(
+    'keeps a saved field of study of %s as its group',
+    (saved) => {
+      expect(migrateSavedProfile({ fieldOfStudy: saved })).toEqual({ fieldOfStudy: saved });
+    },
+  );
 });
