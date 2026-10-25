@@ -9,7 +9,7 @@ import * as formCurrencies from '../../../frontend/src/app/currencies.js';
 import * as form from '../../../frontend/src/app/profile-fields.js';
 import * as rules from '../../../frontend/src/app/profile-rules.js';
 import { readValue } from '../ingestion/extractor.js';
-import { FIXED_LISTS, LEGACY_DESTINATIONS } from '../ingestion/normalise.js';
+import { FIXED_LISTS } from '../ingestion/normalise.js';
 import { COUNTRIES, REGIONS } from '../match/countries.js';
 import { COUNTRY_CURRENCIES, CURRENCIES } from '../match/currencies.js';
 import { match } from '../match/matcher.js';
@@ -37,8 +37,6 @@ const FORM_LISTS: Record<string, readonly FormOption[]> = {
   homeState: form.STATES,
   residenceStatus: form.RESIDENCE_STATUSES,
   citizenshipCountry: formPlaces.COUNTRIES,
-  domicileState: form.STATES,
-  schoolState: form.STATES,
   schoolType: form.SCHOOL_TYPES,
   citizenship: form.CITIZENSHIPS,
   board: form.BOARDS,
@@ -68,10 +66,6 @@ const FORM_ONLY_FIELDS: Record<string, string> = {
 const CRITERION_ONLY_FIELDS: Record<string, string> = {
   destinationIsResidence:
     'home vs international awards: the Matcher answers it by comparing destination with countryOfResidence, so the form never asks it',
-  class10Marks:
-    'replaced by Board marks; kept readable for stored Criteria and Overrides until ticket 09, never extracted',
-  latestMarks:
-    'replaced by Board marks; kept readable for stored Criteria and Overrides until ticket 09, never extracted',
 };
 const CRITERION_ONLY_VALUES: Record<string, Record<string, string>> = {
   parentOccupation: {
@@ -296,10 +290,6 @@ describe('Form ↔ Criteria contract', () => {
       expect(Object.values(STATE_REGIONS).sort()).toEqual(
         [...indianRegions].sort(),
       );
-    });
-
-    it('the form and the backend read the same old destination names as the same codes', () => {
-      expect(rules.LEGACY_DESTINATIONS).toEqual(LEGACY_DESTINATIONS);
     });
 
     it('reads a code as the LLM or a reviewer may write it', () => {

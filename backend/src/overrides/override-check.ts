@@ -1,4 +1,5 @@
 import { approvedValue, checkQuoted } from '../ingestion/extractor.js';
+import { isCriterionField } from '../scholarships/criterion-fields.js';
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import type { Override } from './override.schema.js';
 
@@ -13,20 +14,36 @@ export interface Review {
 export type OverrideCheck =
   | { result: 'applied'; review: Review }
   | { result: 'invalid'; problems: string[] }
+  | { result: 'lapsed'; problems: string[] }
   | { result: 'page changed' };
+
+const READ_AGAIN = 'extraction read again since the review';
 
 // What an Override does to a section with this text and hash, given the
 // Criteria extracted from it (what the reviewer saw in the Review report).
 // It holds only for the text it was written against. An approve makes the
 // extracted Criteria high, so each must hold allowed values; replacement
-// Criteria meet the same quote check as the LLM's.
+// Criteria meet the same quote check as the LLM's. It lapses, and stays
+// lapsed, when it names a field Criteria no longer check, or when it
+// approves an extraction read again (readAgain) since the review.
 export function checkOverride(
   override: Override,
   contentHash: string,
   text: string,
   extracted: Criterion[],
+  readAgain: boolean,
 ): OverrideCheck {
   if (override.contentHash !== contentHash) return { result: 'page changed' };
+  if (override.lastResult === 'lapsed') {
+    return { result: 'lapsed', problems: override.problems ?? [] };
+  }
+  const removed = (override.criteria ?? [])
+    .filter(({ field }) => !isCriterionField(field))
+    .map(({ field }) => `${field}: field removed`);
+  if (removed.length > 0) return { result: 'lapsed', problems: removed };
+  if (override.action === 'approve' && readAgain) {
+    return { result: 'lapsed', problems: [READ_AGAIN] };
+  }
   const criteria: Criterion[] = [];
   const problems: string[] = [];
   if (override.action === 'approve') {

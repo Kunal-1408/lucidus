@@ -100,23 +100,15 @@ describe('Indian Profiles keep their results', () => {
     };
   }
 
-  // Each Profile goes in both shapes: the old one, with a domicile and a
-  // school state, and the one the form sends now, with India and the
-  // state's ISO region (the school state falling back to that Home state).
-  // Both must land in the same buckets.
+  // Each Profile lives in India, in the state's ISO region, which is its
+  // Home state.
   async function expectBuckets(
     profile: object,
-    home: { state: string; region: string },
+    region: string,
     expected: Buckets,
   ) {
-    const old = { domicileState: home.state, schoolState: home.state };
-    expect(await bucketsFor({ ...profile, ...old })).toEqual(expected);
-    const now = {
-      countryOfResidence: 'IN',
-      region: home.region,
-      schoolState: home.state,
-    };
-    expect(await bucketsFor({ ...profile, ...now })).toEqual(expected);
+    const lives = { countryOfResidence: 'IN', region };
+    expect(await bucketsFor({ ...profile, ...lives })).toEqual(expected);
   }
 
   it('a Class 12 girl in Kerala with 85% and income of ₹2–2.5 lakh', async () => {
@@ -124,12 +116,12 @@ describe('Indian Profiles keep their results', () => {
       {
         class: 12,
         gender: 'female',
-        // Was latestMarks: 85, which Board marks replace; for a Class 12
+        // Was 85% latest marks, which Board marks replace; for a Class 12
         // Student their latest marks are the Class 12 result.
         class12Result: { scale: 'percentage', value: 85 },
         incomeBand: '2l_2_5l',
       },
-      { state: 'kerala', region: 'IN-KL' },
+      'IN-KL',
       {
         // The state page says "Class 12 with Science", which names no stream.
         eligible: [AICTE_PRAGATI, LIC_GENERAL, SANTOOR, STATE_SCIENCE],
@@ -147,7 +139,7 @@ describe('Indian Profiles keep their results', () => {
         category: 'sc',
         incomeBand: 'under_1l',
       },
-      { state: 'bihar', region: 'IN-BR' },
+      'IN-BR',
       {
         eligible: [AICTE_PRAGATI],
         withinReach: { [STATE_PRAGATI]: [NEXT_CLASS] },
@@ -165,7 +157,7 @@ describe('Indian Profiles keep their results', () => {
         category: 'obc',
         incomeBand: '1l_2l',
       },
-      { state: 'tamil_nadu', region: 'IN-TN' },
+      'IN-TN',
       {
         eligible: [STATE_MERIT],
         withinReach: { [LIC_SPECIAL]: [NEXT_CLASS] },
@@ -183,13 +175,13 @@ describe('Indian Profiles keep their results', () => {
         gender: 'male',
         category: 'general',
         incomeBand: 'over_8l',
-        // Was latestMarks: 92 with boardsUpcoming: true. Board marks replace
+        // Was 92% latest marks with boards upcoming. Board marks replace
         // latest marks, and a Class 11 Student's last board exam is Class 10;
         // boards upcoming is no longer asked in Class 11.
         class10Result: { scale: 'percentage', value: 92 },
         stream: 'science',
       },
-      { state: 'maharashtra', region: 'IN-MH' },
+      'IN-MH',
       {
         eligible: [],
         withinReach: { [STATE_SCIENCE]: [NEXT_CLASS] },
@@ -206,16 +198,17 @@ describe('Indian Profiles keep their results', () => {
         gender: 'female',
         category: 'st',
         incomeBand: 'under_1l',
-        // Was class10Marks: 57. A Class 10 Student whose boards are upcoming
-        // has no Class 10 result yet, so Board marks don't ask for one.
+        // Was 57% Class 10 marks. A Class 10 Student whose boards are
+        // upcoming has no Class 10 result yet, so Board marks don't ask for
+        // one.
         boardsUpcoming: true,
       },
-      { state: 'odisha', region: 'IN-OD' },
+      'IN-OD',
       {
         eligible: [AICTE_PRAGATI],
         // Moved from Within reach ("Score 60% in Class 10 to unlock this") when
-        // class10Marks was replaced: with no Class 10 result to judge, the 60%
-        // Class 10 Criteria are unknown.
+        // Board marks replaced Class 10 marks: with no Class 10 result to
+        // judge, the 60% Class 10 Criteria are unknown.
         withinReach: {},
         tellUsMore: [PEARSON, NMMSS, LIC_SPECIAL],
       },

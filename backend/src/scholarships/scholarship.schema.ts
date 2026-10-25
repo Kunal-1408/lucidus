@@ -109,6 +109,12 @@ export class Scholarship {
   @Prop({ type: [Criterion], default: undefined })
   extractedCriteria?: Criterion[];
 
+  // The extraction rules the stored extraction was read with
+  // (EXTRACTION_VERSION in ingestion/ingestion.service.ts). Absent on records
+  // read before it was kept.
+  @Prop()
+  extractionVersion?: number;
+
   @Prop({ type: [ExtraRequirement], default: [] })
   extraRequirements: ExtraRequirement[];
 

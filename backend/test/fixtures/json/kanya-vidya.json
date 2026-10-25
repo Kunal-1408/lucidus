@@ -6,6 +6,6 @@
   "class": [10],
   "incomeBand": 250000,
   "category": ["SC", "ST"],
-  "domicileState": "Atlantis",
+  "homeState": "Atlantis",
   "contact": { "email": "scholarships@example.org" }
 }

@@ -12,8 +12,6 @@ import {
   IncomeAmount,
   Profile,
   ResultScale,
-  STATE_REGIONS,
-  STATES,
 } from './profile-fields';
 import { Subject, SUBJECTS } from './subjects';
 
@@ -26,8 +24,6 @@ const QUESTIONS: readonly Question[] = [
   'homeState',
   'residenceStatus',
   'citizenshipCountry',
-  'domicileState',
-  'schoolState',
   'schoolType',
   'citizenship',
   'board',
@@ -376,62 +372,24 @@ function isOnScale(scale: ResultScale, value: unknown): boolean {
   return inRange && (scale !== 'ib_points' || Number.isInteger(value));
 }
 
-// A Profile saved by an earlier version of the form, in today's shape.
+// A Profile saved by an earlier version of the form, in today's shape:
+// answers to questions the form no longer has are dropped, and so is a
+// destination that is no country code ("other" named no country).
 export function migrateSavedProfile(saved: Record<string, unknown>): Profile {
-  return withDestinationCode(withHomeState(withBoardMarks(saved))) as Profile;
-}
-
-// The destinations the form offered before every country, with the code each
-// now is (backend copy: LEGACY_DESTINATIONS in
-// backend/src/ingestion/normalise.ts).
-export const LEGACY_DESTINATIONS: Record<string, string> = {
-  india: 'IN',
-  uk: 'GB',
-  usa: 'US',
-  canada: 'CA',
-  australia: 'AU',
-  germany: 'DE',
-};
-
-// A saved destination becomes its country code; "other" named no country and
-// is dropped. Saved fields of study already are their groups' values.
-function withDestinationCode(saved: Record<string, unknown>): Record<string, unknown> {
-  const { destination, ...migrated } = saved;
-  if (typeof destination !== 'string') return migrated;
-  const code = Object.hasOwn(LEGACY_DESTINATIONS, destination)
-    ? LEGACY_DESTINATIONS[destination]
-    : destination;
-  return COUNTRIES.some((country) => country.value === code)
-    ? { ...migrated, destination: code }
-    : migrated;
-}
-
-// Latest exam marks meant a different year for each class, so they are
-// dropped rather than guessed into a board year; Class 10 marks were always
-// a Class 10 percentage.
-function withBoardMarks(saved: Record<string, unknown>): Record<string, unknown> {
-  const migrated = { ...saved };
-  const class10Marks = migrated['class10Marks'];
-  if (typeof class10Marks === 'number' && migrated['class10Result'] === undefined) {
-    migrated['class10Result'] = { scale: 'percentage', value: class10Marks };
-  }
-  delete migrated['class10Marks'];
-  delete migrated['latestMarks'];
-  return migrated;
+  const { destination, ...rest } = saved;
+  const known = Object.fromEntries(
+    Object.entries(rest).filter(([question]) => QUESTIONS.includes(question as Question)),
+  );
+  const isCountry = COUNTRIES.some((country) => country.value === destination);
+  return (isCountry ? { ...known, destination } : known) as Profile;
 }
 
 // The Profile as sent inside a Match request: answers to questions it no
-// longer asks dropped (a saved Profile may predate a rule), the subject left
-// out (Criteria name groups only), and school state falling back to the Home
-// state of a Student in India (or who gives no country). Abroad the
-// Student's school is not in India, so there is none.
+// longer asks dropped (a saved Profile may predate a rule), and the subject
+// left out (Criteria name groups only).
 export function profileForMatch(profile: Profile): Profile {
   const { subject: _subject, ...asked } = profile;
-  const sent = withoutUnasked(withResidenceClears(asked, {}));
-  const abroad = sent.countryOfResidence !== undefined && sent.countryOfResidence !== INDIA;
-  const homeState = abroad ? undefined : (sent.domicileState ?? homeStateOf(sent));
-  if (homeState !== undefined) sent.schoolState ??= homeState;
-  return sent;
+  return withoutUnasked(withResidenceClears(asked, {}));
 }
 
 // Where the Student lives and their Citizenship: the state or region needs a
@@ -473,23 +431,6 @@ function withResidenceClears(profile: Profile, change: Partial<Profile>): Profil
 
 function isRegionOf(region: string, country: string | undefined): boolean {
   return country !== undefined && (REGIONS[country] ?? []).some((r) => r.value === region);
-}
-
-// The Home state: the region for a Student in India, the answer abroad.
-function homeStateOf(profile: Profile): Profile['homeState'] {
-  if (profile.countryOfResidence !== INDIA) return profile.homeState;
-  return STATES.find((state) => STATE_REGIONS[state.value] === profile.region)?.value;
-}
-
-// A saved domicile state becomes India and the matching region, which makes
-// it the Home state again; one that is no Indian state, or given beside a
-// country, is dropped.
-function withHomeState(saved: Record<string, unknown>): Record<string, unknown> {
-  const { domicileState, ...migrated } = saved;
-  if (domicileState === undefined || migrated['countryOfResidence'] !== undefined) return migrated;
-  const state = STATES.find((s) => s.value === domicileState);
-  if (state === undefined) return migrated;
-  return { countryOfResidence: INDIA, region: STATE_REGIONS[state.value], ...migrated };
 }
 
 // Clearing one answer can hide another question in turn, so this repeats
