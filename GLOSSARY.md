@@ -2,11 +2,13 @@
 
 A proof of concept for Lucidus AI: a school student describes themselves, sees scholarships they match or could match, and saves the ones they care about. Scholarship data comes only from official sources.
 
+An _Avoid_ term in backticks is also banned from code names; `npm run check` enforces it (`scripts/check-glossary-names.mjs`).
+
 ## People
 
 **Student**:
 A school student in Class 9–12 (or the equivalent grade abroad) using the app, living in India or in any other country. The only kind of user; university students and graduates are out of scope.
-_Avoid_: User, applicant, candidate
+_Avoid_: User, `applicant`, `candidate`
 
 **Visitor**:
 An anonymous Student identified only by an ID their browser generates. There is no sign-up.
@@ -46,7 +48,7 @@ _Avoid_: Board result, marks (for a test score)
 
 **Alternatives group**:
 Criteria a Scholarship accepts in place of each other, one per Result scale ("36 IB points or AAA at A-level"). The group passes when any member passes, fails when every member that can be judged fails and none is unknown, and is otherwise unknown.
-_Avoid_: OR-criteria, either-or
+_Avoid_: `OR-criteria`, `either-or`
 
 **Field of study group**:
 One of a few broad groups (Engineering, Medicine and health, Natural sciences, and so on) that every subject a Student can pick belongs to. Criteria name groups; a subject the Student types in belongs to the group Other.
@@ -63,7 +65,7 @@ _Avoid_: Scheme, grant, award, opportunity
 
 **Official source**:
 A page, PDF or data feed published by the scholarship's provider or a government portal. Aggregator sites are never sources.
-_Avoid_: Site, aggregator, listing
+_Avoid_: Site, `aggregator`, listing
 
 **University pointer**:
 A university known to offer international scholarships, listed only so the Student can look it up themselves. Never a Scholarship and never matched.
@@ -71,23 +73,23 @@ _Avoid_: University scholarship, lead, suggestion
 
 **Watchlist**:
 The list of official sources we check for scholarships. Adding a source means adding to the watchlist.
-_Avoid_: Seed list, crawl list
+_Avoid_: `Seed list`, `crawl list`
 
 **Ingestion run**:
 One pass over the watchlist that fetches each source, skips unchanged ones, extracts the rest and records what happened.
-_Avoid_: Crawl, scrape, sync
+_Avoid_: `Crawl`, `scrape`, sync
 
 **Criterion**:
 One eligibility rule of a scholarship, comparing one Profile field against a value, together with the exact sentence it came from. A condition for keeping a scholarship once awarded (renewal) is not a Criterion, nor is how places are shared out between groups.
-_Avoid_: Requirement, condition, filter
+_Avoid_: Requirement, `condition`, filter
 
 **Extra requirement**:
 A condition no Profile field can answer ("top 1% in your board", "not receiving another scholarship"). Shown on the card with its sentence, never matched and never prompted for.
-_Avoid_: Note, unknown criterion
+_Avoid_: Note, `unknown criterion`
 
 **Changeable criterion**:
 A criterion the Student can still come to meet: higher marks, the next class up. Gender, category, citizenship, domicile and income are never changeable.
-_Avoid_: Soft criterion, flexible field
+_Avoid_: `Soft criterion`, `flexible field`
 
 **Confidence**:
 How far we trust a criterion, judged by how its value was obtained (high, medium, low), never by asking the model. A scholarship's confidence is that of its weakest criterion.
@@ -123,7 +125,7 @@ Every criterion passes.
 
 **Within reach**:
 At least one criterion fails, and every failing criterion is changeable within its limit.
-_Avoid_: Almost eligible, near miss
+_Avoid_: `Almost eligible`, `near miss`
 
 **Tell us more**:
 No criterion fails and at least one is unknown because the Profile leaves that field empty.
@@ -131,7 +133,7 @@ _Avoid_: Maybe, incomplete
 
 **Goal**:
 The change that would turn a Within reach scholarship Eligible, phrased for the Student ("Score 80% to unlock this").
-_Avoid_: Gap, shortfall
+_Avoid_: `Gap`, `shortfall`
 
 **Prompt**:
 A question asking for one missing Profile field, together with how many results answering it would settle ("Tell us your family income to check 4 more scholarships").
@@ -139,4 +141,4 @@ _Avoid_: Nudge, question
 
 **Saved scholarship**:
 A scholarship a Visitor kept, with a snapshot of the card as it looked when saved, so it stays readable if the scholarship later changes or goes inactive.
-_Avoid_: Bookmark, favourite
+_Avoid_: `Bookmark`, `favourite`

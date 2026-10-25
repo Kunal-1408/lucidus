@@ -6,6 +6,8 @@
 
 Read files with Read, search with Grep and Glob, change files with Edit and Write; these need no approval and keep a run flowing. Keep Bash and PowerShell for git, npm and running scripts. This holds in every mode, auto mode included, and for subagents. Settings deny `cat`, `head`, `tail`, `sed`, `grep`, `rg`, `find` and `ls` in Bash; on a denial, use the matching tool. Filter git output with git's own flags (`-n`, `--oneline`, `--grep`, `-S`, `-- <path>`, `--stat`, `--name-only`).
 
+Launch every implementer subagent with `isolation: "worktree"`, so it starts inside its own tree and runs plain commands. To continue a stopped implementer's work, stash it with a tag and have the new implementer apply the stash in its own fresh tree.
+
 ## Agent skills
 
 ### Issue tracker

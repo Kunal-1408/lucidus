@@ -4,7 +4,7 @@
   "description": "Repo-wide checks. The app itself lives in backend/ and frontend/, each with its own package.json.",
   "scripts": {
     "setup": "npm ci && npm ci --prefix backend && npm ci --prefix frontend",
-    "check": "npm run check --prefix backend && npm run check --prefix frontend",
+    "check": "node scripts/check-glossary-names.mjs && npm run check --prefix backend && npm run check --prefix frontend",
     "prepare": "husky"
   },
   "lint-staged": {

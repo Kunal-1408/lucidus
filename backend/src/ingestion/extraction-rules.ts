@@ -850,7 +850,7 @@ const SHARES_OUT = /\bshares?\b|\bsegregat\w*|\bdivided\b|\bin the ratio of\b/i;
 const SETS_ASIDE = /\breserved\b|\bearmarked\b|\ballott?ed\b/i;
 const PERCENT_OR_RATIO = /\d\s*%|\bper ?cent\b|\b\d+\s*:\s*\d+\b/i;
 
-function isNotACondition(sentence: string): boolean {
+function statesNoCriterion(sentence: string): boolean {
   if (RENEWAL.test(sentence)) return true;
   if (!PLACES.test(sentence)) return false;
   return (
@@ -860,7 +860,7 @@ function isNotACondition(sentence: string): boolean {
 }
 
 export function isEligibilitySentence(sentence: string): boolean {
-  if (isNotACondition(sentence)) return false;
+  if (statesNoCriterion(sentence)) return false;
   return (
     ELIGIBILITY_WORDS.test(sentence) ||
     RULE_WORDS.some((pattern) => pattern.test(sentence))
