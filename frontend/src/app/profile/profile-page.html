@@ -311,17 +311,19 @@
         </label>
       }
 
-      <label>
-        School type
-        <select (change)="setChoice('schoolType', $any($event.target).value)">
-          <option value="">N.A</option>
-          @for (t of schoolTypes; track t.value) {
-            <option [value]="t.value" [selected]="profile().schoolType === t.value">
-              {{ t.label }}
-            </option>
-          }
-        </select>
-      </label>
+      @if (shown().has('schoolType')) {
+        <label>
+          School type
+          <select (change)="setChoice('schoolType', $any($event.target).value)">
+            <option value="">N.A</option>
+            @for (t of schoolTypes; track t.value) {
+              <option [value]="t.value" [selected]="profile().schoolType === t.value">
+                {{ t.label }}
+              </option>
+            }
+          </select>
+        </label>
+      }
 
       <label>
         Do you belong to a religious or linguistic minority?
@@ -352,26 +354,28 @@
         </label>
       }
 
-      <fieldset>
-        <legend>Parents' occupation</legend>
-        <div class="checks">
-          @for (o of parentOccupations; track o.value) {
-            <label class="check">
-              <input
-                type="checkbox"
-                [checked]="isPicked('parentOccupation', o.value)"
-                (change)="togglePicked('parentOccupation', o.value, $any($event.target).checked)"
-              />
-              {{ o.label }}
-            </label>
-          }
-        </div>
-      </fieldset>
+      @if (shown().has('parentOccupation')) {
+        <fieldset>
+          <legend>Parents' occupation</legend>
+          <div class="checks">
+            @for (o of parentOccupations; track o.value) {
+              <label class="check">
+                <input
+                  type="checkbox"
+                  [checked]="isPicked('parentOccupation', o.value)"
+                  (change)="togglePicked('parentOccupation', o.value, $any($event.target).checked)"
+                />
+                {{ o.label }}
+              </label>
+            }
+          </div>
+        </fieldset>
+      }
 
       <fieldset>
         <legend>Exams you have qualified</legend>
         <div class="checks">
-          @for (e of exams; track e.value) {
+          @for (e of exams(); track e.value) {
             <label class="check">
               <input
                 type="checkbox"

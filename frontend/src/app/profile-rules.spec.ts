@@ -7,6 +7,7 @@ import {
   incomeCurrency,
   findSubjects,
   migrateSavedProfile,
+  offeredExams,
   profileForMatch,
   Question,
   readResult,
@@ -630,6 +631,116 @@ describe('migrateSavedProfile: field of study and destination', () => {
       expect(migrateSavedProfile({ fieldOfStudy: saved })).toEqual({ fieldOfStudy: saved });
     },
   );
+});
+
+// Questions whose answers are Indian terms, asked only where they apply.
+describe('Indian-only questions', () => {
+  const asked = (profile: Profile, question: Question) => visibleQuestions(profile).has(question);
+
+  it('asks the stream only on an Indian board, or when no board is given', () => {
+    for (const board of ['cbse', 'cisce', 'state'] as const) {
+      expect(asked({ class: 12, board }, 'stream')).toBe(true);
+    }
+    expect(asked({ class: 12 }, 'stream')).toBe(true);
+    for (const board of ['cambridge', 'ib', 'us_high_school', 'other'] as const) {
+      expect(asked({ class: 12, board }, 'stream')).toBe(false);
+    }
+    expect(asked({ class: 10, board: 'cbse' }, 'stream')).toBe(false);
+  });
+
+  it('clears the stream when the board moves off an Indian board', () => {
+    expect(applyChange({ class: 11, board: 'cbse', stream: 'science' }, { board: 'ib' })).toEqual({
+      class: 11,
+      board: 'ib',
+    });
+    expect(
+      applyChange({ class: 11, board: 'cbse', stream: 'science' }, { board: 'state' }),
+    ).toEqual({ class: 11, board: 'state', stream: 'science' });
+  });
+
+  it('asks school type only of a Student living in India, or who gives no country', () => {
+    expect(asked({ countryOfResidence: 'IN' }, 'schoolType')).toBe(true);
+    expect(asked({}, 'schoolType')).toBe(true);
+    expect(asked({ countryOfResidence: 'AE' }, 'schoolType')).toBe(false);
+  });
+
+  it('clears school type when the Student moves abroad', () => {
+    expect(
+      applyChange({ countryOfResidence: 'IN', schoolType: 'aided' }, { countryOfResidence: 'GB' }),
+    ).toEqual({ countryOfResidence: 'GB' });
+    expect(applyChange({ schoolType: 'aided' }, { countryOfResidence: 'IN' })).toEqual({
+      countryOfResidence: 'IN',
+      schoolType: 'aided',
+    });
+  });
+
+  it("asks parents' occupation of Indian citizens and OCI card holders, not of another nationality", () => {
+    expect(asked({}, 'parentOccupation')).toBe(true);
+    expect(asked({ citizenship: 'indian' }, 'parentOccupation')).toBe(true);
+    expect(asked({ citizenship: 'oci' }, 'parentOccupation')).toBe(true);
+    expect(asked({ citizenship: 'other' }, 'parentOccupation')).toBe(false);
+  });
+
+  it("clears parents' occupation when Citizenship moves to another nationality", () => {
+    expect(
+      applyChange({ citizenship: 'oci', parentOccupation: ['defence'] }, { citizenship: 'other' }),
+    ).toEqual({ citizenship: 'other' });
+  });
+
+  it('asks exams qualified of everyone, offering NMMS only in India or when no country is given', () => {
+    const offered = (profile: Profile) => offeredExams(profile).map((exam) => exam.value);
+    expect(offered({})).toEqual(['nmms', 'olympiad', 'other']);
+    expect(offered({ countryOfResidence: 'IN' })).toEqual(['nmms', 'olympiad', 'other']);
+    expect(offered({ countryOfResidence: 'US' })).toEqual(['olympiad', 'other']);
+    expect(asked({ countryOfResidence: 'US' }, 'examsQualified')).toBe(true);
+  });
+
+  it('clears an NMMS answer when the Student moves abroad, keeping the other exams', () => {
+    expect(
+      applyChange(
+        { countryOfResidence: 'IN', examsQualified: ['nmms', 'olympiad'] },
+        { countryOfResidence: 'AE' },
+      ),
+    ).toEqual({ countryOfResidence: 'AE', examsQualified: ['olympiad'] });
+    expect(applyChange({ examsQualified: ['nmms'] }, { countryOfResidence: 'AE' })).toEqual({
+      countryOfResidence: 'AE',
+    });
+  });
+
+  it('sends no answer that no longer applies from a saved Profile', () => {
+    expect(
+      profileForMatch({
+        countryOfResidence: 'GB',
+        citizenship: 'other',
+        board: 'cambridge',
+        class: 12,
+        stream: 'science',
+        schoolType: 'government',
+        parentOccupation: ['defence'],
+        examsQualified: ['nmms', 'olympiad'],
+      }),
+    ).toEqual({
+      countryOfResidence: 'GB',
+      citizenship: 'other',
+      board: 'cambridge',
+      class: 12,
+      examsQualified: ['olympiad'],
+    });
+  });
+
+  it('loads a saved Profile without the answers that no longer apply', () => {
+    expect(
+      migrateSavedProfile({
+        countryOfResidence: 'US',
+        citizenship: 'other',
+        board: 'us_high_school',
+        stream: 'arts',
+        schoolType: 'private',
+        parentOccupation: ['defence'],
+        examsQualified: ['nmms'],
+      }),
+    ).toEqual({ countryOfResidence: 'US', citizenship: 'other', board: 'us_high_school' });
+  });
 });
 
 // ATAR and SAT: test scores apart from Board marks, each asked only where it

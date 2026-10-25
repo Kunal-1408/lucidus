@@ -354,6 +354,59 @@ describe('Match request Profile validation', () => {
     });
   });
 
+  // Questions whose answers are Indian terms, only where they apply.
+  describe('Indian-only questions', () => {
+    it.each([
+      ['a stream with no board', { class: 12, stream: 'science' }],
+      ['a stream on CISCE', { class: 11, board: 'cisce', stream: 'arts' }],
+      [
+        'school type, occupation and NMMS with no country or Citizenship',
+        {
+          schoolType: 'government',
+          parentOccupation: ['defence'],
+          examsQualified: ['nmms'],
+        },
+      ],
+      [
+        "an OCI card holder in Dubai with parents' occupation",
+        {
+          countryOfResidence: 'AE',
+          citizenship: 'oci',
+          parentOccupation: ['central_armed_police'],
+          examsQualified: ['olympiad'],
+        },
+      ],
+    ])('matches %s', async (_, profile) => {
+      await matchWith(profile).expect(200);
+    });
+
+    it.each([
+      [
+        'a stream on the IB board',
+        { class: 12, board: 'ib', stream: 'science' },
+        'stream is only asked for the cbse, cisce or state board',
+      ],
+      [
+        'a school type for a Student abroad',
+        { countryOfResidence: 'GB', schoolType: 'government' },
+        'schoolType is only asked when countryOfResidence is IN or not given',
+      ],
+      [
+        "parents' occupation for another nationality",
+        { citizenship: 'other', parentOccupation: ['defence'] },
+        'parentOccupation is only asked when citizenship is indian or oci',
+      ],
+      [
+        'NMMS for a Student abroad',
+        { countryOfResidence: 'US', examsQualified: ['olympiad', 'nmms'] },
+        'examsQualified nmms is only asked when countryOfResidence is IN or not given',
+      ],
+    ])('answers 400 for %s, naming the field', async (_, profile, reason) => {
+      const res = await matchWith(profile).expect(400);
+      expect(res.body.message).toEqual([reason]);
+    });
+  });
+
   describe('ATAR and SAT', () => {
     it.each([
       ['an ATAR in Australia', { countryOfResidence: 'AU', atar: 99.95 }],
