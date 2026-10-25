@@ -166,17 +166,22 @@ describe('Board marks', () => {
     );
   });
 
-  it('drops answers to questions the form no longer has from a saved Profile', () => {
+  it('drops latest exam marks and the school state from a saved Profile and keeps Class 10 marks as the Class 10 result', () => {
     expect(
       migrateSavedProfile({
         class: 12,
         latestMarks: 85,
         class10Marks: 91,
-        domicileState: 'kerala',
         schoolState: 'kerala',
         gender: 'female',
       }),
-    ).toEqual({ class: 12, gender: 'female' });
+    ).toEqual({ class: 12, class10Result: percent(91), gender: 'female' });
+  });
+
+  it('keeps a Class 10 result already given over saved Class 10 marks', () => {
+    expect(migrateSavedProfile({ class10Marks: 91, class10Result: percent(70) })).toEqual({
+      class10Result: percent(70),
+    });
   });
 
   it('leaves a saved Profile with nothing to migrate as it is', () => {
@@ -500,6 +505,28 @@ describe('family income', () => {
 });
 
 describe('migrateSavedProfile: residence', () => {
+  it('turns a saved domicile state into India and its region, so the same Home state', () => {
+    expect(migrateSavedProfile({ domicileState: 'kerala', gender: 'female' })).toEqual({
+      countryOfResidence: 'IN',
+      region: 'IN-KL',
+      gender: 'female',
+    });
+    expect(migrateSavedProfile({ domicileState: 'odisha' })).toEqual({
+      countryOfResidence: 'IN',
+      region: 'IN-OD',
+    });
+  });
+
+  it('keeps a country already given and drops the domicile state', () => {
+    expect(migrateSavedProfile({ countryOfResidence: 'AE', domicileState: 'kerala' })).toEqual({
+      countryOfResidence: 'AE',
+    });
+  });
+
+  it('drops a domicile state that is no Indian state', () => {
+    expect(migrateSavedProfile({ domicileState: 'atlantis' })).toEqual({});
+  });
+
   it('keeps Citizenship as it was: Indian stays Indian, other stays other with no country', () => {
     expect(migrateSavedProfile({ citizenship: 'indian' })).toEqual({ citizenship: 'indian' });
     expect(migrateSavedProfile({ citizenship: 'other' })).toEqual({ citizenship: 'other' });
@@ -573,11 +600,25 @@ describe('field of study', () => {
 });
 
 describe('migrateSavedProfile: field of study and destination', () => {
-  it.each(['uk', 'other'])('drops a saved destination of %s, which is no country code', (saved) => {
-    expect(migrateSavedProfile({ destination: saved, gender: 'male' })).toEqual({
-      gender: 'male',
-    });
+  it.each([
+    ['india', 'IN'],
+    ['uk', 'GB'],
+    ['usa', 'US'],
+    ['canada', 'CA'],
+    ['australia', 'AU'],
+    ['germany', 'DE'],
+  ])('turns a saved destination of %s into %s', (saved, code) => {
+    expect(migrateSavedProfile({ destination: saved })).toEqual({ destination: code });
   });
+
+  it.each(['other', 'atlantis'])(
+    'drops a saved destination of %s, which names no country',
+    (saved) => {
+      expect(migrateSavedProfile({ destination: saved, gender: 'male' })).toEqual({
+        gender: 'male',
+      });
+    },
+  );
 
   it('keeps a destination that is already a country code', () => {
     expect(migrateSavedProfile({ destination: 'SG' })).toEqual({ destination: 'SG' });

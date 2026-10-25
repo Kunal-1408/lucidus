@@ -77,10 +77,10 @@ describe('SPDC on the Watchlist', () => {
     destination: 'IN',
   };
 
+  // PIO cards were merged into the OCI card, so a PIO is an OCI card holder.
   it.each([
-    ['an OCI card holder', 'oci'],
+    ['an OCI card holder (or PIO)', 'oci'],
     ['an NRI', 'indian'],
-    ['a PIO of another nationality', 'other'],
   ])(
     'shows it to %s in Class 12 in the UAE with 75 percent',
     async (_, citizenship) => {
@@ -89,6 +89,16 @@ describe('SPDC on the Watchlist', () => {
       ).toContain(SPDC);
     },
   );
+
+  it('hides it from a Student of another nationality with no OCI card', async () => {
+    expect(
+      await visible({
+        ...inClass12,
+        citizenship: 'other',
+        countryOfResidence: 'AE',
+      }),
+    ).not.toContain(SPDC);
+  });
 
   it('hides it from a Student abroad below 60 percent', async () => {
     expect(
@@ -101,13 +111,22 @@ describe('SPDC on the Watchlist', () => {
     ).not.toContain(SPDC);
   });
 
-  it('hides it from a Student living in India', async () => {
-    expect(
-      await visible({
-        ...inClass12,
+  // "Passed grade 11th and 12th from abroad" is about where the Student
+  // studied, which no Profile field holds, and "not living in India" needs a
+  // negative Criterion (out of scope), so a Student in India is not ruled
+  // out: with no destination given, SPDC waits in Tell us more.
+  it('leaves it in Tell us more for a Student in India who gives no destination', async () => {
+    const res = await harness
+      .http()
+      .post('/api/match')
+      .send({
+        class: 12,
+        class12Result: percent(75),
         citizenship: 'indian',
         countryOfResidence: 'IN',
-      }),
-    ).not.toContain(SPDC);
+      })
+      .expect(200);
+    const { tellUsMore } = res.body as Record<string, { name: string }[]>;
+    expect(tellUsMore.map((c) => c.name)).toContain(SPDC);
   });
 });

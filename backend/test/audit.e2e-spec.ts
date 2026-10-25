@@ -25,13 +25,14 @@ const stored = (
   op: Criterion['op'],
   value: unknown,
   sourceText: string,
+  confidence: Criterion['confidence'] = 'high',
 ): Criterion => ({
   field,
   op,
   value,
   changeable: false,
   sourceText,
-  confidence: 'high',
+  confidence,
 });
 
 describe('Audit of live data', () => {
@@ -118,10 +119,9 @@ describe('Audit of live data', () => {
     ]);
 
     const scholarship = {
-      id: expect.any(String),
-      name: ENGINEERING_NAME,
+      scholarshipId: expect.any(String),
+      scholarshipName: ENGINEERING_NAME,
       sourceUrl: ENGINEERING,
-      schemeName: ENGINEERING_NAME,
     };
     expect(await audit()).toEqual([
       {
@@ -173,6 +173,33 @@ describe('Audit of live data', () => {
         sourceText: 'A SAT score of 2400.',
         problem: 'value outside the range',
       },
+    ]);
+  });
+
+  // A low Criterion holds the LLM's raw values until a reviewer approves it;
+  // it is listed when approving could never give it a value a Profile meets.
+  it("checks a low Criterion's raw values as approving would read them", async () => {
+    await harness.ingest();
+    const low = (field: string, op: Criterion['op'], value: string[]) =>
+      stored(field, op, value, `Raw ${field}.`, 'low');
+    await storeAlso([
+      low('fieldOfStudy', 'in', ['engineering']),
+      low('class12Result', 'gte', ['36 IB points']),
+      low('homeState', 'in', ['atlantis']),
+      low('class10Result', 'gte', ['36 IB points']),
+    ]);
+
+    expect(await audit()).toEqual([
+      expect.objectContaining({
+        field: 'homeState',
+        value: ['atlantis'],
+        problem: 'raw value outside the allowed options',
+      }),
+      expect.objectContaining({
+        field: 'class10Result',
+        value: ['36 IB points'],
+        problem: 'raw value outside the allowed options',
+      }),
     ]);
   });
 });

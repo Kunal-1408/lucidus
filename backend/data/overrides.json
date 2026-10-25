@@ -7,7 +7,7 @@
     "criteria": [
       {
         "field": "citizenship",
-        "values": ["indian", "oci", "other"],
+        "values": ["indian", "oci"],
         "sourceText": "Children of NRIs/PI0s/0CIs"
       },
       {
@@ -29,14 +29,9 @@
         "field": "destination",
         "values": ["IN"],
         "sourceText": "Undergraduate courses in Indian Universities/Institutes"
-      },
-      {
-        "field": "destinationIsResidence",
-        "values": ["no"],
-        "sourceText": "Applicants from all the categories must have passed grade 11th and 12th from abroad."
       }
     ],
-    "note": "Rules misread the 2025-26 guidelines (Class 11, Nepal residence, Pakistan/Bangladesh citizenship, medicine only, the ECR US$ 3000 limit). Replaced with the scheme's own conditions for NRI/PIO/OCI children; age 17-21 has no Profile field. The ECR studied-in-India category (17 places) is not covered by destinationIsResidence no.",
+    "note": "Rules misread the 2025-26 guidelines (Class 11, Nepal residence, Pakistan/Bangladesh citizenship, medicine only, the ECR US$ 3000 limit). Replaced with the scheme's own conditions for NRI/PIO/OCI children: an NRI is an Indian citizen, and PIO cards were merged into the OCI card, so citizenship is indian or oci. Age 17-21 has no Profile field. 'Passed grade 11th and 12th from abroad' is about where the Student studied, which no Profile field holds, and 'not living in India' needs a negative Criterion (out of scope), so a Student in India is not ruled out. The ECR studied-in-India category (17 places) is not covered.",
     "reviewedBy": "Claude (ticket 10), for the operator to confirm",
     "reviewedAt": "2026-10-25T09:00:00.000Z"
   }

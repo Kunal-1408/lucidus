@@ -31,6 +31,11 @@ export interface Extraction {
   deadline?: string;
 }
 
+// How a section's extraction was come by: kept from the last run (the same
+// text, read by today's extraction), read again (the same text, stored by an
+// older extraction or without its extraction), or read for new text.
+export type ExtractionOrigin = 'stored' | 'read again' | 'new text';
+
 export const AMOUNT_NOT_STATED = 'See the official site for the amount';
 
 // Extracts a Scholarship from its cleaned text. The pipeline:

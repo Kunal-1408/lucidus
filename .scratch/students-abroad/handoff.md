@@ -16,6 +16,7 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 - rule extraction gives `region` only for AE, AU, CA, GB, US; other regions left to LLM (03)
 - "predicted ATAR of 95" reads as ATAR Criterion, not Extra requirement; Tuckwell live page does this (08, 10)
 - SPDC Override in `backend/data/overrides.json` written by agent: operator confirm; lapses on 2026-27 PDF, re-point URL + re-review (10)
+- SPDC can show to a Student in India (no negative Criterion; "studied abroad" has no field); revisit if a `not in` op lands (10 review)
 - watch: CBSE SGC class [12] not 11–12, JKCF fieldOfStudy science, Coca-Cola countryOfResidence US; Loran/Schulich/NTU/Gates "no criteria" without LLM (10)
 
 ## Later
