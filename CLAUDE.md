@@ -4,7 +4,7 @@
 
 ## Tools
 
-Read files with Read, search with Grep and Glob, change files with Edit and Write; these need no approval and keep a run flowing. Keep Bash and PowerShell for git, npm and running scripts. This holds in every mode, auto mode included, and for subagents.
+Read files with Read, search with Grep and Glob, change files with Edit and Write; these need no approval and keep a run flowing. Keep Bash and PowerShell for git, npm and running scripts. This holds in every mode, auto mode included, and for subagents. Settings deny `cat`, `head`, `tail`, `sed`, `grep`, `rg`, `find` and `ls` in Bash; on a denial, use the matching tool. Filter git output with git's own flags (`-n`, `--oneline`, `--grep`, `-S`, `-- <path>`, `--stat`, `--name-only`).
 
 ## Agent skills
 
