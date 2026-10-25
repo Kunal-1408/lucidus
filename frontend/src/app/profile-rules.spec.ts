@@ -1,6 +1,7 @@
 import { Profile } from './profile-fields';
 import {
   applyChange,
+  applyScaleChange,
   boardMarksLabel,
   checkAnswer,
   incomeCurrency,
@@ -232,6 +233,47 @@ describe('Result scales', () => {
   it('offers CGPA only for the Class 10 result, and the foreign scales only for Class 12', () => {
     expect(SLOT_SCALES.class10Result).toEqual(['percentage', 'cgpa_10']);
     expect(SLOT_SCALES.class12Result).toEqual(['percentage', 'gpa_4', 'ib_points', 'a_level']);
+  });
+
+  it.each([
+    ['gpa_4', 'High-school GPA'],
+    ['ib_points', 'IB Diploma points'],
+    ['a_level', 'A-level grades'],
+    ['percentage', 'Class 12 board result'],
+  ] as const)('labels a Class 12 result on %s as "%s"', (scale, label) => {
+    expect(boardMarksLabel('class12Result', { class: 12 }, scale)).toBe(label);
+  });
+
+  it("labels the Class 12 result on the board's own scale when none is picked", () => {
+    expect(boardMarksLabel('class12Result', { board: 'us_high_school', class: 12 })).toBe(
+      'High-school GPA',
+    );
+    expect(boardMarksLabel('class12Result', { board: 'ib', class: 12 })).toBe('IB Diploma points');
+  });
+
+  it('labels an expected IB or A-level result as predicted while boards are upcoming', () => {
+    const upcoming = { class: 12, boardsUpcoming: true } as const;
+    expect(boardMarksLabel('class12Result', upcoming, 'ib_points')).toBe(
+      'Predicted IB Diploma points',
+    );
+    expect(boardMarksLabel('class12Result', upcoming, 'a_level')).toBe('Predicted A-level grades');
+  });
+
+  it('clears a result when its scale changes, and keeps it on the same scale', () => {
+    const profile = {
+      class: 12,
+      class10Result: percent(90),
+      class12Result: percent(85),
+    } as const;
+    expect(applyScaleChange(profile, 'class12Result', 'ib_points')).toEqual({
+      class: 12,
+      class10Result: percent(90),
+    });
+    expect(applyScaleChange(profile, 'class12Result', 'percentage')).toEqual(profile);
+    expect(applyScaleChange(profile, 'class10Result', 'cgpa_10')).toEqual({
+      class: 12,
+      class12Result: percent(85),
+    });
   });
 
   it('clears both results when the board changes', () => {

@@ -132,6 +132,20 @@ describe('Normalisation onto the fixed lists', () => {
     },
   );
 
+  it.each([
+    'Applicants with a household income under £30,000 will receive £500 a month.',
+    'Household income must be below £30,000; successful students receive a monthly stipend.',
+  ])(
+    'takes the period from the income limit alone, not from what is paid, in "%s"',
+    (text) => {
+      expect(criterion(text, 'incomeAmount')?.value).toEqual({
+        currency: 'GBP',
+        period: 'yearly',
+        value: 30000,
+      });
+    },
+  );
+
   it('leaves a bare dollar sign to the LLM, since many countries use one', () => {
     const text = 'Family income should be below $65,000 per year.';
     expect(criterion(text, 'incomeAmount')).toBeUndefined();
@@ -201,21 +215,64 @@ describe('Normalisation onto the fixed lists', () => {
     expect(criterion(text, 'fieldOfStudy')).toBeUndefined();
   });
 
+  const inTheUk = ' Awarded for study at a university in the United Kingdom.';
+
   it.each([
     ['The award is open to home students only.', true],
     ['This scholarship is for international students.', false],
     ['Both home and international students may apply.', undefined],
     ['International students may write to the admissions office.', undefined],
-  ])('reads "%s" as a home or international award', (text, home) => {
-    expect(criterion(text, 'destinationIsResidence')?.value).toBe(home);
+  ])(
+    'reads "%s" as a home or international award beside a destination',
+    (text, home) => {
+      expect(criterion(text + inTheUk, 'destinationIsResidence')?.value).toBe(
+        home,
+      );
+    },
+  );
+
+  it.each([
+    'The award is open to home students only.',
+    'This scholarship is for international students.',
+  ])(
+    'reads no home or international award from "%s" when the page names no destination',
+    (text) => {
+      // Home or international means nothing without the country of study:
+      // read alone, an award for international students in Canada would
+      // pass a Student going anywhere abroad.
+      expect(criterion(text, 'destinationIsResidence')).toBeUndefined();
+    },
+  );
+
+  it('reads the country an award for international students names as the destination', () => {
+    // From the Pearson International Scholarship page.
+    const text =
+      'Pearson International Scholarships is one of the largest scholarship programs for international students in Canada.';
+    expect(criterion(text, 'destination')?.value).toEqual(['CA']);
+    expect(criterion(text, 'destinationIsResidence')?.value).toBe(false);
   });
 
-  it('reads where the Student must study, but never India', () => {
+  it('reads where the Student must study', () => {
     const abroad =
       'Awarded to students who wish to study at a university in the United Kingdom.';
     expect(criterion(abroad, 'destination')?.value).toEqual(['GB']);
-    const home = 'For students who will study at a college in India.';
-    expect(criterion(home, 'destination')).toBeUndefined();
+  });
+
+  it.each([
+    'The scholarship is tenable only at universities in India.',
+    'Students must pursue their higher education at a college in India.',
+  ])(
+    'reads India as the destination where "%s" restricts study to it',
+    (text) => {
+      expect(criterion(text, 'destination')?.value).toEqual(['IN']);
+    },
+  );
+
+  it('reads no destination from India named in passing', () => {
+    // An Indian source saying where its Students study restricts nothing a
+    // Student in India could have read.
+    const text = 'For students who will study at a college in India.';
+    expect(criterion(text, 'destination')).toBeUndefined();
   });
 
   it.each([

@@ -1,4 +1,5 @@
 import { COUNTRIES, INDIA, REGIONS } from '../match/countries.js';
+import type { TestScoreField } from '../match/profile.js';
 import {
   BOARD_MARKS_FIELDS,
   type BoardMarksField,
@@ -11,6 +12,8 @@ import type {
 import {
   DATE,
   escape,
+  FOREIGN_MONEY,
+  incomePeriod,
   MONEY,
   STATE_NAMES,
   toClass,
@@ -122,20 +125,39 @@ const incomeRule: FieldRule = (sentences) => {
 
 // The same limit in another currency, with how often it is counted: "household
 // monthly income ... should NOT exceed an amount equivalent to US Dollar Five
-// Thousand (US$ 5000)", "household income of under £62,215 a year".
+// Thousand (US$ 5000)", "household income of under £62,215 a year". The
+// period comes from the income limit phrase alone: the words naming the
+// income, the cue, the figure and a period right after it. What the award
+// pays ("will receive £500 a month") says nothing about the limit.
 const FOREIGN_INCOME_CUE = new RegExp(INCOME_CUE, 'i');
 const FOREIGN_INCOME_REACH = 80;
+// "monthly income", "monthly household income", "annual family income".
+const PERIOD_BEFORE_INCOME =
+  /\b(?:month(?:ly)?|annual|yearly)\s+(?:[\w()'-]+\s+){0,2}$/i;
+// "£62,215 a year", "US$ 5000 per month", "AED 250,000 annually".
+const PERIOD_AFTER_LIMIT =
+  /^\s*(?:(?:a|per|each|every)\s+(?:month|year|annum)\b|monthly\b|annually\b|yearly\b|per mensem\b)/i;
 
 const foreignIncomeRule: FieldRule = (sentences) => {
   for (const sentence of sentences) {
     const cue = sentence.match(FOREIGN_INCOME_CUE);
     if (!cue || INCOME_LIMIT.test(sentence)) continue;
-    const start = (cue.index ?? 0) + cue[0].length;
-    const after = sentence.slice(start, start + FOREIGN_INCOME_REACH);
-    const limit = toIncomeLimit(after.split(/\.(?!\d)/)[0]);
-    if (!limit) continue;
-    const period = toIncomeLimit(sentence)?.period ?? limit.period;
-    const raw = `${limit.currency} ${limit.value} ${period}`;
+    const cueAt = cue.index ?? 0;
+    const start = cueAt + cue[0].length;
+    const reach = sentence
+      .slice(start, start + FOREIGN_INCOME_REACH)
+      .split(/\.(?!\d)/)[0];
+    const money = [...reach.matchAll(FOREIGN_MONEY)].find((m) =>
+      toIncomeLimit(m[0]),
+    );
+    if (!money) continue;
+    const limit = toIncomeLimit(money[0])!;
+    const limitEnd = start + money.index + money[0].length;
+    const phrase =
+      (sentence.slice(0, cueAt).match(PERIOD_BEFORE_INCOME)?.[0] ?? '') +
+      sentence.slice(cueAt, limitEnd) +
+      (sentence.slice(limitEnd).match(PERIOD_AFTER_LIMIT)?.[0] ?? '');
+    const raw = `${limit.currency} ${limit.value} ${incomePeriod(phrase)}`;
     return found('incomeAmount', raw, sentence);
   }
   return undefined;
@@ -213,19 +235,20 @@ const A_LEVEL_GRADES = /(?<![\w*])((?:A\*|[A-E]){2,5})(?![\w*])/;
 // least 3.5", "8.5 CGPA or above". A bare figure beside the word is not one
 // ("CGPA X 9.5 will give the percentage").
 function minimumOn(unit: string): RegExp {
-  const n = String.raw`(\d{1,2}(?:\.\d{1,2})?)`;
+  const minimum = String.raw`(\d{1,2}(?:\.\d{1,2})?)`;
   return new RegExp(
     [
-      String.raw`\b(?:minimum|at least|not less than)\s+(?:an?\s+)?(?:unweighted\s+)?${unit}\s+(?:of\s+)?${n}`,
-      String.raw`\b${unit}\s+of\s+(?:at least\s+|minimum(?: of)?\s+|not less than\s+)?${n}`,
-      String.raw`\b${n}\s+(?:unweighted\s+)?${unit}\s+(?:or above|or more|and above|or higher)`,
+      String.raw`\b(?:minimum|at least|not less than)\s+(?:an?\s+)?(?:unweighted\s+)?${unit}\s+(?:of\s+)?${minimum}`,
+      String.raw`\b${unit}\s+of\s+(?:at least\s+|minimum(?: of)?\s+|not less than\s+)?${minimum}`,
+      String.raw`\b${minimum}\s+(?:unweighted\s+)?${unit}\s+(?:or above|or more|and above|or higher)`,
     ].join('|'),
     'i',
   );
 }
 const GPA = minimumOn('GPA');
 const CGPA = minimumOn('CGPA');
-const figure = (m: RegExpMatchArray) => m[1] ?? m[2] ?? m[3];
+// The minimum a minimumOn pattern matched, whichever wording it was in.
+const minimumFound = (m: RegExpMatchArray) => m[1] ?? m[2] ?? m[3];
 // A weighted GPA and AP scores are no scale the Profile takes (Extra
 // requirements). "AP" alone is often Andhra Pradesh in Indian sources.
 const WEIGHTED_GPA = /(?<!un)weighted\s+GPA\b/i;
@@ -256,7 +279,7 @@ const SCALE_RULES: ScaleRule[] = [
     read: (s) => {
       if (WEIGHTED_GPA.test(s) || /\bCGPA\b/i.test(s)) return undefined;
       const m = s.match(GPA);
-      return m ? `${figure(m)} GPA` : undefined;
+      return m ? `${minimumFound(m)} GPA` : undefined;
     },
   },
   {
@@ -266,7 +289,7 @@ const SCALE_RULES: ScaleRule[] = [
     read: (s) => {
       const m = s.match(CGPA);
       if (!m || marksYear(s, m.index ?? 0) !== 10) return undefined;
-      return `${figure(m)} CGPA`;
+      return `${minimumFound(m)} CGPA`;
     },
   },
 ];
@@ -345,7 +368,7 @@ const RESULT_WORDS = [IB, A_LEVEL, /\bC?GPA\b/i, /\bI?GCSEs?\b/, AP];
 const ATAR = /\bATAR\b[^.\d]{0,40}?(\d{1,2}(?:\.\d{1,2})?)(?!\.?\d|\s*%)/;
 const SAT = /\bSAT\b[^.\d]{0,40}?(\d,?\d{3}|\d{3})(?![.,]?\d|\s*%)/;
 
-function testScoreRule(field: 'atar' | 'sat', pattern: RegExp): FieldRule {
+function testScoreRule(field: TestScoreField, pattern: RegExp): FieldRule {
   return (sentences) => {
     for (const sentence of sentences) {
       const m = sentence.match(pattern);
@@ -681,10 +704,14 @@ const OCI = /\b[Oo]verseas [Cc]itizens? of India\b/g;
 function placesIn(sentence: string) {
   const plain = sentence.replace(OCI, ' ');
   const regions = namedPlaces(plain, REGION_NAMES);
-  const countries = namedPlaces(regions.rest, COUNTRY_NAMES).codes.filter(
-    (code) => code !== INDIA,
-  );
-  return { plain, regions: regions.codes, countries };
+  const named = namedPlaces(regions.rest, COUNTRY_NAMES).codes;
+  const countries = named.filter((code) => code !== INDIA);
+  return {
+    plain,
+    regions: regions.codes,
+    countries,
+    namesIndia: named.includes(INDIA),
+  };
 }
 
 // "residents of the United Arab Emirates", "living in the UK".
@@ -733,17 +760,23 @@ const citizenshipCountryRule: FieldRule = (sentences) => {
   return undefined;
 };
 
-// "to study at a university in the United States": where the Student must
-// study. As for residence, India is never read: an Indian source's "study in
-// India" is not a condition, and schools are where a Student lives.
+// "to study at a university in the United States", "for international
+// students in Canada": where the Student must study. Schools are where a
+// Student lives, never a destination. India is read only where a sentence
+// restricts study to it ("tenable only at universities in India"): an Indian
+// source's passing "study at a college in India" is no condition.
 const STUDY_ABROAD =
-  /\bstud(?:y|ying)\b[^.]*\b(?:universit(?:y|ies)|colleges?|higher education)\b|\b(?:universit(?:y|ies)|colleges?)\s+in\b/i;
+  /\bstud(?:y|ying)\b[^.]*\b(?:universit(?:y|ies)|colleges?|higher education)\b|\b(?:universit(?:y|ies)|colleges?)\s+in\b|\b(?:home|domestic|international|overseas) students?\s+(?:in|at)\b/i;
+const RESTRICTS_STUDY =
+  /\bonly\b|\bmust\b|\bexclusively\b|\brestricted to\b|\blimited to\b|\btenable\b/i;
 
 const destinationRule: FieldRule = (sentences) => {
   for (const sentence of sentences) {
-    const { plain, countries } = placesIn(sentence);
-    if (STUDY_ABROAD.test(plain) && !LIVES.test(plain) && countries.length)
-      return found('destination', countries, sentence);
+    const { plain, countries, namesIndia } = placesIn(sentence);
+    if (!STUDY_ABROAD.test(plain) || LIVES.test(plain)) continue;
+    if (countries.length) return found('destination', countries, sentence);
+    if (namesIndia && RESTRICTS_STUDY.test(plain))
+      return found('destination', [INDIA], sentence);
   }
   return undefined;
 };

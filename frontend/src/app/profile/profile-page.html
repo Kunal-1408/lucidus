@@ -120,7 +120,7 @@
   @for (question of boardMarksQuestions; track question) {
     @if (shown().has(question)) {
       <label>
-        {{ boardMarksLabel(question, profile()) }}: scale
+        {{ boardMarksLabel(question, profile(), scaleOf(question)) }}: scale
         <select (change)="setScale(question, $any($event.target).value)">
           @for (s of scalesFor(question); track s.value) {
             <option [value]="s.value" [selected]="scaleOf(question) === s.value">
@@ -130,7 +130,7 @@
         </select>
       </label>
       <label>
-        {{ boardMarksLabel(question, profile()) }}
+        {{ boardMarksLabel(question, profile(), scaleOf(question)) }}
         @if (scaleOf(question) === 'a_level') {
           <input
             type="text"

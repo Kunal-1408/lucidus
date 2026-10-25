@@ -5,11 +5,11 @@
 // so this test reads them straight from frontend/src/app/profile-fields.ts.
 import { isDeepStrictEqual as isEqual } from 'node:util';
 import * as formPlaces from '../../../frontend/src/app/countries.js';
-import * as formMoney from '../../../frontend/src/app/currencies.js';
+import * as formCurrencies from '../../../frontend/src/app/currencies.js';
 import * as form from '../../../frontend/src/app/profile-fields.js';
 import * as rules from '../../../frontend/src/app/profile-rules.js';
 import { readValue } from '../ingestion/extractor.js';
-import { FIXED_LISTS } from '../ingestion/normalise.js';
+import { FIXED_LISTS, LEGACY_DESTINATIONS } from '../ingestion/normalise.js';
 import { COUNTRIES, REGIONS } from '../match/countries.js';
 import { COUNTRY_CURRENCIES, CURRENCIES } from '../match/currencies.js';
 import { match } from '../match/matcher.js';
@@ -22,6 +22,7 @@ import {
   SLOT_SCALES,
   STATE_REGIONS,
   TEST_SCORE_RANGES,
+  type TestScoreField,
 } from '../match/profile.js';
 import { CRITERION_FIELDS } from './criterion-fields.js';
 
@@ -57,7 +58,7 @@ const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'];
 // Fields the form asks as an amount in a currency.
 const AMOUNT_FIELDS = ['incomeAmount'];
 // Test scores: fields the form asks as a number in a range.
-const TEST_SCORE_FIELDS = ['atar', 'sat'] as const;
+const TEST_SCORE_FIELDS: readonly TestScoreField[] = ['atar', 'sat'];
 
 // Values deliberately on one side only, each with the reason.
 const FORM_ONLY_FIELDS: Record<string, string> = {
@@ -252,16 +253,16 @@ describe('Form ↔ Criteria contract', () => {
   });
 
   describe('incomeAmount', () => {
-    const formCurrencies = formMoney.CURRENCIES.map((option) => option.value);
+    const formCodes = formCurrencies.CURRENCIES.map((option) => option.value);
 
     it('the form and the backend hold the same currencies, and the same currency for each country', () => {
-      expect(formMoney.CURRENCIES).toEqual(CURRENCIES);
-      expect(formMoney.COUNTRY_CURRENCIES).toEqual(COUNTRY_CURRENCIES);
+      expect(formCurrencies.CURRENCIES).toEqual(CURRENCIES);
+      expect(formCurrencies.COUNTRY_CURRENCIES).toEqual(COUNTRY_CURRENCIES);
     });
 
     it("every country's currency is one the form offers", () => {
       const unoffered = Object.values(COUNTRY_CURRENCIES).filter(
-        (currency) => !formCurrencies.includes(currency),
+        (currency) => !formCodes.includes(currency),
       );
       expect(unoffered).toEqual([]);
     });
@@ -269,7 +270,7 @@ describe('Form ↔ Criteria contract', () => {
     it('every currency the form can send, but rupees, is one a Criterion can hold', () => {
       // A rupee limit is a rupee band limit (incomeBand), which a rupee
       // amount is judged against instead.
-      const unread = formCurrencies.filter(
+      const unread = formCodes.filter(
         (currency) =>
           currency !== 'INR' &&
           !isEqual(readValue('incomeAmount', [`${currency} 1000 yearly`]), {
@@ -295,6 +296,10 @@ describe('Form ↔ Criteria contract', () => {
       expect(Object.values(STATE_REGIONS).sort()).toEqual(
         [...indianRegions].sort(),
       );
+    });
+
+    it('the form and the backend read the same old destination names as the same codes', () => {
+      expect(rules.LEGACY_DESTINATIONS).toEqual(LEGACY_DESTINATIONS);
     });
 
     it('reads a code as the LLM or a reviewer may write it', () => {
