@@ -15,8 +15,10 @@ import { CURRENCY_CODES } from './currencies.js';
 import { INCOME_BANDS } from './matcher.js';
 import {
   type BoardResult,
+  CLASSES,
   type IncomeAmount,
   isALevelGrades,
+  isInRange,
   NO_CLASS_10_EXAM_BOARDS,
   NO_CLASS_12_EXAM_BOARDS,
   type Profile,
@@ -29,7 +31,6 @@ import {
 export type ProfileParseResult =
   { ok: true; profile: Profile } | { ok: false; reasons: string[] };
 
-const CLASSES = [9, 10, 11, 12] as const;
 // Every answer the form takes as yes or no, boards upcoming included.
 const YES_NO_FIELDS = [
   'boardsUpcoming',
@@ -226,8 +227,7 @@ function boardResult(
   if (scale === 'ib_points') {
     const [min, max] = RESULT_SCALE_RANGES.ib_points;
     const points = answer.value;
-    const whole = typeof points === 'number' && Number.isInteger(points);
-    if (whole && points >= min && points <= max)
+    if (isInRange(points, [min, max]) && Number.isInteger(points))
       return { scale, value: points };
     reasons.push(`${label} must be a whole number from ${min} to ${max}`);
     return undefined;

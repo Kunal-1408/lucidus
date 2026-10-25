@@ -27,3 +27,9 @@ See spec: "Ingestion", Further Notes, and `.scratch/students-abroad/research-wat
 - SPDC e2e (`spdc.e2e-spec.ts`, fixture = live PDF): India Student hidden only with destination IN given; without a destination it's Tell us more (no `not in` op).
 - `overrides.e2e-spec.ts` now seeds `fixtures/overrides/empty.json`; repo file no longer empty.
 - Rules-only preview (fake LLM) of the other new sources: Review report "no criteria" for Loran, Schulich, NTU, Gates. Misreads to watch post-deploy: CBSE SGC class [12] (should be 11–12), JKCF fieldOfStudy science, Coca-Cola countryOfResidence US.
+
+**2026-10-25 (agent):** Wave 3 review fixes on `fix/abroad-wave-3-review`.
+- SPDC Override: citizenship `indian`/`oci` (NRI = Indian citizen abroad; PIO cards merged into OCI); `other` no longer accepted. `destinationIsResidence no` dropped: "passed grade 11th and 12th from abroad" is where they studied, no Profile field. `reviewedBy` still operator-to-confirm
+- consequence: a Student in India is no longer ruled out (negative Criterion out of scope, spec): with no destination SPDC is Tell us more, with destination `IN` it can match. Acceptance line "a Student in India doesn't" now covered only as this accepted gap
+- spdc e2e: OCI/PIO and NRI in UAE Class 12 75% see it; other nationality hidden; below 60% hidden; India Student without destination in Tell us more
+- Provider type: GLOSSARY term added; stored keys `scholarshipType` (Watchlist) / `type` (Scholarship) kept, glossary says why

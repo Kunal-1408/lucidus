@@ -5,9 +5,11 @@ import { CURRENCY_CODES, RUPEES } from '../match/currencies.js';
 import {
   type ALevelGrade,
   type BoardResult,
+  CLASSES,
   type IncomeLimit,
   type IncomePeriod,
   type IndianState,
+  isInRange,
   type Profile,
   RESULT_SCALE_RANGES,
   type ResultScale,
@@ -29,7 +31,6 @@ export const MONEY =
   /(?:₹|\bRs\.?|\bINR)\s*([\d,]+(?:\.\d+)?)(?:\s*\/-)?(?:\s*(lakhs?|lacs?|crores?)\b)?|\b(\d+(?:\.\d+)?)\s*(lakhs?|lacs?|crores?)\b/i;
 
 const ROMAN_CLASS: Record<string, number> = { ix: 9, x: 10, xi: 11, xii: 12 };
-const CLASSES = [9, 10, 11, 12];
 
 // "IX", "10th", "Class 12" → 9, 10, 12; anything outside Class 9–12 is
 // dropped.
@@ -40,7 +41,7 @@ export function toClass(label: string): number | undefined {
     .replace(/(?:st|nd|rd|th)$/, '')
     .trim();
   const level = ROMAN_CLASS[bare] ?? Number(bare);
-  return CLASSES.includes(level) ? level : undefined;
+  return (CLASSES as readonly number[]).includes(level) ? level : undefined;
 }
 
 const asList = (raw: string | string[]) => (Array.isArray(raw) ? raw : [raw]);
@@ -253,8 +254,9 @@ function toTestScore(
   const text = raw.trim().replace(/,/g, '');
   if (!/^\d+(?:\.\d+)?$/.test(text)) return undefined;
   const value = Number(text);
-  const [min, max] = TEST_SCORE_RANGES[field];
-  return value > 0 && value >= min && value <= max ? value : undefined;
+  return value > 0 && isInRange(value, TEST_SCORE_RANGES[field])
+    ? value
+    : undefined;
 }
 
 // A Board marks threshold, written as the rules, the LLM guide and

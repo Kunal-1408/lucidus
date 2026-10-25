@@ -12,6 +12,8 @@ import {
   IncomeAmount,
   Profile,
   ResultScale,
+  STATE_REGIONS,
+  STATES,
 } from './profile-fields';
 import { Subject, SUBJECTS } from './subjects';
 
@@ -372,16 +374,60 @@ function isOnScale(scale: ResultScale, value: unknown): boolean {
   return inRange && (scale !== 'ib_points' || Number.isInteger(value));
 }
 
-// A Profile saved by an earlier version of the form, in today's shape:
-// answers to questions the form no longer has are dropped, and so is a
-// destination that is no country code ("other" named no country).
+// A Profile saved by an earlier version of the form, in today's shape. The
+// old answers' keys live only here: whatever they don't carry over, like any
+// other answer to a question the form no longer has, is dropped.
 export function migrateSavedProfile(saved: Record<string, unknown>): Profile {
-  const { destination, ...rest } = saved;
-  const known = Object.fromEntries(
-    Object.entries(rest).filter(([question]) => QUESTIONS.includes(question as Question)),
-  );
-  const isCountry = COUNTRIES.some((country) => country.value === destination);
-  return (isCountry ? { ...known, destination } : known) as Profile;
+  const migrated = withDestinationCode(withHomeState(withClass10Result(saved)));
+  return Object.fromEntries(
+    Object.entries(migrated).filter(([question]) => QUESTIONS.includes(question as Question)),
+  ) as Profile;
+}
+
+// The destinations the form offered before every country, with the code each
+// now is.
+const OLD_DESTINATIONS: Record<string, string> = {
+  india: 'IN',
+  uk: 'GB',
+  usa: 'US',
+  canada: 'CA',
+  australia: 'AU',
+  germany: 'DE',
+};
+
+// A saved destination becomes its country code; "other" named no country and
+// is dropped. Saved fields of study already are their groups' values.
+function withDestinationCode(saved: Record<string, unknown>): Record<string, unknown> {
+  const { destination, ...migrated } = saved;
+  if (typeof destination !== 'string') return migrated;
+  const code = Object.hasOwn(OLD_DESTINATIONS, destination)
+    ? OLD_DESTINATIONS[destination]
+    : destination;
+  return COUNTRIES.some((country) => country.value === code)
+    ? { ...migrated, destination: code }
+    : migrated;
+}
+
+// Class 10 marks were always a Class 10 percentage; latest exam marks meant a
+// different year for each class, so they are dropped rather than guessed into
+// a board year.
+function withClass10Result(saved: Record<string, unknown>): Record<string, unknown> {
+  const { class10Marks, ...migrated } = saved;
+  if (typeof class10Marks === 'number' && migrated['class10Result'] === undefined) {
+    migrated['class10Result'] = { scale: 'percentage', value: class10Marks };
+  }
+  return migrated;
+}
+
+// A saved domicile state becomes India and the matching region, which makes
+// it the Home state again; one that is no Indian state, or given beside a
+// country, is dropped.
+function withHomeState(saved: Record<string, unknown>): Record<string, unknown> {
+  const { domicileState, ...migrated } = saved;
+  if (domicileState === undefined || migrated['countryOfResidence'] !== undefined) return migrated;
+  const state = STATES.find((s) => s.value === domicileState);
+  if (state === undefined) return migrated;
+  return { countryOfResidence: INDIA, region: STATE_REGIONS[state.value], ...migrated };
 }
 
 // The Profile as sent inside a Match request: answers to questions it no

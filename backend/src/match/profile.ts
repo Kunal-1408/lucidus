@@ -151,6 +151,14 @@ export const RESULT_SCALE_RANGES: Record<
   ib_points: [0, 45],
 };
 
+// Whether a value is a number inside a range, both ends included.
+export function isInRange(
+  value: unknown,
+  [min, max]: readonly [min: number, max: number],
+): value is number {
+  return typeof value === 'number' && value >= min && value <= max;
+}
+
 // The Profile fields holding a Test score, kept apart from Board marks
 // (frontend copy: TestScoreField in frontend/src/app/profile-rules.ts).
 export type TestScoreField = 'atar' | 'sat';
@@ -187,7 +195,8 @@ export interface IncomeAmount {
 
 // How often an income limit is counted. A monthly limit is compared as
 // twelve months.
-export type IncomePeriod = 'monthly' | 'yearly';
+export const INCOME_PERIODS = ['monthly', 'yearly'] as const;
+export type IncomePeriod = (typeof INCOME_PERIODS)[number];
 
 // An income limit on a Criterion: at most this amount, in this currency,
 // per this period.
@@ -212,8 +221,11 @@ export type FieldOfStudyGroup =
   | 'education'
   | 'other';
 
+// The classes a Student can be in.
+export const CLASSES = [9, 10, 11, 12] as const;
+
 export interface Profile {
-  class?: 9 | 10 | 11 | 12;
+  class?: (typeof CLASSES)[number];
   // Where the Student lives and who they are: an ISO 3166-1 alpha-2 country
   // and an ISO 3166-2 region of it (countries.ts); Home state and Residence
   // status only abroad (in India the region is the Home state); a
