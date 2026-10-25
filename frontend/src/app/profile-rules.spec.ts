@@ -3,6 +3,7 @@ import {
   applyChange,
   boardMarksLabel,
   checkAnswer,
+  incomeCurrency,
   migrateSavedProfile,
   profileForMatch,
   Question,
@@ -273,6 +274,71 @@ describe('where the Student lives and their Citizenship', () => {
       countryOfResidence: 'AE',
       homeState: 'goa',
     });
+  });
+});
+
+// Family income: rupee bands in India, an amount in a currency abroad.
+describe('family income', () => {
+  const asked = (profile: Profile, question: Question) => visibleQuestions(profile).has(question);
+  const dirhams = (value: number) => ({ currency: 'AED', value });
+
+  it('asks a Student living outside India for an amount, and a Student in India for a band', () => {
+    expect(asked({ countryOfResidence: 'AE' }, 'incomeAmount')).toBe(true);
+    expect(asked({ countryOfResidence: 'AE' }, 'incomeBand')).toBe(false);
+    expect(asked({ countryOfResidence: 'IN' }, 'incomeAmount')).toBe(false);
+    expect(asked({ countryOfResidence: 'IN' }, 'incomeBand')).toBe(true);
+  });
+
+  it('asks a Student who gives no country for a band, as before', () => {
+    expect(asked({}, 'incomeBand')).toBe(true);
+    expect(asked({}, 'incomeAmount')).toBe(false);
+  });
+
+  it('clears the band when the Student moves abroad, and the amount when they move to India', () => {
+    expect(
+      applyChange({ countryOfResidence: 'IN', incomeBand: '1l_2l' }, { countryOfResidence: 'AE' }),
+    ).toEqual({ countryOfResidence: 'AE' });
+    expect(
+      applyChange(
+        { countryOfResidence: 'AE', incomeAmount: dirhams(90000) },
+        { countryOfResidence: 'IN' },
+      ),
+    ).toEqual({ countryOfResidence: 'IN' });
+    expect(
+      applyChange(
+        { countryOfResidence: 'AE', incomeAmount: dirhams(90000) },
+        { countryOfResidence: undefined },
+      ),
+    ).toEqual({});
+  });
+
+  it('keeps the amount, in the currency given, when the Student moves to another country abroad', () => {
+    expect(
+      applyChange(
+        { countryOfResidence: 'AE', incomeAmount: dirhams(90000) },
+        { countryOfResidence: 'GB' },
+      ),
+    ).toEqual({ countryOfResidence: 'GB', incomeAmount: dirhams(90000) });
+  });
+
+  it("offers the country's currency until the Student gives another", () => {
+    expect(incomeCurrency({ countryOfResidence: 'AE' })).toBe('AED');
+    expect(incomeCurrency({ countryOfResidence: 'GB' })).toBe('GBP');
+    expect(incomeCurrency({ countryOfResidence: 'DE' })).toBe('EUR');
+    expect(
+      incomeCurrency({ countryOfResidence: 'AE', incomeAmount: { currency: 'USD', value: 1 } }),
+    ).toBe('USD');
+    expect(incomeCurrency({ countryOfResidence: 'AQ' })).toBeUndefined();
+  });
+
+  it('refuses a negative amount, an amount that is no number, and an unknown currency', () => {
+    expect(checkAnswer('incomeAmount', dirhams(90000))).toBeUndefined();
+    expect(checkAnswer('incomeAmount', dirhams(0))).toBeUndefined();
+    expect(checkAnswer('incomeAmount', dirhams(-1))).toBe('Enter an amount of 0 or more.');
+    expect(checkAnswer('incomeAmount', dirhams(Number.NaN))).toBe('Enter an amount of 0 or more.');
+    expect(checkAnswer('incomeAmount', { currency: 'XYZ', value: 100 })).toBe(
+      'Pick the currency your family income is in.',
+    );
   });
 });
 

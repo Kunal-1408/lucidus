@@ -131,12 +131,77 @@ describe('Matcher: income bands against an income threshold', () => {
     expect(bucketOf({ incomeBand: band }, atLeast(limit))).toBe(bucket);
   });
 
+  it('compares a Student abroad who gives a rupee income with a rupee limit', () => {
+    const s = upTo(250000);
+    const inRupees = (value: number): Profile => ({
+      countryOfResidence: 'AE',
+      incomeAmount: { currency: 'INR', value },
+    });
+    expect(bucketOf(inRupees(200000), s)).toBe('eligible');
+    expect(bucketOf(inRupees(300000), s)).toBe('hidden');
+    expect(
+      bucketOf(
+        {
+          countryOfResidence: 'AE',
+          incomeAmount: { currency: 'AED', value: 1000 },
+        },
+        s,
+      ),
+    ).toBe('tellUsMore');
+  });
+
   it('matches an income band criterion naming bands directly', () => {
     const s = scholarship([
       { field: 'incomeBand', op: 'in', value: ['under_1l', '1l_2l'] },
     ]);
     expect(bucketOf({ incomeBand: '1l_2l' }, s)).toBe('eligible');
     expect(bucketOf({ incomeBand: '2l_2_5l' }, s)).toBe('hidden');
+  });
+});
+
+describe('Matcher: family income as an amount in a currency', () => {
+  const limit = (value: number, currency: string, period: string) =>
+    scholarship([
+      { field: 'incomeAmount', op: 'lte', value: { currency, period, value } },
+    ]);
+  const abroad = (currency: string, value: number): Profile => ({
+    countryOfResidence: 'US',
+    incomeAmount: { currency, value },
+  });
+
+  it.each<[string, Profile, string]>([
+    ['a yearly income under the limit', abroad('GBP', 50000), 'eligible'],
+    ['a yearly income on the limit', abroad('GBP', 62215), 'eligible'],
+    ['a yearly income over the limit', abroad('GBP', 70000), 'hidden'],
+    ['an income in another currency', abroad('USD', 50000), 'tellUsMore'],
+    [
+      'a Student in India who gives a band',
+      { incomeBand: '1l_2l' },
+      'tellUsMore',
+    ],
+    ['no income given', { countryOfResidence: 'GB' }, 'tellUsMore'],
+  ])('a yearly limit in pounds: %s', (_, profile, bucket) => {
+    expect(bucketOf(profile, limit(62215, 'GBP', 'yearly'))).toBe(bucket);
+  });
+
+  it.each<[string, number, string]>([
+    ['twelve months under the limit', 59000, 'eligible'],
+    ['exactly twelve months of the limit', 60000, 'eligible'],
+    ['more than twelve months of the limit', 61000, 'hidden'],
+  ])(
+    'a monthly limit is compared as twelve months: %s',
+    (_, yearly, bucket) => {
+      expect(
+        bucketOf(abroad('USD', yearly), limit(5000, 'USD', 'monthly')),
+      ).toBe(bucket);
+    },
+  );
+
+  it('names family income as missing', () => {
+    const card = cardFor({}, limit(5000, 'USD', 'monthly'));
+    expect(card.missing).toEqual([
+      { field: 'incomeAmount', label: 'family income' },
+    ]);
   });
 });
 

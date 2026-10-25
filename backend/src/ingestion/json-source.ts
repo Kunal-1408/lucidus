@@ -64,7 +64,12 @@ export function itemsAt(
 }
 
 // Fields whose values are parsed from figures and labels, not slugs.
-const PARSED_FIELDS = ['class', ...BOARD_MARKS_FIELDS, 'incomeBand'];
+const PARSED_FIELDS = [
+  'class',
+  ...BOARD_MARKS_FIELDS,
+  'incomeBand',
+  'incomeAmount',
+];
 
 // The Criteria an item states as top-level fields named after Profile
 // fields (CRITERION_FIELDS). A value that fits the field's fixed list is high Confidence, like

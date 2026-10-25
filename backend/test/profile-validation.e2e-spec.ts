@@ -286,4 +286,83 @@ describe('Match request Profile validation', () => {
       expect(res.body.message).toEqual([reason]);
     });
   });
+
+  // Family income: a rupee band in India, an amount in a currency abroad.
+  describe('family income', () => {
+    it.each([
+      [
+        'a Student in Dubai with an amount in dirhams',
+        {
+          countryOfResidence: 'AE',
+          incomeAmount: { currency: 'AED', value: 250000 },
+        },
+      ],
+      [
+        'a Student in London with no income at all',
+        {
+          countryOfResidence: 'GB',
+          incomeAmount: { currency: 'GBP', value: 0 },
+        },
+      ],
+      [
+        'a Student in India with a band',
+        { countryOfResidence: 'IN', incomeBand: '1l_2l' },
+      ],
+    ])('matches %s', async (_, profile) => {
+      await matchWith(profile).expect(200);
+    });
+
+    it.each([
+      [
+        'a negative amount',
+        {
+          countryOfResidence: 'AE',
+          incomeAmount: { currency: 'AED', value: -1 },
+        },
+        'incomeAmount.value must be 0 or more',
+      ],
+      [
+        'an amount that is no number',
+        {
+          countryOfResidence: 'AE',
+          incomeAmount: { currency: 'AED', value: '1000' },
+        },
+        'incomeAmount.value must be 0 or more',
+      ],
+      [
+        'an unknown currency',
+        {
+          countryOfResidence: 'AE',
+          incomeAmount: { currency: 'XYZ', value: 1000 },
+        },
+        'incomeAmount.currency must be an ISO 4217 currency code',
+      ],
+      [
+        'an amount that is a bare number',
+        { countryOfResidence: 'AE', incomeAmount: 1000 },
+        'incomeAmount must be an amount with a currency and a value',
+      ],
+      [
+        'an amount for a Student in India',
+        {
+          countryOfResidence: 'IN',
+          incomeAmount: { currency: 'INR', value: 200000 },
+        },
+        'incomeAmount is only asked when countryOfResidence is not IN',
+      ],
+      [
+        'an amount without a country',
+        { incomeAmount: { currency: 'USD', value: 1000 } },
+        'incomeAmount is only asked when countryOfResidence is not IN',
+      ],
+      [
+        'a band for a Student abroad',
+        { countryOfResidence: 'AE', incomeBand: '1l_2l' },
+        'incomeBand is only asked when countryOfResidence is IN or not given',
+      ],
+    ])('answers 400 for %s, naming the field', async (_, profile, reason) => {
+      const res = await matchWith(profile).expect(400);
+      expect(res.body.message).toEqual([reason]);
+    });
+  });
 });

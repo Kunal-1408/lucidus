@@ -162,17 +162,51 @@
     </label>
   }
 
-  <label>
-    Family income per year
-    <select (change)="setChoice('incomeBand', $any($event.target).value)">
-      <option value="">N.A</option>
-      @for (b of incomeBands; track b.value) {
-        <option [value]="b.value" [selected]="profile().incomeBand === b.value">
-          {{ b.label }}
-        </option>
-      }
-    </select>
-  </label>
+  @if (shown().has('incomeBand')) {
+    <label>
+      Family income per year
+      <select (change)="setChoice('incomeBand', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (b of incomeBands; track b.value) {
+          <option [value]="b.value" [selected]="profile().incomeBand === b.value">
+            {{ b.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (shown().has('incomeAmount')) {
+    <fieldset>
+      <legend>Family income per year</legend>
+      <label>
+        Currency
+        <select (change)="setIncomeCurrency($any($event.target).value)">
+          <option value="">N.A</option>
+          @for (c of currencies; track c.value) {
+            <option [value]="c.value" [selected]="incomeCurrency() === c.value">
+              {{ c.label }}
+            </option>
+          }
+        </select>
+      </label>
+      <label>
+        Amount
+        <input
+          type="number"
+          min="0"
+          step="1"
+          inputmode="decimal"
+          [value]="profile().incomeAmount?.value ?? ''"
+          [attr.aria-invalid]="incomeError() ? true : null"
+          (change)="setIncomeAmount($any($event.target).value)"
+        />
+        @if (incomeError(); as error) {
+          <span class="field-error" role="alert">{{ error }}</span>
+        }
+      </label>
+    </fieldset>
+  }
 
   <label>
     What do you want to study?
