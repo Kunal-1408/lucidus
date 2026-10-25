@@ -102,6 +102,14 @@ form > label,
   color: var(--amber);
 }
 
+/* How an answer is used, under its field. */
+.field-note {
+  grid-column: 2;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
 input[aria-invalid='true'] {
   border-color: var(--amber);
 }
@@ -111,7 +119,8 @@ form > label:first-of-type {
 }
 
 select,
-input[type='number'] {
+input[type='number'],
+input[type='search'] {
   font: inherit;
   font-weight: 400;
   color: var(--ink);
@@ -134,12 +143,14 @@ select {
 }
 
 select:hover,
-input[type='number']:hover {
+input[type='number']:hover,
+input[type='search']:hover {
   border-color: #b6c2d4;
 }
 
 select:focus-visible,
-input[type='number']:focus-visible {
+input[type='number']:focus-visible,
+input[type='search']:focus-visible {
   outline: 0;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-wash);
@@ -251,7 +262,8 @@ button[type='submit']:hover {
     grid-template-columns: 1fr;
   }
 
-  .field-error {
+  .field-error,
+  .field-note {
     grid-column: 1;
   }
 }

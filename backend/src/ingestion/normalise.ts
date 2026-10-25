@@ -1,8 +1,22 @@
 // Normalisation: turns the raw values the rules (and, later, the LLM) find
 // into the exact values the Matcher compares against the Profile.
 import { COUNTRIES, REGIONS } from '../match/countries.js';
-import type { BoardResult, IndianState, Profile } from '../match/profile.js';
+import { CURRENCY_CODES, RUPEES } from '../match/currencies.js';
 import {
+  type ALevelGrade,
+  type BoardResult,
+  type IncomeLimit,
+  type IncomePeriod,
+  type IndianState,
+  type Profile,
+  RESULT_SCALE_RANGES,
+  type ResultScale,
+  SLOT_SCALES,
+  TEST_SCORE_RANGES,
+  type TestScoreField,
+} from '../match/profile.js';
+import {
+  type BoardMarksField,
   isBoardMarksField,
   isLegacyMarksField,
 } from '../scholarships/criterion-fields.js';
@@ -139,20 +153,17 @@ export const FIXED_LISTS: Record<string, readonly string[]> = {
     'engineering',
     'medicine',
     'science',
+    'computing',
     'commerce',
-    'arts',
     'law',
+    'arts',
+    'social_sciences',
+    'design',
+    'agriculture',
+    'education',
     'other',
   ],
-  destination: [
-    'india',
-    'uk',
-    'usa',
-    'canada',
-    'australia',
-    'germany',
-    'other',
-  ],
+  destination: COUNTRY_CODES,
   gender: ['female', 'male', 'other'],
   category: ['general', 'sc', 'st', 'obc', 'ews', 'ebc', 'dnt'],
   parentOccupation: [
@@ -172,9 +183,41 @@ type ArrayElement<T> = T extends readonly (infer E)[] ? E : never;
 
 // Criterion fields a source states as yes or no. Boards upcoming is a yes /
 // no answer too, but never a Criterion.
-const YES_NO_CRITERION_FIELDS = ['minority', 'disability', 'singleGirlChild'];
+const YES_NO_CRITERION_FIELDS = [
+  'minority',
+  'disability',
+  'singleGirlChild',
+  'destinationIsResidence',
+];
 // Fields holding ISO codes, which a source or the LLM may write in any case.
-const ISO_CODE_FIELDS = ['countryOfResidence', 'region', 'citizenshipCountry'];
+const ISO_CODE_FIELDS = [
+  'countryOfResidence',
+  'region',
+  'citizenshipCountry',
+  'destination',
+];
+
+// The destinations a Profile or Criterion named before they became ISO
+// codes, with the code each now is ("other" named no country). Stored
+// Criteria and Overrides may still hold them until ticket 09 re-extracts;
+// University pointers are still stored under them (frontend copy:
+// LEGACY_DESTINATIONS in frontend/src/app/profile-rules.ts).
+export const LEGACY_DESTINATIONS: Record<string, string> = {
+  india: 'IN',
+  uk: 'GB',
+  usa: 'US',
+  canada: 'CA',
+  australia: 'AU',
+  germany: 'DE',
+};
+
+// The ISO code an old destination name now is, or undefined for any other
+// value.
+export function legacyDestinationCode(value: unknown): string | undefined {
+  return typeof value === 'string' && Object.hasOwn(LEGACY_DESTINATIONS, value)
+    ? LEGACY_DESTINATIONS[value]
+    : undefined;
+}
 
 // The value a Criterion stores for a raw value a rule found, or undefined
 // when it falls outside the field's fixed list (the Criterion is dropped).
@@ -188,6 +231,14 @@ export function normaliseValue(
     // A bare figure ("250000", as the LLM, a reviewer or a JSON number
     // writes it) is rupees.
     return toRupees(/^\d[\d,]*$/.test(raw.trim()) ? `₹${raw.trim()}` : raw);
+  }
+  if (field === 'incomeAmount') {
+    if (typeof raw !== 'string') return undefined;
+    // The LLM or a reviewer may write the code in lower case ("sgd 70000").
+    const tidy = raw
+      .trim()
+      .replace(/^[a-z]{3}\b/i, (code) => code.toUpperCase());
+    return toIncomeLimit(tidy);
   }
   if (field === 'class') {
     const levels = [
@@ -203,10 +254,13 @@ export function normaliseValue(
     return toPercent(raw);
   }
   if (isBoardMarksField(field)) {
-    return toBoardResult(raw);
+    return toBoardResult(field, raw);
+  }
+  if (field === 'atar' || field === 'sat') {
+    return toTestScore(field, raw);
   }
   if (ISO_CODE_FIELDS.includes(field)) {
-    const codes = asList(raw).map((code) => code.trim().toUpperCase());
+    const codes = asList(raw).map((code) => isoCode(field, code));
     return oneOf(codes, FIXED_LISTS[field], op);
   }
   if (YES_NO_CRITERION_FIELDS.includes(field)) {
@@ -217,16 +271,74 @@ export function normaliseValue(
   return allowed && oneOf(raw, allowed, op);
 }
 
+// An ISO code as a source or the LLM wrote it, upper-cased; an old
+// destination name is read as its code.
+function isoCode(field: string, raw: string): string {
+  const code = raw.trim();
+  const legacy =
+    field === 'destination' ? legacyDestinationCode(code) : undefined;
+  return legacy ?? code.toUpperCase();
+}
+
 // A percentage of marks, 0–100.
 function toPercent(raw: string | string[]): number | undefined {
   const value = typeof raw === 'string' ? Number(raw) : NaN;
   return value > 0 && value <= 100 ? value : undefined;
 }
 
-// A Board marks threshold. Sources so far state percentages only.
-function toBoardResult(raw: string | string[]): BoardResult | undefined {
-  const value = toPercent(raw);
-  return value === undefined ? undefined : { scale: 'percentage', value };
+// A minimum ATAR ("99.90") or SAT score ("1400", "1,400"), dropped when it
+// is outside the score's range or no minimum at all.
+function toTestScore(
+  field: TestScoreField,
+  raw: string | string[],
+): number | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const text = raw.trim().replace(/,/g, '');
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return undefined;
+  const value = Number(text);
+  const [min, max] = TEST_SCORE_RANGES[field];
+  return value > 0 && value >= min && value <= max ? value : undefined;
+}
+
+// A Board marks threshold, written as the rules, the LLM guide and
+// reviewers write it: "60" (a percentage), "8.5 CGPA", "3.5 GPA", "36 IB
+// points" or "A*AA at A-level". It is dropped when the scale isn't one its
+// slot takes (SLOT_SCALES) or the value is outside the scale.
+function toBoardResult(
+  field: BoardMarksField,
+  raw: string | string[],
+): BoardResult | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const result = readBoardResult(raw.trim());
+  return result && SLOT_SCALES[field].includes(result.scale)
+    ? result
+    : undefined;
+}
+
+const NUMBER_ON_SCALE: [Exclude<ResultScale, 'a_level'>, RegExp][] = [
+  ['percentage', /^(\d+(?:\.\d+)?)$/],
+  ['cgpa_10', /^(\d+(?:\.\d+)?)\s*CGPA$/i],
+  ['gpa_4', /^(\d+(?:\.\d+)?)\s*GPA$/i],
+  ['ib_points', /^(\d+)\s*IB points?$/i],
+];
+const A_LEVEL_RESULT = /^((?:A\*|[A-E])+)(?:\s+at\s+A-levels?)?$/;
+
+function readBoardResult(text: string): BoardResult | undefined {
+  const grades = text.match(A_LEVEL_RESULT);
+  if (grades) {
+    const value = [...grades[1].matchAll(/A\*|[A-E]/g)].map(
+      (m) => m[0] as ALevelGrade,
+    );
+    return { scale: 'a_level', value };
+  }
+  for (const [scale, pattern] of NUMBER_ON_SCALE) {
+    const m = text.match(pattern);
+    if (!m) continue;
+    const value = Number(m[1]);
+    const [, max] = RESULT_SCALE_RANGES[scale];
+    return value > 0 && value <= max ? { scale, value } : undefined;
+  }
+  return undefined;
 }
 
 function oneOf(
@@ -297,4 +409,44 @@ export function toRupees(text: string): number | undefined {
   if (unit.startsWith('crore')) return Math.round(number * CRORE);
   if (unit.startsWith('la')) return Math.round(number * LAKH);
   return number;
+}
+
+// Signs that name one currency. A bare "$" is left out: Canada, Australia,
+// Singapore and the US all write it.
+const CURRENCY_SIGNS: Record<string, string> = {
+  US$: 'USD',
+  C$: 'CAD',
+  A$: 'AUD',
+  S$: 'SGD',
+  NZ$: 'NZD',
+  HK$: 'HKD',
+  '£': 'GBP',
+  '€': 'EUR',
+};
+// A currency sign or an upper-case ISO 4217 code, then a figure:
+// "US$ 5000", "£62,215", "AED 250,000".
+export const FOREIGN_MONEY =
+  /([A-Z]{1,2}\$|£|€|\b[A-Z]{3}\b)\s*\(?\s*(\d[\d,]*(?:\.\d+)?)/g;
+const MONTHLY = /\bmonth(?:ly)?\b|\bper mensem\b/i;
+
+// How often an income limit is counted: monthly when the text says so, else
+// yearly, as income limits usually are.
+export function incomePeriod(text: string): IncomePeriod {
+  return MONTHLY.test(text) ? 'monthly' : 'yearly';
+}
+
+// An income limit in a currency other than rupees, from the first figure
+// with a currency in the text: monthly when the text says so, else yearly.
+// Rupee limits are rupee band limits (incomeBand), never these.
+export function toIncomeLimit(text: string): IncomeLimit | undefined {
+  for (const [, sign, figure] of text.matchAll(FOREIGN_MONEY)) {
+    const currency =
+      CURRENCY_SIGNS[sign] ??
+      (CURRENCY_CODES.includes(sign) ? sign : undefined);
+    if (currency === undefined) continue;
+    const value = Number(figure.replace(/,/g, ''));
+    if (currency === RUPEES || !(value > 0)) return undefined;
+    return { currency, period: incomePeriod(text), value };
+  }
+  return undefined;
 }

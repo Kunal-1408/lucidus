@@ -55,7 +55,7 @@ describe('University pointers', () => {
     });
     await harness.ingest();
 
-    const result = await matchFor({ destination: 'uk' });
+    const result = await matchFor({ destination: 'GB' });
 
     expect(result.universityPointers).toEqual([
       {
@@ -83,17 +83,17 @@ describe('University pointers', () => {
     });
 
     it.each([
-      ['usa', 'the USA', 'Massachusetts Institute of Technology'],
-      ['canada', 'Canada', 'University of Toronto'],
-      ['australia', 'Australia', 'University of Melbourne'],
+      ['US', 'usa', 'the USA', 'Massachusetts Institute of Technology'],
+      ['CA', 'canada', 'Canada', 'University of Toronto'],
+      ['AU', 'australia', 'Australia', 'University of Melbourne'],
     ])(
       'names the country in the label for %s',
-      async (destination, country, name) => {
+      async (destination, pointerCountry, country, name) => {
         const result = await matchFor({ destination });
 
         expect(result.universityPointers).toEqual([
           {
-            country: destination,
+            country: pointerCountry,
             label: `Universities in ${country} with international scholarships. Not checked against your profile; see their site for details.`,
             names: [name],
           },
@@ -101,7 +101,7 @@ describe('University pointers', () => {
       },
     );
 
-    it.each([['india'], ['germany'], ['other']])(
+    it.each([['IN'], ['DE'], ['SG']])(
       'returns no pointers for a destination of %s',
       async (destination) => {
         expect((await matchFor({ destination })).universityPointers).toEqual(
@@ -116,7 +116,7 @@ describe('University pointers', () => {
 
     it('keeps pointers out of the buckets and Prompts', async () => {
       const result = await matchFor({
-        destination: 'uk',
+        destination: 'GB',
         gender: 'female',
         class: 10,
       });
@@ -161,7 +161,7 @@ describe('University pointers', () => {
         result: 'ok',
       });
       expect(
-        (await matchFor({ destination: 'uk' })).universityPointers,
+        (await matchFor({ destination: 'GB' })).universityPointers,
       ).toEqual([
         expect.objectContaining({ names: ['University of Glasgow'] }),
       ]);
@@ -186,12 +186,12 @@ describe('University pointers', () => {
       // WorqNow is not a Watchlist source.
       expect(summary.sources).toEqual([{ url: GIRLS, result: 'unchanged' }]);
       expect(
-        (await matchFor({ destination: 'uk' })).universityPointers,
+        (await matchFor({ destination: 'GB' })).universityPointers,
       ).toEqual([
         expect.objectContaining({ names: ['University of Edinburgh'] }),
       ]);
       expect(
-        (await matchFor({ destination: 'usa' })).universityPointers,
+        (await matchFor({ destination: 'US' })).universityPointers,
       ).toEqual([expect.objectContaining({ names: ['Stanford University'] })]);
     });
 
@@ -211,7 +211,7 @@ describe('University pointers', () => {
         detail: expect.any(String),
       });
       expect(
-        (await matchFor({ destination: 'uk' })).universityPointers,
+        (await matchFor({ destination: 'GB' })).universityPointers,
       ).toEqual([
         expect.objectContaining({ names: ['University of Edinburgh'] }),
       ]);
@@ -219,7 +219,7 @@ describe('University pointers', () => {
 
     it('returns no group for a destination WorqNow lists no universities for', async () => {
       expect(
-        (await matchFor({ destination: 'canada' })).universityPointers,
+        (await matchFor({ destination: 'CA' })).universityPointers,
       ).toEqual([]);
     });
   });
@@ -240,7 +240,7 @@ describe('University pointers', () => {
       });
       await harness.ingest();
 
-      const [group] = (await matchFor({ destination: 'uk' }))
+      const [group] = (await matchFor({ destination: 'GB' }))
         .universityPointers as { names: string[] }[];
 
       expect(group.names).toEqual([

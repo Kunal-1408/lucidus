@@ -1,4 +1,5 @@
 import { COUNTRIES, INDIA, REGIONS } from '../match/countries.js';
+import type { TestScoreField } from '../match/profile.js';
 import {
   BOARD_MARKS_FIELDS,
   type BoardMarksField,
@@ -8,7 +9,16 @@ import type {
   Criterion,
   ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
-import { DATE, escape, MONEY, STATE_NAMES, toClass } from './normalise.js';
+import {
+  DATE,
+  escape,
+  FOREIGN_MONEY,
+  incomePeriod,
+  MONEY,
+  STATE_NAMES,
+  toClass,
+  toIncomeLimit,
+} from './normalise.js';
 
 // What a rule found, before normalisation: the raw value as the source
 // wrote it ("₹3,50,000/-", "IX", "Andhra Pradesh") and its sentence.
@@ -18,9 +28,12 @@ export interface Found {
   raw: string | string[];
   changeable: boolean;
   sourceText: string;
+  alternativeGroup?: string;
 }
 
-export type FieldRule = (sentences: string[]) => Found | undefined;
+// Most rules find one Criterion; a Board marks rule finds one per Result
+// scale a source accepts, as an alternatives group.
+export type FieldRule = (sentences: string[]) => Found | Found[] | undefined;
 
 // The sentence filter: eligibility words, plus every keyword rule's words
 // (see isEligibilitySentence below).
@@ -96,9 +109,9 @@ const classRule: FieldRule = (sentences) => {
 
 // "parental income ... not more than ₹3,50,000/-", "income below Rs.2.5
 // lakh": an upper limit on family income.
+const INCOME_CUE = String.raw`\bincome\b[^.]{0,80}?\b(?:not more than|not exceeding|does not exceed|should not exceed|not exceed|less than|below|up to|upto|within|under|maximum of|limit of|ceiling of)\b`;
 const INCOME_LIMIT = new RegExp(
-  String.raw`\bincome\b[^.]{0,80}?\b(?:not more than|not exceeding|does not exceed|should not exceed|not exceed|less than|below|up to|upto|within|under|maximum of|limit of|ceiling of)\b[^.\d₹]{0,40}?` +
-    `(${MONEY.source})`,
+  INCOME_CUE + String.raw`[^.\d₹]{0,40}?` + `(${MONEY.source})`,
   'i',
 );
 
@@ -106,6 +119,46 @@ const incomeRule: FieldRule = (sentences) => {
   for (const sentence of sentences) {
     const m = sentence.match(INCOME_LIMIT);
     if (m) return found('incomeBand', m[1], sentence);
+  }
+  return undefined;
+};
+
+// The same limit in another currency, with how often it is counted: "household
+// monthly income ... should NOT exceed an amount equivalent to US Dollar Five
+// Thousand (US$ 5000)", "household income of under £62,215 a year". The
+// period comes from the income limit phrase alone: the words naming the
+// income, the cue, the figure and a period right after it. What the award
+// pays ("will receive £500 a month") says nothing about the limit.
+const FOREIGN_INCOME_CUE = new RegExp(INCOME_CUE, 'i');
+const FOREIGN_INCOME_REACH = 80;
+// "monthly income", "monthly household income", "annual family income".
+const PERIOD_BEFORE_INCOME =
+  /\b(?:month(?:ly)?|annual|yearly)\s+(?:[\w()'-]+\s+){0,2}$/i;
+// "£62,215 a year", "US$ 5000 per month", "AED 250,000 annually".
+const PERIOD_AFTER_LIMIT =
+  /^\s*(?:(?:a|per|each|every)\s+(?:month|year|annum)\b|monthly\b|annually\b|yearly\b|per mensem\b)/i;
+
+const foreignIncomeRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const cue = sentence.match(FOREIGN_INCOME_CUE);
+    if (!cue || INCOME_LIMIT.test(sentence)) continue;
+    const cueAt = cue.index ?? 0;
+    const start = cueAt + cue[0].length;
+    const reach = sentence
+      .slice(start, start + FOREIGN_INCOME_REACH)
+      .split(/\.(?!\d)/)[0];
+    const money = [...reach.matchAll(FOREIGN_MONEY)].find((m) =>
+      toIncomeLimit(m[0]),
+    );
+    if (!money) continue;
+    const limit = toIncomeLimit(money[0])!;
+    const limitEnd = start + money.index + money[0].length;
+    const phrase =
+      (sentence.slice(0, cueAt).match(PERIOD_BEFORE_INCOME)?.[0] ?? '') +
+      sentence.slice(cueAt, limitEnd) +
+      (sentence.slice(limitEnd).match(PERIOD_AFTER_LIMIT)?.[0] ?? '');
+    const raw = `${limit.currency} ${limit.value} ${incomePeriod(phrase)}`;
+    return found('incomeAmount', raw, sentence);
   }
   return undefined;
 };
@@ -171,20 +224,115 @@ function marksThresholds(sentences: string[]): MarksThreshold[] {
   });
 }
 
-// Board marks: a percentage for the Class 10 or Class 12 board exam. A
-// Student can still raise their marks, so both are changeable. Marks naming
-// no year are left to the LLM.
+// Results on the other Result scales, each written the way normaliseValue
+// reads it. IB points, A-level grades and a GPA are Class 12 results; a
+// CGPA out of 10 is a Class 10 (CBSE) one.
+const IB = /\bIB\b|\bInternational Baccalaureate\b/;
+const IB_POINTS = /\b(\d{1,2})\s*(?:total\s+)?points\b/i;
+const A_LEVEL = /\bA[- ]levels?\b/i;
+const A_LEVEL_GRADES = /(?<![\w*])((?:A\*|[A-E]){2,5})(?![\w*])/;
+// A minimum on a scale named by a word: "a minimum GPA of 3.0", "GPA of at
+// least 3.5", "8.5 CGPA or above". A bare figure beside the word is not one
+// ("CGPA X 9.5 will give the percentage").
+function minimumOn(unit: string): RegExp {
+  const minimum = String.raw`(\d{1,2}(?:\.\d{1,2})?)`;
+  return new RegExp(
+    [
+      String.raw`\b(?:minimum|at least|not less than)\s+(?:an?\s+)?(?:unweighted\s+)?${unit}\s+(?:of\s+)?${minimum}`,
+      String.raw`\b${unit}\s+of\s+(?:at least\s+|minimum(?: of)?\s+|not less than\s+)?${minimum}`,
+      String.raw`\b${minimum}\s+(?:unweighted\s+)?${unit}\s+(?:or above|or more|and above|or higher)`,
+    ].join('|'),
+    'i',
+  );
+}
+const GPA = minimumOn('GPA');
+const CGPA = minimumOn('CGPA');
+// The minimum a minimumOn pattern matched, whichever wording it was in.
+const minimumFound = (m: RegExpMatchArray) => m[1] ?? m[2] ?? m[3];
+// A weighted GPA and AP scores are no scale the Profile takes (Extra
+// requirements). "AP" alone is often Andhra Pradesh in Indian sources.
+const WEIGHTED_GPA = /(?<!un)weighted\s+GPA\b/i;
+const AP = /\bAP (?:exams?|scores?|courses?|tests?)\b|\bAdvanced Placement\b/;
+
+interface ScaleRule {
+  field: BoardMarksField;
+  read: (sentence: string) => string | undefined;
+}
+
+const SCALE_RULES: ScaleRule[] = [
+  {
+    field: 'class12Result',
+    read: (s) => {
+      const points = IB.test(s) ? s.match(IB_POINTS) : null;
+      return points ? `${points[1]} IB points` : undefined;
+    },
+  },
+  {
+    field: 'class12Result',
+    read: (s) => {
+      const grades = A_LEVEL.test(s) ? s.match(A_LEVEL_GRADES) : null;
+      return grades ? `${grades[1]} at A-level` : undefined;
+    },
+  },
+  {
+    field: 'class12Result',
+    read: (s) => {
+      if (WEIGHTED_GPA.test(s) || /\bCGPA\b/i.test(s)) return undefined;
+      const m = s.match(GPA);
+      return m ? `${minimumFound(m)} GPA` : undefined;
+    },
+  },
+  {
+    // Only a CGPA the sentence ties to Class 10: a degree CGPA is no board
+    // result.
+    field: 'class10Result',
+    read: (s) => {
+      const m = s.match(CGPA);
+      if (!m || marksYear(s, m.index ?? 0) !== 10) return undefined;
+      return `${minimumFound(m)} CGPA`;
+    },
+  },
+];
+
+// Board marks for the Class 10 or Class 12 board exam: a percentage for a
+// named year, or a result on another Result scale. A Student can still
+// raise their marks, so both are changeable. A Student has one result per
+// slot, so results on several scales for the same slot ("36 points in the
+// IB Diploma or AAA at A-level") are alternatives: one Criterion per scale,
+// the first stated for each, grouped. Percentage marks naming no year are
+// left to the LLM.
 function boardMarksRule(field: BoardMarksField): FieldRule {
   const year = field === 'class10Result' ? 10 : 12;
   return (sentences) => {
+    const results: Found[] = [];
     const threshold = marksThresholds(sentences).find((t) => t.year === year);
-    return threshold && found(field, threshold.percent, threshold.sentence);
+    if (threshold) {
+      results.push(found(field, threshold.percent, threshold.sentence));
+    }
+    for (const rule of SCALE_RULES.filter((r) => r.field === field)) {
+      for (const sentence of sentences) {
+        const raw = rule.read(sentence);
+        if (raw === undefined) continue;
+        results.push(found(field, raw, sentence));
+        break;
+      }
+    }
+    if (results.length < 2) return results;
+    return results.map((r) => ({ ...r, alternativeGroup: field }));
   };
 }
 
-// Marks for any other year (NMMS's Class 7 or 8) are never asked, so they
-// are shown as Extra requirements rather than matched on the wrong result.
-export function otherYearMarks(sentences: string[]): ExtraRequirement[] {
+// Marks rules no Profile answer can settle, shown as Extra requirements
+// rather than matched on the wrong result: marks for any other year (NMMS's
+// Class 7 or 8), GCSE/IGCSE grades, and results on scales the Profile
+// doesn't take.
+export function marksExtraRequirements(
+  sentences: string[],
+): ExtraRequirement[] {
+  return [...otherYearMarks(sentences), ...unsupportedResults(sentences)];
+}
+
+function otherYearMarks(sentences: string[]): ExtraRequirement[] {
   return marksThresholds(sentences)
     .filter((t) => t.year !== 10 && t.year !== 12)
     .map((t) => ({
@@ -192,6 +340,48 @@ export function otherYearMarks(sentences: string[]): ExtraRequirement[] {
       sourceText: t.sentence,
     }));
 }
+
+const UNSUPPORTED_RESULTS: [text: string, pattern: RegExp][] = [
+  ['GCSE/IGCSE results', /\bI?GCSEs?\b/],
+  ['A weighted GPA', WEIGHTED_GPA],
+  ['AP exam scores', AP],
+  ["Quebec's R score", /\bR[- ]score\b|\bcote R\b/i],
+];
+
+function unsupportedResults(sentences: string[]): ExtraRequirement[] {
+  return sentences.flatMap((sentence) =>
+    UNSUPPORTED_RESULTS.filter(([, pattern]) => pattern.test(sentence)).map(
+      ([text]) => ({ text, sourceText: sentence }),
+    ),
+  );
+}
+
+// The words a Board marks sentence on another Result scale uses.
+const RESULT_WORDS = [IB, A_LEVEL, /\bC?GPA\b/i, /\bI?GCSEs?\b/, AP];
+
+// Test scores apart from Board marks: "an ATAR of at least 99.90", "SAT
+// composite score of 1200", "SAT score ≥ 1450". The figure is the first one
+// after the name, in the same sentence, and must be inside the score's range
+// (normaliseValue), so NMMS's "Scholastic Aptitude Test (SAT) ... 40 %
+// marks" gives nothing. A predicted ATAR is still the ATAR a Student gives.
+// Both are changeable: a Student can still sit or resit the test.
+const ATAR = /\bATAR\b[^.\d]{0,40}?(\d{1,2}(?:\.\d{1,2})?)(?!\.?\d|\s*%)/;
+const SAT = /\bSAT\b[^.\d]{0,40}?(\d,?\d{3}|\d{3})(?![.,]?\d|\s*%)/;
+
+function testScoreRule(field: TestScoreField, pattern: RegExp): FieldRule {
+  return (sentences) => {
+    for (const sentence of sentences) {
+      const m = sentence.match(pattern);
+      if (m) return found(field, m[1].replace(/,/g, ''), sentence);
+    }
+    return undefined;
+  };
+}
+
+const TEST_SCORE_RULES = [
+  testScoreRule('atar', ATAR),
+  testScoreRule('sat', SAT),
+];
 
 // "studying ... in a Government, Government-aided and local body school".
 // Only where the Student studies now: "Passed class 10 from a government
@@ -311,6 +501,9 @@ const KEYWORD_FIELDS: KeywordField[] = [
     cue: new RegExp(
       String.raw`\b${STUDENTS}\b|\b(?:[Pp]assed|[Pp]assing|[Ss]tudying|[Aa]ffiliated)\b`,
     ),
+    // GCSE/IGCSE grades asked of every applicant are an Extra requirement,
+    // not the board the Student is on.
+    skip: /\bI?GCSEs?\b[^.]*\b(?:pass(?:es)?|grades?)\b|\b(?:pass(?:es)?|grades?)\b[^.]*\bI?GCSEs?\b/i,
     // "a recognized Board of Education including CBSE, ICSE, NIOS": any
     // board will do, the ones listed are examples.
     beyondOptions:
@@ -321,6 +514,66 @@ const KEYWORD_FIELDS: KeywordField[] = [
       ['state', /\bstate boards?\b/i],
       ['ib', /\bInternational Baccalaureate\b/i],
       ['cambridge', /\bIGCSE\b|\bCambridge (?:board|international)\b/i],
+    ],
+  },
+  {
+    // The subjects a source restricts an award to, read as the Field of
+    // study groups they belong to. Subjects named as examples, as an
+    // encouragement or for the amount paid restrict nothing, and a stream is
+    // not a field of study (above).
+    field: 'fieldOfStudy',
+    cue: /\b(?:only|must|exclusively|(?:is|are) (?:only )?(?:for|open to)|open (?:only )?to|restricted to|limited to)\b[^.]*\b(?:pursu(?:e|es|ing)|stud(?:y|ies|ying)|courses?|degrees?|programmes?|programs?|disciplines?)\b/i,
+    skip: /\bstreams?\b|\bsuch as\b|\betc\b|\bencouraged\b|\bwill (?:get|receive)\b/i,
+    options: [
+      ['engineering', /\bengineering\b|\bB\.?\s?Tech\b/i],
+      [
+        'medicine',
+        /\bmedicine\b|\bmedical (?:studies|courses?|degrees?|education|sciences?)\b|\bMBBS\b|\bnursing\b|\bpharmacy\b|\bdentistry\b/i,
+      ],
+      [
+        'science',
+        /\b(?:natural|pure|basic) sciences?\b|\bphysics\b|\bchemistry\b|\bbiology\b|\bmathematics\b|\bB\.?\s?Sc\b/i,
+      ],
+      [
+        'computing',
+        /\bcomputer science\b|\bcomputing\b|\binformation technology\b/i,
+      ],
+      [
+        'commerce',
+        /\bcommerce\b|\bbusiness (?:studies|administration)\b|\baccount(?:ancy|ing)\b|\bB\.?\s?Com\b|\bBBA\b/i,
+      ],
+      [
+        'law',
+        /\bLL\.?B\b|\blegal studies\b|\blaw (?:degrees?|courses?)\b|\b(?:in|of) law\b|\b(?:stud(?:y|ying)|pursu(?:e|ing)) law\b/i,
+      ],
+      [
+        'arts',
+        /\bhumanities\b|\b(?:liberal|fine|performing) arts\b|\bliterature\b|\bphilosophy\b/i,
+      ],
+      [
+        'social_sciences',
+        /\bsocial sciences?\b|\beconomics\b|\bpsychology\b|\bsociology\b|\bpolitical science\b/i,
+      ],
+      [
+        'design',
+        /\b(?:fashion|graphic|product|interior) design\b|\barchitecture\b|\bB\.?\s?Arch\b|\bB\.?\s?Des\b/i,
+      ],
+      ['agriculture', /\bagricultur(?:e|al)\b|\bhorticulture\b|\bfisheries\b/i],
+      ['education', /\bteacher training\b|\bB\.?\s?Ed\b/i],
+    ],
+  },
+  {
+    // Home-student awards are for Students studying in the country they
+    // live in, international-student awards for the others. A sentence
+    // naming both restricts nothing, nor does one that only mentions them
+    // ("international students may write to the office").
+    field: 'destinationIsResidence',
+    cue: /\b(?:for|open to|only|must be|eligible|restricted to|limited to)\b[^.]*\b(?:home|domestic|international|overseas) students?\b|\b(?:home|domestic|international|overseas) students? only\b/i,
+    beyondOptions:
+      /\b(?:home|domestic)\b[^.]*\b(?:international|overseas)\b|\b(?:international|overseas)\b[^.]*\b(?:home|domestic)\b/i,
+    options: [
+      ['yes', /\b(?:home|domestic) students?\b/i],
+      ['no', /\b(?:international|overseas) students?\b/i],
     ],
   },
   {
@@ -451,10 +704,14 @@ const OCI = /\b[Oo]verseas [Cc]itizens? of India\b/g;
 function placesIn(sentence: string) {
   const plain = sentence.replace(OCI, ' ');
   const regions = namedPlaces(plain, REGION_NAMES);
-  const countries = namedPlaces(regions.rest, COUNTRY_NAMES).codes.filter(
-    (code) => code !== INDIA,
-  );
-  return { plain, regions: regions.codes, countries };
+  const named = namedPlaces(regions.rest, COUNTRY_NAMES).codes;
+  const countries = named.filter((code) => code !== INDIA);
+  return {
+    plain,
+    regions: regions.codes,
+    countries,
+    namesIndia: named.includes(INDIA),
+  };
 }
 
 // "residents of the United Arab Emirates", "living in the UK".
@@ -503,13 +760,35 @@ const citizenshipCountryRule: FieldRule = (sentences) => {
   return undefined;
 };
 
+// "to study at a university in the United States", "for international
+// students in Canada": where the Student must study. Schools are where a
+// Student lives, never a destination. India is read only where a sentence
+// restricts study to it ("tenable only at universities in India"): an Indian
+// source's passing "study at a college in India" is no condition.
+const STUDY_ABROAD =
+  /\bstud(?:y|ying)\b[^.]*\b(?:universit(?:y|ies)|colleges?|higher education)\b|\b(?:universit(?:y|ies)|colleges?)\s+in\b|\b(?:home|domestic|international|overseas) students?\s+(?:in|at)\b/i;
+const RESTRICTS_STUDY =
+  /\bonly\b|\bmust\b|\bexclusively\b|\brestricted to\b|\blimited to\b|\btenable\b/i;
+
+const destinationRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const { plain, countries, namesIndia } = placesIn(sentence);
+    if (!STUDY_ABROAD.test(plain) || LIVES.test(plain)) continue;
+    if (countries.length) return found('destination', countries, sentence);
+    if (namesIndia && RESTRICTS_STUDY.test(plain))
+      return found('destination', [INDIA], sentence);
+  }
+  return undefined;
+};
+
 const RESIDENCE_RULES = [
   countryOfResidenceRule,
   regionRule,
   residenceStatusRule,
   citizenshipCountryRule,
+  destinationRule,
 ];
-const RESIDENCE_WORDS = [LIVES, PERMANENT_RESIDENT, CITIZEN];
+const RESIDENCE_WORDS = [LIVES, PERMANENT_RESIDENT, CITIZEN, STUDY_ABROAD];
 
 const DEADLINE_CUE =
   /\b(?:last date|deadline|closing date|apply (?:by|before)|open till|closes?(?: on)?|on or before|due date)\b/i;
@@ -538,7 +817,9 @@ export const FIELD_RULES: FieldRule[] = [
   genderRule,
   classRule,
   incomeRule,
+  foreignIncomeRule,
   ...BOARD_MARKS_FIELDS.map(boardMarksRule),
+  ...TEST_SCORE_RULES,
   schoolTypeRule,
   ...KEYWORD_FIELDS.map(keywordRule),
   ...RESIDENCE_RULES,
@@ -551,6 +832,9 @@ const RULE_WORDS = [
     ...spec.options.map(([, pattern]) => pattern),
   ]),
   ...RESIDENCE_WORDS,
+  ...RESULT_WORDS,
+  ATAR,
+  SAT,
 ];
 
 // Neither a condition for keeping a scholarship once awarded nor how its
@@ -566,7 +850,7 @@ const SHARES_OUT = /\bshares?\b|\bsegregat\w*|\bdivided\b|\bin the ratio of\b/i;
 const SETS_ASIDE = /\breserved\b|\bearmarked\b|\ballott?ed\b/i;
 const PERCENT_OR_RATIO = /\d\s*%|\bper ?cent\b|\b\d+\s*:\s*\d+\b/i;
 
-function isNotACondition(sentence: string): boolean {
+function statesNoCriterion(sentence: string): boolean {
   if (RENEWAL.test(sentence)) return true;
   if (!PLACES.test(sentence)) return false;
   return (
@@ -576,7 +860,7 @@ function isNotACondition(sentence: string): boolean {
 }
 
 export function isEligibilitySentence(sentence: string): boolean {
-  if (isNotACondition(sentence)) return false;
+  if (statesNoCriterion(sentence)) return false;
   return (
     ELIGIBILITY_WORDS.test(sentence) ||
     RULE_WORDS.some((pattern) => pattern.test(sentence))

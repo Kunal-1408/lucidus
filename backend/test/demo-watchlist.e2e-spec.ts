@@ -103,18 +103,33 @@ describe('The demo Watchlist', () => {
     );
   });
 
-  it('sends a page with no Criteria the rules can read to the Review report', async () => {
+  // Until ticket 07 the rules read nothing on this page and it went to the
+  // Review report; "an award for international students" is now read, with
+  // the country it names ("for international students in Canada").
+  it('reads the Pearson page as an award for international students in Canada', async () => {
     await harness.ingest();
-    const res = await harness
-      .http()
-      .get('/api/admin/review')
-      .set('x-admin-token', ADMIN_TOKEN)
-      .expect(200);
-    expect(res.body).toContainEqual(
-      expect.objectContaining({
-        name: 'Lester B. Pearson International Scholarship',
-      }),
-    );
+    const pearson = 'Lester B. Pearson International Scholarship';
+    const shownTo = async (profile: object) => {
+      const res = await harness
+        .http()
+        .post('/api/match')
+        .send(profile)
+        .expect(200);
+      const { eligible, withinReach, tellUsMore } = res.body as Record<
+        string,
+        { name: string }[]
+      >;
+      return [...eligible, ...withinReach, ...tellUsMore].map((c) => c.name);
+    };
+    expect(
+      await shownTo({ countryOfResidence: 'IN', destination: 'CA' }),
+    ).toContain(pearson);
+    expect(
+      await shownTo({ countryOfResidence: 'CA', destination: 'CA' }),
+    ).not.toContain(pearson);
+    expect(
+      await shownTo({ countryOfResidence: 'IN', destination: 'GB' }),
+    ).not.toContain(pearson);
   });
 
   it('skips every unchanged Scholarship on a second run', async () => {

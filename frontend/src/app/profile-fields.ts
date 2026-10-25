@@ -148,9 +148,21 @@ export const BOARDS = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-// The scales a Board marks result can be given on. Results on different
-// scales are never compared.
-export const RESULT_SCALES = [{ value: 'percentage', label: 'Percentage' }] as const;
+// The scales a Board marks result can be given on (backend copy: ResultScale
+// in backend/src/match/profile.ts). Results on different scales are never
+// compared.
+export const RESULT_SCALES = [
+  { value: 'percentage', label: 'Percentage' },
+  { value: 'cgpa_10', label: 'CGPA out of 10' },
+  { value: 'gpa_4', label: 'GPA out of 4' },
+  { value: 'ib_points', label: 'IB points (out of 45)' },
+  { value: 'a_level', label: 'A-level grades' },
+] as const;
+
+// A-level grades, best first (backend copy: A_LEVEL_GRADES in
+// backend/src/match/profile.ts).
+export const A_LEVEL_GRADES = ['A*', 'A', 'B', 'C', 'D', 'E'] as const;
+export type ALevelGrade = (typeof A_LEVEL_GRADES)[number];
 
 export const STREAMS = [
   { value: 'science', label: 'Science' },
@@ -159,25 +171,25 @@ export const STREAMS = [
   { value: 'not_chosen', label: 'Not chosen yet' },
 ] as const;
 
+// The Field of study groups every subject belongs to (SUBJECTS in
+// subjects.ts); a subject the Student types belongs to other. science and
+// arts keep the values saved Profiles and stored Criteria already use.
 export const FIELDS_OF_STUDY = [
   { value: 'engineering', label: 'Engineering' },
-  { value: 'medicine', label: 'Medicine' },
-  { value: 'science', label: 'Science' },
-  { value: 'commerce', label: 'Commerce' },
-  { value: 'arts', label: 'Arts and humanities' },
+  { value: 'medicine', label: 'Medicine and health' },
+  { value: 'science', label: 'Natural sciences' },
+  { value: 'computing', label: 'Computing' },
+  { value: 'commerce', label: 'Commerce and business' },
   { value: 'law', label: 'Law' },
+  { value: 'arts', label: 'Arts and humanities' },
+  { value: 'social_sciences', label: 'Social sciences' },
+  { value: 'design', label: 'Design and architecture' },
+  { value: 'agriculture', label: 'Agriculture' },
+  { value: 'education', label: 'Education' },
   { value: 'other', label: 'Other' },
 ] as const;
 
-export const DESTINATIONS = [
-  { value: 'india', label: 'India' },
-  { value: 'uk', label: 'UK' },
-  { value: 'usa', label: 'USA' },
-  { value: 'canada', label: 'Canada' },
-  { value: 'australia', label: 'Australia' },
-  { value: 'germany', label: 'Germany' },
-  { value: 'other', label: 'Other' },
-] as const;
+export type FieldOfStudyGroup = ValueOf<typeof FIELDS_OF_STUDY>;
 
 export const PARENT_OCCUPATIONS = [
   { value: 'defence', label: 'Defence or ex-servicemen' },
@@ -197,9 +209,18 @@ type ValueOf<T extends readonly { value: unknown }[]> = T[number]['value'];
 
 export type ResultScale = ValueOf<typeof RESULT_SCALES>;
 
-// A Board marks result: a value on its Result scale.
-export interface BoardResult {
-  scale: ResultScale;
+// A Board marks result: a value on its Result scale, a number on every scale
+// but A-level grades, which are a list of grades ("A*AB") (backend copy:
+// BoardResult in backend/src/match/profile.ts).
+export type BoardResult =
+  | { scale: Exclude<ResultScale, 'a_level'>; value: number }
+  | { scale: 'a_level'; value: ALevelGrade[] };
+
+// Family income abroad: a yearly amount in an ISO 4217 currency
+// (CURRENCIES in currencies.ts). Incomes in different currencies are never
+// compared (backend copy: IncomeAmount in backend/src/match/profile.ts).
+export interface IncomeAmount {
+  currency: string;
   value: number;
 }
 
@@ -225,10 +246,23 @@ export interface Profile {
   boardsUpcoming?: boolean;
   class10Result?: BoardResult;
   class12Result?: BoardResult;
+  // Test scores apart from Board marks: the ATAR (0–99.95) only for a Student
+  // living in Australia, the SAT score (400–1600) only on the US high-school
+  // board or for a Student heading to the US.
+  atar?: number;
+  sat?: number;
   stream?: ValueOf<typeof STREAMS>;
-  fieldOfStudy?: ValueOf<typeof FIELDS_OF_STUDY>;
-  destination?: ValueOf<typeof DESTINATIONS>;
+  fieldOfStudy?: FieldOfStudyGroup;
+  // The subject the Student picked from SUBJECTS or typed (then the group is
+  // other). Kept on this device only: a Match request sends the group.
+  subject?: string;
+  // Where the Student wants to study: an ISO 3166-1 alpha-2 country
+  // (COUNTRIES in countries.ts).
+  destination?: string;
   incomeBand?: ValueOf<typeof INCOME_BANDS>;
+  // Only for a Student living outside India, who gives an amount in place of
+  // a rupee band.
+  incomeAmount?: IncomeAmount;
   gender?: ValueOf<typeof GENDERS>;
   category?: ValueOf<typeof CATEGORIES>;
   minority?: boolean;

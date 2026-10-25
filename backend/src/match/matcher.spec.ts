@@ -1,6 +1,6 @@
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import { match, type MatchableScholarship } from './matcher.js';
-import type { Profile } from './profile.js';
+import type { BoardResult, Profile } from './profile.js';
 
 const TODAY = '2026-07-20';
 
@@ -131,12 +131,94 @@ describe('Matcher: income bands against an income threshold', () => {
     expect(bucketOf({ incomeBand: band }, atLeast(limit))).toBe(bucket);
   });
 
+  it('compares a Student abroad who gives a rupee income with a rupee limit', () => {
+    const s = upTo(250000);
+    const inRupees = (value: number): Profile => ({
+      countryOfResidence: 'AE',
+      incomeAmount: { currency: 'INR', value },
+    });
+    expect(bucketOf(inRupees(200000), s)).toBe('eligible');
+    expect(bucketOf(inRupees(300000), s)).toBe('hidden');
+    expect(
+      bucketOf(
+        {
+          countryOfResidence: 'AE',
+          incomeAmount: { currency: 'AED', value: 1000 },
+        },
+        s,
+      ),
+    ).toBe('tellUsMore');
+  });
+
   it('matches an income band criterion naming bands directly', () => {
     const s = scholarship([
       { field: 'incomeBand', op: 'in', value: ['under_1l', '1l_2l'] },
     ]);
     expect(bucketOf({ incomeBand: '1l_2l' }, s)).toBe('eligible');
     expect(bucketOf({ incomeBand: '2l_2_5l' }, s)).toBe('hidden');
+  });
+});
+
+describe('Matcher: family income as an amount in a currency', () => {
+  const limit = (value: number, currency: string, period: string) =>
+    scholarship([
+      { field: 'incomeAmount', op: 'lte', value: { currency, period, value } },
+    ]);
+  const abroad = (currency: string, value: number): Profile => ({
+    countryOfResidence: 'US',
+    incomeAmount: { currency, value },
+  });
+
+  it.each<[string, Profile, string]>([
+    ['a yearly income under the limit', abroad('GBP', 50000), 'eligible'],
+    ['a yearly income on the limit', abroad('GBP', 62215), 'eligible'],
+    ['a yearly income over the limit', abroad('GBP', 70000), 'hidden'],
+    ['an income in another currency', abroad('USD', 50000), 'tellUsMore'],
+    [
+      'a Student in India who gives a band',
+      { incomeBand: '1l_2l' },
+      'tellUsMore',
+    ],
+    ['no income given', { countryOfResidence: 'GB' }, 'tellUsMore'],
+  ])('a yearly limit in pounds: %s', (_, profile, bucket) => {
+    expect(bucketOf(profile, limit(62215, 'GBP', 'yearly'))).toBe(bucket);
+  });
+
+  it.each<[string, number, string]>([
+    ['twelve months under the limit', 59000, 'eligible'],
+    ['exactly twelve months of the limit', 60000, 'eligible'],
+    ['more than twelve months of the limit', 61000, 'hidden'],
+  ])(
+    'a monthly limit is compared as twelve months: %s',
+    (_, yearly, bucket) => {
+      expect(
+        bucketOf(abroad('USD', yearly), limit(5000, 'USD', 'monthly')),
+      ).toBe(bucket);
+    },
+  );
+
+  it('names family income as missing', () => {
+    const card = cardFor({}, limit(5000, 'USD', 'monthly'));
+    expect(card.missing).toEqual([
+      { field: 'incomeAmount', label: 'family income' },
+    ]);
+  });
+
+  it('names the currency that would settle a limit in another currency', () => {
+    const card = cardFor(abroad('GBP', 50000), limit(5000, 'USD', 'monthly'));
+    expect(card.missing).toEqual([
+      { field: 'incomeAmount', label: 'family income in USD' },
+    ]);
+  });
+
+  it('names rupees for a rupee limit a Student abroad gave another currency for', () => {
+    const rupeeLimit = scholarship([
+      { field: 'incomeBand', op: 'lte', value: 250000 },
+    ]);
+    const card = cardFor(abroad('AED', 1000), rupeeLimit);
+    expect(card.missing).toEqual([
+      { field: 'incomeBand', label: 'family income in INR' },
+    ]);
   });
 });
 
@@ -337,6 +419,162 @@ describe('Matcher: Board marks', () => {
     expect(bucketOf(class10Behind, resultAtLeast('class10Result', 60))).toBe(
       'hidden',
     );
+  });
+});
+
+describe('Matcher: Result scales', () => {
+  const result = (scale: BoardResult['scale'], value: unknown) =>
+    ({ scale, value }) as BoardResult;
+  const atLeast = (
+    threshold: BoardResult,
+    field: 'class10Result' | 'class12Result' = 'class12Result',
+    alternativeGroup?: string,
+  ): Partial<Criterion> => ({
+    field,
+    op: 'gte',
+    value: threshold,
+    changeable: true,
+    ...(alternativeGroup && { alternativeGroup }),
+  });
+  const ib36 = atLeast(result('ib_points', 36), 'class12Result', 'class12');
+  const aaa = atLeast(
+    result('a_level', ['A', 'A', 'A']),
+    'class12Result',
+    'class12',
+  );
+
+  it.each([
+    [
+      'CGPA out of 10',
+      'class10Result',
+      result('cgpa_10', 8),
+      result('cgpa_10', 8.4),
+      result('cgpa_10', 7.8),
+    ],
+    [
+      'GPA out of 4',
+      'class12Result',
+      result('gpa_4', 3.5),
+      result('gpa_4', 3.7),
+      result('gpa_4', 3.2),
+    ],
+    [
+      'IB points',
+      'class12Result',
+      result('ib_points', 36),
+      result('ib_points', 36),
+      result('ib_points', 35),
+    ],
+  ] as const)(
+    'passes and fails a threshold in %s on the same scale',
+    (_, field, threshold, passing, failing) => {
+      const s = scholarship([atLeast(threshold, field)]);
+      expect(bucketOf({ [field]: passing }, s)).toBe('eligible');
+      expect(bucketOf({ [field]: failing }, s)).toBe('hidden');
+    },
+  );
+
+  it('compares A-level grades best first, each at least the grade asked', () => {
+    const s = scholarship([aaa]);
+    const grades = (...value: string[]) => ({
+      class12Result: result('a_level', value),
+    });
+    expect(bucketOf(grades('A*', 'A', 'A'), s)).toBe('eligible');
+    expect(bucketOf(grades('B', 'A', 'A*', 'A'), s)).toBe('eligible');
+    expect(bucketOf(grades('A*', 'A*', 'B'), s)).toBe('hidden');
+    expect(bucketOf(grades('A', 'A'), s)).toBe('hidden');
+  });
+
+  it('names the result that would settle a Criterion on another scale', () => {
+    const card = cardFor(
+      { class12Result: result('percentage', 95) },
+      scholarship([atLeast(result('ib_points', 36))]),
+    );
+    expect(card.missing).toEqual([
+      { field: 'class12Result', label: 'Class 12 result in IB points' },
+    ]);
+  });
+
+  describe('alternatives across scales', () => {
+    const ibOrALevel = () => scholarship([ib36, aaa]);
+    const ibOrHigherIb = () =>
+      scholarship([
+        ib36,
+        atLeast(result('ib_points', 40), 'class12Result', 'class12'),
+      ]);
+
+    it('passes when any one alternative passes', () => {
+      expect(
+        bucketOf({ class12Result: result('ib_points', 38) }, ibOrALevel()),
+      ).toBe('eligible');
+      expect(
+        bucketOf(
+          { class12Result: result('a_level', ['A', 'A', 'A']) },
+          ibOrALevel(),
+        ),
+      ).toBe('eligible');
+    });
+
+    it('fails when every judgeable alternative fails and none is unknown', () => {
+      expect(
+        bucketOf({ class12Result: result('ib_points', 30) }, ibOrHigherIb()),
+      ).toBe('hidden');
+    });
+
+    it('is unknown when the judgeable alternatives fail but another is unknown', () => {
+      const card = cardFor(
+        { class12Result: result('ib_points', 30) },
+        ibOrALevel(),
+      );
+      expect(card.missing).toEqual([
+        { field: 'class12Result', label: 'Class 12 result in A-level grades' },
+      ]);
+      expect(
+        bucketOf({ class12Result: result('percentage', 95) }, ibOrALevel()),
+      ).toBe('tellUsMore');
+    });
+
+    it('counts a failing group as one fail, with a Goal from the member that has one', () => {
+      const profile: Profile = {
+        class: 12,
+        boardsUpcoming: true,
+        class12Result: result('ib_points', 34),
+      };
+      expect(cardFor(profile, ibOrHigherIb()).goals).toEqual([
+        'Score 36 IB points to unlock this',
+      ]);
+    });
+  });
+
+  describe('Goals', () => {
+    const upcoming = (class12Result: BoardResult): Profile => ({
+      class: 12,
+      boardsUpcoming: true,
+      class12Result,
+    });
+
+    it('offers a Goal on IB points within 2 points', () => {
+      const s = scholarship([atLeast(result('ib_points', 36))]);
+      expect(cardFor(upcoming(result('ib_points', 34)), s).goals).toEqual([
+        'Score 36 IB points to unlock this',
+      ]);
+      expect(bucketOf(upcoming(result('ib_points', 33)), s)).toBe('hidden');
+    });
+
+    it('never offers a Goal on A-level grades or a GPA', () => {
+      expect(
+        bucketOf(
+          upcoming(result('a_level', ['A', 'A', 'B'])),
+          scholarship([aaa]),
+        ),
+      ).toBe('hidden');
+      expect(
+        bucketOf(
+          upcoming(result('gpa_4', 3.4)),
+          scholarship([atLeast(result('gpa_4', 3.5))]),
+        ),
+      ).toBe('hidden');
+    });
   });
 });
 

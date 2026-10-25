@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AMOUNT_NOT_STATED, extractByRules } from './extractor.js';
+import { AMOUNT_NOT_STATED, extractByRules, readValue } from './extractor.js';
 import { cleanHtml } from './fetcher.js';
 
 // Seam 3: the Extractor as a pure function over a Scholarship's cleaned text,
@@ -56,6 +56,10 @@ describe('Extractor rules on a myScheme page (NMMSS)', () => {
     ]);
   });
 
+  it('reads no SAT score from the Scholastic Aptitude Test cut-off', () => {
+    expect(criterion(nmmss, 'sat')).toBeUndefined();
+  });
+
   it('shows the Class 8 marks rule as an Extra requirement', () => {
     expect(extractByRules(nmmss).extraRequirements).toEqual([
       {
@@ -95,6 +99,82 @@ describe('Normalisation onto the fixed lists', () => {
   });
 
   it.each([
+    [
+      'The total household monthly income of the parent(s) of the applicant should NOT exceed an amount equivalent to US Dollar Five Thousand (US$ 5000).',
+      { currency: 'USD', period: 'monthly', value: 5000 },
+    ],
+    [
+      'To qualify you must have a household income of under £62,215 a year.',
+      { currency: 'GBP', period: 'yearly', value: 62215 },
+    ],
+    [
+      'Have a household income under £70,000.',
+      { currency: 'GBP', period: 'yearly', value: 70000 },
+    ],
+    [
+      'Annual family income must not exceed AED 250,000.',
+      { currency: 'AED', period: 'yearly', value: 250000 },
+    ],
+    [
+      'Family income should be below US$65,000 per year.',
+      { currency: 'USD', period: 'yearly', value: 65000 },
+    ],
+  ])(
+    'records the currency and period of the income limit in "%s"',
+    (text, limit) => {
+      expect(criterion(text, 'incomeAmount')).toMatchObject({
+        op: 'lte',
+        value: limit,
+        changeable: false,
+        sourceText: text,
+      });
+      expect(criterion(text, 'incomeBand')).toBeUndefined();
+    },
+  );
+
+  it.each([
+    'Applicants with a household income under £30,000 will receive £500 a month.',
+    'Household income must be below £30,000; successful students receive a monthly stipend.',
+  ])(
+    'takes the period from the income limit alone, not from what is paid, in "%s"',
+    (text) => {
+      expect(criterion(text, 'incomeAmount')?.value).toEqual({
+        currency: 'GBP',
+        period: 'yearly',
+        value: 30000,
+      });
+    },
+  );
+
+  it('leaves a bare dollar sign to the LLM, since many countries use one', () => {
+    const text = 'Family income should be below $65,000 per year.';
+    expect(criterion(text, 'incomeAmount')).toBeUndefined();
+  });
+
+  it('keeps a rupee income limit a rupee band limit', () => {
+    const text = 'Annual family income should be less than Rs. 2.5 lakh.';
+    expect(criterion(text, 'incomeAmount')).toBeUndefined();
+  });
+
+  it.each([
+    ['USD 5000 monthly', { currency: 'USD', period: 'monthly', value: 5000 }],
+    ['GBP 62,215 yearly', { currency: 'GBP', period: 'yearly', value: 62215 }],
+    ['sgd 70000', { currency: 'SGD', period: 'yearly', value: 70000 }],
+  ])(
+    'reads an income limit "%s" as the LLM or a reviewer writes it',
+    (raw, limit) => {
+      expect(readValue('incomeAmount', [raw])).toEqual(limit);
+    },
+  );
+
+  it.each(['INR 250000 yearly', 'XYZ 5000 monthly', 'USD -5 monthly', 'USD'])(
+    'refuses "%s" as an income limit abroad',
+    (raw) => {
+      expect(readValue('incomeAmount', [raw])).toBeUndefined();
+    },
+  );
+
+  it.each([
     ['The applicant must be a domicile of Tamil Nadu.', ['tamil_nadu']],
     [
       'Open to permanent residents of Jammu & Kashmir or Ladakh.',
@@ -111,6 +191,122 @@ describe('Normalisation onto the fixed lists', () => {
     const text =
       '15% seats are earmarked for SCs, 7.5% for STs and 27 % for OBCs and 5% horizontal reservation for students with Benchmark Disabilities (Disability of 40% or more) in all the categories].';
     expect(criterion(text, 'disability')).toBeUndefined();
+  });
+
+  it.each([
+    [
+      'The scholarship is only for students pursuing a B.Sc in physics or chemistry.',
+      ['science'],
+    ],
+    [
+      'Open only to students who study law, psychology or graphic design.',
+      ['law', 'social_sciences', 'design'],
+    ],
+    ['Applicants must be pursuing a degree in agriculture.', ['agriculture']],
+  ])('reads the Field of study groups in "%s"', (text, groups) => {
+    expect(criterion(text, 'fieldOfStudy')?.value).toEqual(groups);
+  });
+
+  it.each([
+    'Scholarships are provided for professional courses, such as Medical, Engineering etc.',
+    'Students interested in pursuing humanities are strongly encouraged to apply.',
+    'Meant for those who plan to pursue engineering after school.',
+  ])('reads no Field of study group from "%s"', (text) => {
+    expect(criterion(text, 'fieldOfStudy')).toBeUndefined();
+  });
+
+  const inTheUk = ' Awarded for study at a university in the United Kingdom.';
+
+  it.each([
+    ['The award is open to home students only.', true],
+    ['This scholarship is for international students.', false],
+    ['Both home and international students may apply.', undefined],
+    ['International students may write to the admissions office.', undefined],
+  ])(
+    'reads "%s" as a home or international award beside a destination',
+    (text, home) => {
+      expect(criterion(text + inTheUk, 'destinationIsResidence')?.value).toBe(
+        home,
+      );
+    },
+  );
+
+  it.each([
+    'The award is open to home students only.',
+    'This scholarship is for international students.',
+  ])(
+    'reads no home or international award from "%s" when the page names no destination',
+    (text) => {
+      // Home or international means nothing without the country of study:
+      // read alone, an award for international students in Canada would
+      // pass a Student going anywhere abroad.
+      expect(criterion(text, 'destinationIsResidence')).toBeUndefined();
+    },
+  );
+
+  it('reads the country an award for international students names as the destination', () => {
+    // From the Pearson International Scholarship page.
+    const text =
+      'Pearson International Scholarships is one of the largest scholarship programs for international students in Canada.';
+    expect(criterion(text, 'destination')?.value).toEqual(['CA']);
+    expect(criterion(text, 'destinationIsResidence')?.value).toBe(false);
+  });
+
+  it('reads where the Student must study', () => {
+    const abroad =
+      'Awarded to students who wish to study at a university in the United Kingdom.';
+    expect(criterion(abroad, 'destination')?.value).toEqual(['GB']);
+  });
+
+  it.each([
+    'The scholarship is tenable only at universities in India.',
+    'Students must pursue their higher education at a college in India.',
+  ])(
+    'reads India as the destination where "%s" restricts study to it',
+    (text) => {
+      expect(criterion(text, 'destination')?.value).toEqual(['IN']);
+    },
+  );
+
+  it('reads no destination from India named in passing', () => {
+    // An Indian source saying where its Students study restricts nothing a
+    // Student in India could have read.
+    const text = 'For students who will study at a college in India.';
+    expect(criterion(text, 'destination')).toBeUndefined();
+  });
+
+  it.each([
+    ['Have achieved an ATAR of at least 99.90.', 'atar', 99.9],
+    [
+      'Students must be predicted by their school to achieve an ATAR of 95 or higher.',
+      'atar',
+      95,
+    ],
+    ['American: SAT score ≥ 1450.', 'sat', 1450],
+    [
+      'Minimum 98 percent with 2 APs at grade 5 or SAT composite score of 1200.',
+      'sat',
+      1200,
+    ],
+    ['Applicants need a minimum SAT score of 1,300.', 'sat', 1300],
+  ])('reads "%s" as a minimum %s, changeable', (text, field, value) => {
+    expect(criterion(text, field)).toMatchObject({
+      field,
+      op: 'gte',
+      value,
+      changeable: true,
+    });
+  });
+
+  it.each([
+    [
+      'Submit standardized test scores from the SAT or ACT (no minimum score).',
+      'sat',
+    ],
+    ['An ATAR of 120 is required.', 'atar'],
+    ['A SAT score of 1700 is required.', 'sat'],
+  ])('reads no test score from "%s"', (text, field) => {
+    expect(criterion(text, field)).toBeUndefined();
   });
 
   it('still reads a scholarship reserved for students with disabilities', () => {
@@ -205,6 +401,62 @@ describe('Normalisation onto the fixed lists', () => {
       ]);
     },
   );
+
+  it.each([
+    [
+      'Students must have a CGPA of at least 8.5 in Class 10.',
+      'class10Result',
+      { scale: 'cgpa_10', value: 8.5 },
+    ],
+    [
+      'Applicants need a minimum GPA of 3.0.',
+      'class12Result',
+      { scale: 'gpa_4', value: 3 },
+    ],
+    [
+      'Candidates must score 32 points in the IB Diploma.',
+      'class12Result',
+      { scale: 'ib_points', value: 32 },
+    ],
+    [
+      'Applicants must hold A*AB at A-level.',
+      'class12Result',
+      { scale: 'a_level', value: ['A*', 'A', 'B'] },
+    ],
+  ])('reads the result on its scale in "%s"', (text, field, value) => {
+    expect(criterion(text, field)).toEqual(
+      expect.objectContaining({ value, op: 'gte', changeable: true }),
+    );
+    expect(criterion(text, field)?.alternativeGroup).toBeUndefined();
+  });
+
+  it.each([
+    ['Applicants must have a weighted GPA of at least 3.8.', 'A weighted GPA'],
+    ['Students must have an R score of 30 or above.', "Quebec's R score"],
+    [
+      'Applicants must hold five IGCSE passes at grade C or above.',
+      'GCSE/IGCSE results',
+    ],
+  ])(
+    'shows the result on an unsupported scale in "%s" as an Extra requirement',
+    (text, requirement) => {
+      const extraction = extractByRules(text);
+      expect(
+        extraction.criteria.filter((c) => c.field.endsWith('Result')),
+      ).toEqual([]);
+      expect(extraction.criteria.map((c) => c.field)).not.toContain('board');
+      expect(extraction.extraRequirements).toEqual([
+        { text: requirement, sourceText: text },
+      ]);
+    },
+  );
+
+  it.each([
+    'To convert the CGPA into percentage; CGPA X 9.5 will give the percentage.',
+    'Students must hold a CGPA of at least 6.5 in their degree.',
+  ])('reads no Board marks from a CGPA not tied to Class 10: "%s"', (text) => {
+    expect(extractByRules(text).criteria).toEqual([]);
+  });
 
   it('leaves marks that name no year to the LLM', () => {
     const extraction = extractByRules(

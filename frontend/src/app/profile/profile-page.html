@@ -96,7 +96,7 @@
 
   <label>
     Board
-    <select (change)="setChoice('board', $any($event.target).value)">
+    <select (change)="setBoard($any($event.target).value)">
       <option value="">N.A</option>
       @for (b of boards; track b.value) {
         <option [value]="b.value" [selected]="profile().board === b.value">
@@ -120,18 +120,58 @@
   @for (question of boardMarksQuestions; track question) {
     @if (shown().has(question)) {
       <label>
-        {{ boardMarksLabel(question, profile()) }} (%)
+        {{ boardMarksLabel(question, profile(), scaleOf(question)) }}: scale
+        <select (change)="setScale(question, $any($event.target).value)">
+          @for (s of scalesFor(question); track s.value) {
+            <option [value]="s.value" [selected]="scaleOf(question) === s.value">
+              {{ s.label }}
+            </option>
+          }
+        </select>
+      </label>
+      <label>
+        {{ boardMarksLabel(question, profile(), scaleOf(question)) }}
+        @if (scaleOf(question) === 'a_level') {
+          <input
+            type="text"
+            placeholder="For example A*AB"
+            [value]="shownResult(profile()[question])"
+            [attr.aria-invalid]="marksErrors()[question] ? true : null"
+            (change)="setMarks(question, $any($event.target).value)"
+          />
+        } @else {
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            [value]="shownResult(profile()[question])"
+            [attr.aria-invalid]="marksErrors()[question] ? true : null"
+            (change)="setMarks(question, $any($event.target).value)"
+          />
+        }
+        @if (marksErrors()[question]; as error) {
+          <span class="field-error" role="alert">{{ error }}</span>
+        }
+      </label>
+    }
+  }
+
+  @for (score of testScores; track score.question) {
+    @if (shown().has(score.question)) {
+      <label>
+        {{ score.label }}
         <input
           type="number"
-          min="0"
-          max="100"
-          step="0.1"
+          [min]="score.min"
+          [max]="score.max"
+          [step]="score.step"
           inputmode="decimal"
-          [value]="profile()[question]?.value ?? ''"
-          [attr.aria-invalid]="marksErrors()[question] ? true : null"
-          (change)="setMarks(question, $any($event.target).value)"
+          [value]="profile()[score.question] ?? ''"
+          [attr.aria-invalid]="scoreErrors()[score.question] ? true : null"
+          (change)="setTestScore(score.question, $any($event.target).value)"
         />
-        @if (marksErrors()[question]; as error) {
+        @if (scoreErrors()[score.question]; as error) {
           <span class="field-error" role="alert">{{ error }}</span>
         }
       </label>
@@ -162,20 +202,75 @@
     </label>
   }
 
+  @if (shown().has('incomeBand')) {
+    <label>
+      Family income per year
+      <select (change)="setChoice('incomeBand', $any($event.target).value)">
+        <option value="">N.A</option>
+        @for (b of incomeBands; track b.value) {
+          <option [value]="b.value" [selected]="profile().incomeBand === b.value">
+            {{ b.label }}
+          </option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (shown().has('incomeAmount')) {
+    <fieldset>
+      <legend>Family income per year</legend>
+      <label>
+        Currency
+        <select (change)="setIncomeCurrency($any($event.target).value)">
+          <option value="">N.A</option>
+          @for (c of currencies; track c.value) {
+            <option [value]="c.value" [selected]="incomeCurrency() === c.value">
+              {{ c.label }}
+            </option>
+          }
+        </select>
+      </label>
+      <label>
+        Amount
+        <input
+          type="number"
+          min="0"
+          step="1"
+          inputmode="decimal"
+          [value]="profile().incomeAmount?.value ?? ''"
+          [attr.aria-invalid]="incomeError() ? true : null"
+          (change)="setIncomeAmount($any($event.target).value)"
+        />
+        @if (incomeError(); as error) {
+          <span class="field-error" role="alert">{{ error }}</span>
+        }
+      </label>
+    </fieldset>
+  }
+
   <label>
-    Family income per year
-    <select (change)="setChoice('incomeBand', $any($event.target).value)">
-      <option value="">N.A</option>
-      @for (b of incomeBands; track b.value) {
-        <option [value]="b.value" [selected]="profile().incomeBand === b.value">
-          {{ b.label }}
-        </option>
+    What do you want to study? Search, or type your own
+    <input
+      type="search"
+      list="subject-options"
+      autocomplete="off"
+      placeholder="e.g. marine"
+      [value]="profile().subject ?? ''"
+      (input)="subjectQuery.set($any($event.target).value)"
+      (change)="setSubject($any($event.target).value)"
+    />
+    <datalist id="subject-options">
+      @for (s of subjectOptions(); track s.label) {
+        <option [value]="s.label">{{ groupLabel(s.group) }}</option>
       }
-    </select>
+    </datalist>
+    @if (subjectNote(); as note) {
+      <span class="field-note">{{ note }}</span>
+    }
   </label>
 
   <label>
-    What do you want to study?
+    Field of study group
     <select (change)="setChoice('fieldOfStudy', $any($event.target).value)">
       <option value="">N.A</option>
       @for (f of fieldsOfStudy; track f.value) {
@@ -190,9 +285,9 @@
     Where do you want to study?
     <select (change)="setChoice('destination', $any($event.target).value)">
       <option value="">N.A</option>
-      @for (d of destinations; track d.value) {
-        <option [value]="d.value" [selected]="profile().destination === d.value">
-          {{ d.label }}
+      @for (c of countries; track c.value) {
+        <option [value]="c.value" [selected]="profile().destination === c.value">
+          {{ c.label }}
         </option>
       }
     </select>

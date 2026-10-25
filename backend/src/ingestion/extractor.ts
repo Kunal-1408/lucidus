@@ -13,7 +13,7 @@ import {
   FIELD_RULES,
   Found,
   isEligibilitySentence,
-  otherYearMarks,
+  marksExtraRequirements,
 } from './extraction-rules.js';
 import {
   type Quoted,
@@ -51,7 +51,7 @@ export async function extract(
   });
   const fromLlm = answer.criteria
     .filter((c) => EXTRACTED_FIELDS.includes(c.field) && !found.has(c.field))
-    .map((reading) => fromCriterionReading(reading, text));
+    .flatMap((reading) => alternatives(reading, text));
   // Extra requirements are never matched, so one whose sentence isn't on the
   // page is simply dropped rather than shown.
   // The rules' own Extra requirements come first; the LLM's copy of the same
@@ -71,7 +71,7 @@ export async function extract(
   const llmDeadline = quotedValue(text, answer.deadline);
   const deadline = byRules.deadline ?? (llmDeadline && toIsoDate(llmDeadline));
   return {
-    criteria: [...byRules.criteria, ...fromLlm],
+    criteria: withDestinationForHome([...byRules.criteria, ...fromLlm]),
     extraRequirements,
     amountText,
     deadline,
@@ -91,18 +91,47 @@ export function extractByRules(text: string): Extraction {
     .map((c) => ({ ...c, confidence: 'high' as const }));
   const deadline = deadlineText(sentences);
   return {
-    criteria,
-    extraRequirements: otherYearMarks(eligibility),
+    criteria: withDestinationForHome(criteria),
+    extraRequirements: marksExtraRequirements(eligibility),
     amountText: amountRule(sentences) ?? AMOUNT_NOT_STATED,
     deadline: deadline && toIsoDate(deadline),
   };
 }
 
+// A home or international award (destinationIsResidence) is kept only beside
+// the destination it is home or international to. Alone it would pass a
+// Student going anywhere abroad: Pearson's award for international students
+// in Canada would show to a Student in India going to the UK.
+function withDestinationForHome(criteria: Criterion[]): Criterion[] {
+  if (criteria.some((c) => c.field === 'destination')) return criteria;
+  return criteria.filter((c) => c.field !== 'destinationIsResidence');
+}
+
 function normalise(found: Found): Omit<Criterion, 'confidence'> | undefined {
   const value = normaliseValue(found.field, found.op, found.raw);
   if (value === undefined) return undefined;
-  const { field, op, changeable, sourceText } = found;
-  return { field, op, value, changeable, sourceText };
+  const { field, op, changeable, sourceText, alternativeGroup } = found;
+  return {
+    field,
+    op,
+    value,
+    changeable,
+    sourceText,
+    ...(alternativeGroup && { alternativeGroup }),
+  };
+}
+
+// Several results the LLM gives for one Board marks field are alternatives
+// on different Result scales: one Criterion each, grouped.
+function alternatives(reading: CriterionReading, text: string): Criterion[] {
+  if (!isBoardMarksField(reading.field) || reading.values.length < 2) {
+    return [fromCriterionReading(reading, text)];
+  }
+  return reading.values.map((value) => {
+    const member = fromCriterionReading({ ...reading, values: [value] }, text);
+    member.alternativeGroup = reading.field;
+    return member;
+  });
 }
 
 // An LLM value is medium Confidence when it passes the quote check;

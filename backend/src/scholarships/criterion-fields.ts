@@ -14,7 +14,13 @@ export const CRITERION_FIELDS: Record<
   class12Result: { op: 'gte', changeable: true },
   class10Marks: { op: 'gte', changeable: true },
   latestMarks: { op: 'gte', changeable: true },
+  // Test scores apart from Board marks: a minimum ATAR, a minimum SAT score.
+  atar: { op: 'gte', changeable: true },
+  sat: { op: 'gte', changeable: true },
   incomeBand: { op: 'lte', changeable: false },
+  // Family income abroad: the value is an income limit with its currency
+  // and period.
+  incomeAmount: { op: 'lte', changeable: false },
   gender: { op: 'eq', changeable: false },
   category: { op: 'in', changeable: false },
   minority: { op: 'eq', changeable: false },
@@ -35,6 +41,10 @@ export const CRITERION_FIELDS: Record<
   stream: { op: 'in', changeable: false },
   fieldOfStudy: { op: 'in', changeable: false },
   destination: { op: 'in', changeable: false },
+  // Home-student awards (true: the Student studies in the country they live
+  // in) and international-student awards (false). No Profile answer holds
+  // it: the Matcher compares destination with country of residence.
+  destinationIsResidence: { op: 'eq', changeable: false },
   parentOccupation: { op: 'in', changeable: false },
   examsQualified: { op: 'in', changeable: false },
 };

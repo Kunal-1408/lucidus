@@ -11,11 +11,15 @@ const FIELD_GUIDE: Record<string, string> = {
   class:
     'the class the Student must be in now: one value per class, each "9", "10", "11" or "12"',
   class10Result:
-    'the minimum Class 10 board exam result, one percentage such as "60"',
+    'the minimum Class 10 board exam result: a percentage such as "60", or a CGPA out of 10 such as "8.5 CGPA"',
   class12Result:
-    'the minimum Class 12 board exam result, one percentage such as "75"',
+    'the minimum Class 12 board exam result: a percentage such as "75", IB Diploma points such as "36 IB points", A-level grades such as "AAB at A-level", or an unweighted GPA out of 4 such as "3.5 GPA"; when the text accepts results on several of these scales ("IB 36 or AAA at A-level"), give each as its own value',
+  atar: 'the minimum ATAR (Australian Tertiary Admission Rank, 0 to 99.95), one figure such as "95" or "99.90"',
+  sat: 'the minimum SAT score (400 to 1600), one figure such as "1400"; leave it out when the text sets no minimum score',
   incomeBand:
-    'the upper limit on annual family income, one figure as the text writes it, such as "Rs. 2.5 lakh"',
+    'the upper limit on annual family income in rupees, one figure as the text writes it, such as "Rs. 2.5 lakh"',
+  incomeAmount:
+    'the upper limit on family income in a currency other than rupees: one value, the ISO 4217 code, the figure and monthly or yearly as the text counts it, such as "USD 5000 monthly" or "GBP 62215 yearly"',
   minority: '"yes" when only minority-community students may apply',
   disability: '"yes" when only students with a disability may apply',
   singleGirlChild: '"yes" when only a single girl child may apply',
@@ -30,6 +34,11 @@ const FIELD_GUIDE: Record<string, string> = {
     'one or more of: indian (Indian citizens, including NRIs), oci (OCI or PIO card holders), other (another nationality)',
   citizenshipCountry:
     'the countries the Student must be a citizen of, other than India, each an ISO 3166-1 alpha-2 code such as "US"',
+  fieldOfStudy: `the broad groups of subjects the Student must study, one or more of: ${FIXED_LISTS.fieldOfStudy.join(', ')} (science is the natural sciences, arts is arts and humanities, other is any subject outside these groups)`,
+  destination:
+    'the countries the Student must study in, each an ISO 3166-1 alpha-2 code such as "GB" or "US", including the country an award for home or international students names ("international students in Canada" is "CA"); "IN" only when the text restricts study to India, not when it mentions India in passing',
+  destinationIsResidence:
+    '"yes" when only home (domestic) students of the country of study may apply, "no" when only international (overseas) students may apply; it is kept only when the text also names the country of study (destination)',
 };
 
 function guideFor(field: string): string {
@@ -44,7 +53,7 @@ Rules:
 - Every value comes with a quote: one sentence copied exactly, character for character, from the text, that states it. A value whose quote is not in the text is discarded.
 - criteria: one entry per requested field the text restricts, using only the values allowed for that field. Leave a field out when the text doesn't restrict it.
 - extraRequirements: conditions on who may apply that none of the profile fields listed can answer (for example "top 1% in your board", "not receiving another scholarship", "born after 2010"). Write each as a short phrase for the Student. Documents to submit are not requirements.
-- Marks: only a Class 10 or Class 12 board exam result is a criterion. Marks required in any other year (for example Class 7 or Class 8) are extraRequirements.
+- Marks: only a Class 10 or Class 12 board exam result is a criterion. Marks required in any other year (for example Class 7 or Class 8), GCSE or IGCSE grades, and results on any other scale (a weighted GPA, AP exam scores, Quebec's R score) are extraRequirements. A minimum ATAR or SAT score is not Board marks: it is the atar or sat criterion.
 - amountText: what the Scholarship pays, copied as the text words it (for example "full tuition" or "₹10,000 per month"), with its quote; null when the text doesn't say or it wasn't asked for.
 - deadline: the last date a Student can apply, copied exactly as the text writes the date, with its quote; null when the text doesn't say or it wasn't asked for.`;
 

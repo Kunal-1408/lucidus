@@ -3,17 +3,16 @@
     "baseRef": "head",
     "symlinkDirectories": ["node_modules", "backend/node_modules", "frontend/node_modules"]
   },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash|PowerShell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-no-verify.mjs\""
-          }
-        ]
-      }
+  "permissions": {
+    "deny": [
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(sed:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ]
   }
 }

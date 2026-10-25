@@ -24,6 +24,13 @@ export class Criterion {
 
   @Prop({ type: String, required: true, enum: ['high', 'medium', 'low'] })
   confidence: ConfidenceLevel;
+
+  // Criteria sharing an alternatives group are alternatives ("IB 36 or AAA
+  // at A-level"): the group passes when any member passes, fails when every
+  // member that can be judged fails and none is unknown, and is otherwise
+  // unknown. Absent on a Criterion that stands alone.
+  @Prop()
+  alternativeGroup?: string;
 }
 
 // Mirrored in frontend/src/app/api.ts.

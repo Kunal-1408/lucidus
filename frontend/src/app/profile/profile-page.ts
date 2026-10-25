@@ -1,31 +1,45 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { COUNTRIES, REGIONS } from '../countries';
+import { CURRENCIES } from '../currencies';
 import {
-  BoardResult,
   BOARDS,
   CATEGORIES,
   CITIZENSHIPS,
   CLASSES,
-  DESTINATIONS,
   EXAMS,
+  FieldOfStudyGroup,
   FIELDS_OF_STUDY,
   GENDERS,
   INCOME_BANDS,
+  IncomeAmount,
   PARENT_OCCUPATIONS,
   Profile,
   RESIDENCE_STATUSES,
+  RESULT_SCALES,
+  ResultScale,
   SCHOOL_TYPES,
   STATES,
   STREAMS,
 } from '../profile-fields';
 import {
   applyChange,
+  applyScaleChange,
   BOARD_MARKS_FIELDS,
   BoardMarksQuestion,
   boardMarksLabel,
   checkAnswer,
+  findSubjects,
+  incomeCurrency,
   profileForMatch,
+  readResult,
+  resultScale,
+  shownResult,
+  SLOT_SCALES,
+  subjectAnswer,
+  TEST_SCORE_RANGES,
+  subjectNote,
+  TestScoreField,
   visibleQuestions,
 } from '../profile-rules';
 import { ProfileStore } from '../profile-store';
@@ -51,6 +65,17 @@ type ChoiceField =
 type YesNoField = 'boardsUpcoming' | 'minority' | 'disability' | 'singleGirlChild';
 type MultiField = 'parentOccupation' | 'examsQualified';
 
+// The test scores, each asked as a number in its range.
+const TEST_SCORES = (
+  [
+    ['atar', 'ATAR', 0.05],
+    ['sat', 'SAT score', 10],
+  ] as const
+).map(([question, label, step]) => {
+  const [min, max] = TEST_SCORE_RANGES[question];
+  return { question, label, step, min, max };
+});
+
 @Component({
   selector: 'app-profile-page',
   templateUrl: './profile-page.html',
@@ -69,13 +94,16 @@ export class ProfilePage {
   protected readonly boards = BOARDS;
   protected readonly streams = STREAMS;
   protected readonly fieldsOfStudy = FIELDS_OF_STUDY;
-  protected readonly destinations = DESTINATIONS;
   protected readonly parentOccupations = PARENT_OCCUPATIONS;
   protected readonly exams = EXAMS;
   protected readonly countries = COUNTRIES;
   protected readonly residenceStatuses = RESIDENCE_STATUSES;
+  protected readonly currencies = CURRENCIES;
   protected readonly boardMarksQuestions = BOARD_MARKS_FIELDS;
   protected readonly boardMarksLabel = boardMarksLabel;
+  protected readonly testScores = TEST_SCORES;
+  // Why the last score typed into a test score field was not saved.
+  protected readonly scoreErrors = signal<Partial<Record<TestScoreField, string>>>({});
 
   protected readonly profile = this.store.profile;
   protected readonly shown = computed(() => visibleQuestions(this.profile()));
@@ -85,16 +113,61 @@ export class ProfilePage {
   );
   // Why the last answer typed into a Board marks field was not saved.
   protected readonly marksErrors = signal<Partial<Record<BoardMarksQuestion, string>>>({});
+  // The scale the Student picked for each Board marks question, if any.
+  private readonly pickedScales = signal<Partial<Record<BoardMarksQuestion, ResultScale>>>({});
+  protected readonly shownResult = shownResult;
   // School state defaults to the Home state of a Student in India until the
   // Student changes it; abroad there is no default.
   protected readonly schoolState = computed(() => profileForMatch(this.profile()).schoolState);
+  // The currency of the family income amount: one picked before any amount
+  // is typed, else the answer's, else the country's own.
+  private readonly pickedCurrency = signal<string | undefined>(undefined);
+  protected readonly incomeCurrency = computed(
+    () => this.pickedCurrency() ?? incomeCurrency(this.profile()),
+  );
+  // Why the last amount typed was not saved.
+  protected readonly incomeError = signal<string | undefined>(undefined);
+  // What the Student has typed into the subject search so far.
+  protected readonly subjectQuery = signal('');
+  protected readonly subjectOptions = computed(() => findSubjects(this.subjectQuery()));
+  protected readonly subjectNote = computed(() => subjectNote(this.profile()));
+
+  protected groupLabel(group: FieldOfStudyGroup): string {
+    return FIELDS_OF_STUDY.find((option) => option.value === group)?.label ?? '';
+  }
+
+  // A listed subject sets its group; any other subject counts as Other.
+  protected setSubject(value: string) {
+    this.subjectQuery.set('');
+    this.update(subjectAnswer(value));
+  }
 
   protected setClass(value: string) {
     this.update({ class: value ? (Number(value) as Profile['class']) : undefined });
   }
 
   protected setChoice(field: ChoiceField, value: string) {
+    // A new country offers its own currency again.
+    if (field === 'countryOfResidence') this.pickedCurrency.set(undefined);
     this.update({ [field]: value || undefined });
+  }
+
+  protected setIncomeCurrency(currency: string) {
+    this.pickedCurrency.set(currency || undefined);
+    const amount = this.profile().incomeAmount;
+    if (amount !== undefined) this.setIncomeAmount(String(amount.value));
+  }
+
+  // An empty field clears the answer; an amount that can't be saved isn't,
+  // and the field says why.
+  protected setIncomeAmount(value: string) {
+    const answer: IncomeAmount | undefined =
+      value.trim() === ''
+        ? undefined
+        : { currency: this.incomeCurrency() ?? '', value: Number(value) };
+    const error = answer === undefined ? undefined : checkAnswer('incomeAmount', answer);
+    this.incomeError.set(error);
+    if (!error) this.update({ incomeAmount: answer });
   }
 
   protected yesNo(field: YesNoField): '' | 'yes' | 'no' {
@@ -106,14 +179,46 @@ export class ProfilePage {
     this.update({ [field]: value === '' ? undefined : value === 'yes' });
   }
 
+  // The scale each Board marks question is answered on (see resultScale).
+  protected scaleOf(question: BoardMarksQuestion): ResultScale {
+    return resultScale(question, this.profile(), this.pickedScales()[question]);
+  }
+
+  protected scalesFor(question: BoardMarksQuestion) {
+    return RESULT_SCALES.filter((option) => SLOT_SCALES[question].includes(option.value));
+  }
+
+  // The rules clear a result on the old scale (applyScaleChange).
+  protected setScale(question: BoardMarksQuestion, value: string) {
+    const scale = value as ResultScale;
+    this.pickedScales.update((picked) => ({ ...picked, [question]: scale }));
+    this.marksErrors.update((errors) => ({ ...errors, [question]: undefined }));
+    this.store.profile.update((p) => applyScaleChange(p, question, scale));
+  }
+
+  // A change of board resets the scales to the new board's presets (the
+  // rules clear the results).
+  protected setBoard(value: string) {
+    this.pickedScales.set({});
+    this.setChoice('board', value);
+  }
+
   // An empty field clears the answer; an answer out of range is not saved and
-  // the field says why. Only the percentage scale exists so far.
-  protected setMarks(question: BoardMarksQuestion, value: string) {
-    const result: BoardResult | undefined =
-      value.trim() === '' ? undefined : { scale: 'percentage', value: Number(value) };
+  // the field says why.
+  protected setMarks(question: BoardMarksQuestion, typed: string) {
+    const result = readResult(this.scaleOf(question), typed);
     const error = result === undefined ? undefined : checkAnswer(question, result);
     this.marksErrors.update((errors) => ({ ...errors, [question]: error }));
     if (!error) this.update({ [question]: result });
+  }
+
+  // An empty field clears the score; a score out of range is not saved and
+  // the field says why.
+  protected setTestScore(question: TestScoreField, typed: string) {
+    const score = typed.trim() === '' ? undefined : Number(typed);
+    const error = score === undefined ? undefined : checkAnswer(question, score);
+    this.scoreErrors.update((errors) => ({ ...errors, [question]: error }));
+    if (!error) this.update({ [question]: score });
   }
 
   protected isPicked(field: MultiField, value: string): boolean {

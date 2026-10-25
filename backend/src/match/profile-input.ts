@@ -8,11 +8,24 @@ import {
 } from '../input-checks.js';
 import {
   BOARD_MARKS_FIELDS,
+  type BoardMarksField,
   LEGACY_MARKS_FIELDS,
 } from '../scholarships/criterion-fields.js';
 import { INDIA } from './countries.js';
+import { CURRENCY_CODES } from './currencies.js';
 import { INCOME_BANDS } from './matcher.js';
-import type { BoardResult, Profile, ResultScale } from './profile.js';
+import {
+  type BoardResult,
+  type IncomeAmount,
+  isALevelGrades,
+  NO_CLASS_10_EXAM_BOARDS,
+  NO_CLASS_12_EXAM_BOARDS,
+  type Profile,
+  RESULT_SCALE_RANGES,
+  SLOT_SCALES,
+  TEST_SCORE_RANGES,
+  type TestScoreField,
+} from './profile.js';
 
 export type ProfileParseResult =
   { ok: true; profile: Profile } | { ok: false; reasons: string[] };
@@ -33,11 +46,12 @@ const ONE_OF_FIELDS = [
   'board',
   'stream',
   'fieldOfStudy',
-  'destination',
   'gender',
   'category',
 ] as const;
 const LIST_FIELDS = ['parentOccupation', 'examsQualified'] as const;
+// Test scores, each a number in its range (TEST_SCORE_RANGES).
+const TEST_SCORE_FIELDS: readonly TestScoreField[] = ['atar', 'sat'];
 
 // Checks the Profile sent in a Match request against the rules the form
 // applies (the frontend's copy is frontend/src/app/profile-rules.ts):
@@ -90,9 +104,15 @@ export function parseProfile(body: unknown): ProfileParseResult {
   for (const field of BOARD_MARKS_FIELDS) {
     if (field in raw) keep(field, boardResult(raw, field, reasons));
   }
+  if ('incomeAmount' in raw) keep('incomeAmount', incomeAmount(raw, reasons));
+  for (const field of TEST_SCORE_FIELDS) {
+    const [min, max] = TEST_SCORE_RANGES[field];
+    if (field in raw) keep(field, numberBetween(raw, field, min, max, reasons));
+  }
 
   reasons.push(...contradictions(raw), ...boardMarksContradictions(raw));
-  reasons.push(...residenceContradictions(raw));
+  reasons.push(...residenceContradictions(raw), ...incomeContradictions(raw));
+  reasons.push(...testScoreContradictions(raw));
   if (reasons.length > 0) return { ok: false, reasons };
   return { ok: true, profile: profile as Profile };
 }
@@ -114,10 +134,14 @@ function contradictions(raw: Record<string, unknown>): string[] {
   return reasons;
 }
 
-// Where the Student lives and their Citizenship (citizenship itself is a
-// plain fixed list above): ISO codes for the country, region and
-// Citizenship country, fixed lists for Home state and Residence status.
-const COUNTRY_FIELDS = ['countryOfResidence', 'citizenshipCountry'] as const;
+// Where the Student lives, their Citizenship (citizenship itself is a plain
+// fixed list above) and where they want to study: ISO codes for the
+// countries and the region, fixed lists for Home state and Residence status.
+const COUNTRY_FIELDS = [
+  'countryOfResidence',
+  'citizenshipCountry',
+  'destination',
+] as const;
 const RESIDENCE_ONE_OF_FIELDS = ['homeState', 'residenceStatus'] as const;
 
 function residenceAnswers(
@@ -181,16 +205,12 @@ function residenceContradictions(raw: Record<string, unknown>): string[] {
   return reasons;
 }
 
-// Board marks: each result a value inside its Result scale's range
-// (frontend copy: RESULT_SCALE_RANGES in frontend/src/app/profile-rules.ts).
-const RESULT_SCALE_RANGES: Record<ResultScale, [min: number, max: number]> = {
-  percentage: [0, 100],
-};
-const RESULT_SCALES = Object.keys(RESULT_SCALE_RANGES) as ResultScale[];
-
+// Board marks: each result on a scale its slot allows (SLOT_SCALES), with a
+// value inside that scale's range: whole IB points, A-level grades from A*
+// to E (frontend copy: checkBoardResult in frontend/src/app/profile-rules.ts).
 function boardResult(
   raw: Record<string, unknown>,
-  field: string,
+  field: BoardMarksField,
   reasons: string[],
 ): BoardResult | undefined {
   const answer = raw[field];
@@ -201,31 +221,46 @@ function boardResult(
   const scale = oneOf(
     answer,
     'scale',
-    RESULT_SCALES,
+    SLOT_SCALES[field],
     reasons,
     `${field}.scale`,
   );
   if (scale === undefined) return undefined;
+  const label = `${field}.value`;
+  if (scale === 'a_level') {
+    const grades = answer.value;
+    if (isALevelGrades(grades)) return { scale, value: grades };
+    reasons.push(`${label} must be A-level grades from A* to E`);
+    return undefined;
+  }
+  if (scale === 'ib_points') {
+    const [min, max] = RESULT_SCALE_RANGES.ib_points;
+    const points = answer.value;
+    const whole = typeof points === 'number' && Number.isInteger(points);
+    if (whole && points >= min && points <= max)
+      return { scale, value: points };
+    reasons.push(`${label} must be a whole number from ${min} to ${max}`);
+    return undefined;
+  }
   const [min, max] = RESULT_SCALE_RANGES[scale];
-  const value = numberBetween(
-    answer,
-    'value',
-    min,
-    max,
-    reasons,
-    `${field}.value`,
-  );
+  const value = numberBetween(answer, 'value', min, max, reasons, label);
   return value === undefined ? undefined : { scale, value };
 }
 
 // The Board marks grid, as the form applies it: a Class 10 result from
 // Class 10 once its boards are done, a Class 12 result only in Class 12,
 // and boards upcoming only in a class that ends in board exams. A Student
-// who gives no class may give both results.
+// who gives no class may give both results. Board narrows it: no Class 10
+// result, nor boards upcoming in a class, where the board has no exam then.
 function boardMarksContradictions(raw: Record<string, unknown>): string[] {
   const reasons: string[] = [];
+  const board = raw.board as Profile['board'];
+  const noClass10Exam = board && NO_CLASS_10_EXAM_BOARDS.includes(board);
+  const noClass12Exam = board && NO_CLASS_12_EXAM_BOARDS.includes(board);
   const boardsAhead = raw.class === 10 && raw.boardsUpcoming === true;
-  if ('class10Result' in raw && (raw.class === 9 || boardsAhead)) {
+  if ('class10Result' in raw && noClass10Exam) {
+    reasons.push(`class10Result is not asked for the ${board} board`);
+  } else if ('class10Result' in raw && (raw.class === 9 || boardsAhead)) {
     reasons.push(
       'class10Result is only asked from Class 10, once Class 10 boards are done',
     );
@@ -235,6 +270,81 @@ function boardMarksContradictions(raw: Record<string, unknown>): string[] {
   }
   if ('boardsUpcoming' in raw && raw.class !== 10 && raw.class !== 12) {
     reasons.push('boardsUpcoming is only asked in Class 10 or 12');
+  } else if (
+    'boardsUpcoming' in raw &&
+    ((raw.class === 10 && noClass10Exam) || (raw.class === 12 && noClass12Exam))
+  ) {
+    reasons.push(`boardsUpcoming is not asked for the ${board} board`);
+  }
+  return reasons;
+}
+
+// Family income abroad: an amount of 0 or more in an ISO 4217 currency
+// (frontend copy: checkIncomeAmount in frontend/src/app/profile-rules.ts).
+function incomeAmount(
+  raw: Record<string, unknown>,
+  reasons: string[],
+): IncomeAmount | undefined {
+  const answer = raw.incomeAmount;
+  if (!isObject(answer)) {
+    reasons.push('incomeAmount must be an amount with a currency and a value');
+    return undefined;
+  }
+  const currency = oneOf(
+    answer,
+    'currency',
+    CURRENCY_CODES,
+    reasons,
+    'incomeAmount.currency',
+    'incomeAmount.currency must be an ISO 4217 currency code',
+  );
+  const { value } = answer;
+  const amount = typeof value === 'number' && value >= 0 ? value : undefined;
+  if (amount === undefined) {
+    reasons.push(
+      value === undefined
+        ? 'incomeAmount.value is required'
+        : 'incomeAmount.value must be 0 or more',
+    );
+  }
+  return currency === undefined || amount === undefined
+    ? undefined
+    : { currency, value: amount };
+}
+
+// Family income as the form asks it: a rupee band in India (or when no
+// country is given), an amount abroad.
+function incomeContradictions(raw: Record<string, unknown>): string[] {
+  const country = raw.countryOfResidence;
+  const abroad = country !== undefined && country !== INDIA;
+  if ('incomeAmount' in raw && !abroad) {
+    return ['incomeAmount is only asked when countryOfResidence is not IN'];
+  }
+  if ('incomeBand' in raw && abroad) {
+    return [
+      'incomeBand is only asked when countryOfResidence is IN or not given',
+    ];
+  }
+  return [];
+}
+
+// Test scores, as the form asks them: the ATAR only of a Student living in
+// Australia, the SAT score only on the US high-school board or of a Student
+// heading to the US (frontend copy: unaskedTestScores in
+// frontend/src/app/profile-rules.ts).
+function testScoreContradictions(raw: Record<string, unknown>): string[] {
+  const reasons: string[] = [];
+  if ('atar' in raw && raw.countryOfResidence !== 'AU') {
+    reasons.push('atar is only asked when countryOfResidence is AU');
+  }
+  if (
+    'sat' in raw &&
+    raw.board !== 'us_high_school' &&
+    raw.destination !== 'US'
+  ) {
+    reasons.push(
+      'sat is only asked for the us_high_school board or when destination is US',
+    );
   }
   return reasons;
 }
