@@ -2,7 +2,7 @@ import {
   CRITERION_FIELDS,
   EXTRACTED_FIELDS,
   isBoardMarksField,
-  isLegacyMarksField,
+  isCriterionField,
 } from '../scholarships/criterion-fields.js';
 import type {
   Criterion,
@@ -196,8 +196,10 @@ export function checkQuoted(
 
 // The normalised value of values read off the page (by the LLM or a
 // reviewer), or undefined unless every one is an allowed option (a list
-// field must not quietly lose one of the values it named).
+// field must not quietly lose one of the values it named). A field no
+// Criterion checks has no allowed options.
 export function readValue(field: string, values: string[]): unknown {
+  if (!isCriterionField(field)) return undefined;
   const { op } = CRITERION_FIELDS[field];
   const raw = values.map((v) => tidyReadValue(field, v.trim()));
   if (raw.length === 0) return undefined;
@@ -211,9 +213,7 @@ export function readValue(field: string, values: string[]): unknown {
 
 // The model and reviewers write a percentage with its sign ("60%").
 function tidyReadValue(field: string, raw: string): string {
-  return isBoardMarksField(field) || isLegacyMarksField(field)
-    ? raw.replace(/\s*%$/, '')
-    : raw;
+  return isBoardMarksField(field) ? raw.replace(/\s*%$/, '') : raw;
 }
 
 // A value the model says the source states, kept only when the value sits

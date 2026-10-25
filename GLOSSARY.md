@@ -104,7 +104,7 @@ The list of scholarships that need review, each with the criterion that made it 
 _Avoid_: Error log, flag list
 
 **Override**:
-A person's fix for one scholarship: either approving it as extracted or supplying corrected criteria. It holds only for the exact page text it was written against; if the source changes, the override lapses and the scholarship is checked again.
+A person's fix for one scholarship: either approving it as extracted or supplying corrected criteria. It holds only for the exact page text it was written against; if the source changes, the override lapses and the scholarship is checked again. It also lapses when it names a field Criteria no longer check, or approves an extraction that has since been read again.
 _Avoid_: Patch, manual edit, exception
 
 **Deadline status**:

@@ -11,6 +11,7 @@
 //   ingest                        start a run, wait for it to end, print its summary
 //   ingest <runId>                print a run's summary
 //   review                        the Review report
+//   audit                         stored Criteria no valid Profile could satisfy
 // Prints the JSON response; exits 1 on an error response or a run that didn't finish.
 import { readFileSync } from 'node:fs';
 
@@ -34,6 +35,8 @@ if (command in collections) {
   print(action ? await call('GET', `/api/admin/ingest/${action}`) : await ingest());
 } else if (command === 'review') {
   print(await call('GET', '/api/admin/review'));
+} else if (command === 'audit') {
+  print(await call('GET', '/api/admin/audit'));
 } else {
   usage();
 }
@@ -87,6 +90,6 @@ function fail(status, body) {
 }
 
 function usage() {
-  console.error('Usage: node --env-file=.env scripts/admin.mjs watchlist|overrides [add <file.json> | remove <id>] | ingest [runId] | review');
+  console.error('Usage: node --env-file=.env scripts/admin.mjs watchlist|overrides [add <file.json> | remove <id>] | ingest [runId] | review | audit');
   process.exit(2);
 }

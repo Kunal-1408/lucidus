@@ -223,10 +223,6 @@ export interface Profile {
   homeState?: IndianState;
   residenceStatus?: ResidenceStatus;
   citizenshipCountry?: string;
-  // Replaced by country of residence, region and Home state; kept until the
-  // old fields are removed.
-  domicileState?: IndianState;
-  schoolState?: IndianState;
   schoolType?: 'government' | 'aided' | 'private';
   citizenship?: Citizenship;
   board?:
@@ -237,9 +233,6 @@ export interface Profile {
     | 'ib'
     | 'us_high_school'
     | 'other';
-  // Readable until ticket 09 removes them: the form no longer sends them.
-  class10Marks?: number;
-  latestMarks?: number;
   boardsUpcoming?: boolean;
   class10Result?: BoardResult;
   class12Result?: BoardResult;

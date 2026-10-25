@@ -51,13 +51,24 @@ export interface PageChangedEntry extends ReviewEntryBase {
   note: string;
 }
 
+// An Override for the current text that no longer holds: it names a field
+// Criteria no longer check, or approved an extraction read again since. It
+// is kept, and the Scholarship is checked again.
+export interface LapsedOverrideEntry extends ReviewEntryBase {
+  reason: 'override lapsed';
+  overrideId: string;
+  problems: string[];
+  note: string;
+}
+
 // One line of the Review report. Each reason is its own shape; a new reason
 // joins this union and gets its own builder.
 export type ReviewEntry =
   | LowConfidenceEntry
   | NoCriteriaEntry
   | InvalidOverrideEntry
-  | PageChangedEntry;
+  | PageChangedEntry
+  | LapsedOverrideEntry;
 
 export type StoredScholarship = Scholarship & { _id: Types.ObjectId };
 export type StoredOverride = Override & { _id: Types.ObjectId };
@@ -119,6 +130,14 @@ function overrideEntry(
     return {
       ...base,
       reason: 'invalid override',
+      ...about,
+      problems: override.problems ?? [],
+    };
+  }
+  if (override.lastResult === 'lapsed') {
+    return {
+      ...base,
+      reason: 'override lapsed',
       ...about,
       problems: override.problems ?? [],
     };

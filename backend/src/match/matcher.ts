@@ -7,7 +7,6 @@ import {
   type BoardMarksField,
   isBoardMarksField,
 } from '../scholarships/criterion-fields.js';
-import { legacyDestinationCode } from '../ingestion/normalise.js';
 import { INDIA } from './countries.js';
 import { RUPEES } from './currencies.js';
 import {
@@ -89,13 +88,9 @@ const FIELD_LABELS: Record<string, string> = {
   homeState: 'home state',
   residenceStatus: 'residence status',
   citizenshipCountry: 'country of citizenship',
-  domicileState: 'home state',
-  schoolState: 'school state',
   schoolType: 'school type',
   citizenship: 'citizenship',
   board: 'board',
-  class10Marks: 'Class 10 marks',
-  latestMarks: 'latest marks',
   class10Result: 'Class 10 result',
   class12Result: 'Class 12 result',
   boardsUpcoming: 'whether your boards are upcoming',
@@ -335,21 +330,8 @@ const UG_GOAL = 'Get admitted to an undergraduate course to unlock this';
 // Student, or undefined when the fail can't be changed within its limit.
 function goalFor(criterion: Criterion, profile: Profile): string | undefined {
   if (!criterion.changeable) return undefined;
-  const { field, op, value } = criterion;
+  const { field } = criterion;
   if (isBoardMarksField(field)) return boardMarksGoal(criterion, profile);
-  if (
-    (field === 'latestMarks' || field === 'class10Marks') &&
-    op === 'gte' &&
-    profile.boardsUpcoming === true
-  ) {
-    const target = Number(value);
-    const rise = target - Number(profile[field]);
-    const [, maxPercent] = RESULT_SCALE_RANGES.percentage;
-    if (target > maxPercent || rise > MAX_MARKS_GOAL_RISE) return undefined;
-    return field === 'class10Marks'
-      ? `Score ${target}% in Class 10 to unlock this`
-      : `Score ${target}% to unlock this`;
-  }
   if (field === 'class' && profile.class !== undefined) {
     // Up one year only; Class 12 never moves up to UG, but a Class 12
     // Student can still get admitted to UG.
@@ -447,9 +429,7 @@ export const INCOME_BANDS: Record<string, [number, number]> = {
 };
 
 // Answers that follow from others: the Home state of a Student in India is
-// the region they live in, and an old domicile state is the Home state (in
-// either direction, so old Profiles and old Criteria keep matching); an
-// Indian citizen is a citizen of India. An OCI card holder's country of
+// the region they live in; an Indian citizen is a citizen of India. An OCI card holder's country of
 // citizenship is not known. A Student studies at home when their
 // destination is the country they live in, which needs both answers.
 function derivedAnswer(profile: Profile, field: string): unknown {
@@ -459,10 +439,8 @@ function derivedAnswer(profile: Profile, field: string): unknown {
       return undefined;
     return destination === countryOfResidence;
   }
-  const homeState =
-    profile.homeState ?? homeStateInIndia(profile) ?? profile.domicileState;
-  if (field === 'homeState') return homeState;
-  if (field === 'domicileState') return profile.domicileState ?? homeState;
+  if (field === 'homeState')
+    return profile.homeState ?? homeStateInIndia(profile);
   // A Student abroad may give their income in rupees, which a rupee limit
   // can judge.
   if (field === 'incomeBand') return profile.incomeBand ?? profile.incomeAmount;
@@ -517,13 +495,7 @@ function compare(criterion: Criterion, answer: unknown): Outcome {
     return compareIncome(op, Number(value), String(answer));
   }
   const answers = Array.isArray(answer) ? answer : [answer];
-  const listed = op === 'in' && Array.isArray(value) ? value : [value];
-  // A stored destination Criterion may still name a destination as the
-  // Profile did before ISO codes (until ticket 09 re-extracts).
-  const allowed =
-    criterion.field === 'destination'
-      ? listed.map((v) => legacyDestinationCode(v) ?? v)
-      : listed;
+  const allowed = op === 'in' && Array.isArray(value) ? value : [value];
   const passes =
     op === 'eq' || op === 'in'
       ? answers.some((a) => allowed.includes(a))

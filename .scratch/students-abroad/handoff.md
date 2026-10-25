@@ -4,16 +4,13 @@ Telegraphic, per ticket. Delete a line once its ticket uses it. Detail: the tick
 
 ## 09 remove old fields, re-ingest, audit
 
-- delete `domicileState`: Profile ×2, `FIXED_LISTS`, `CRITERION_FIELDS`, `LEGACY_FIELDS`, `derivedAnswer` cases, `withHomeState` (03)
-- delete `schoolState`: form question, `profileForMatch` fallback (03)
-- delete `class10Marks`, `latestMarks` (+ `LEGACY_MARKS_FIELDS`); not on 09's list, replaced same way (04)
-- delete `LEGACY_DESTINATIONS` (normalise.ts, profile-rules.ts) + Matcher `destinationCode` fallback, BUT keep `uk`/`usa`/`canada`/`australia`: University pointers read them via `legacyDestinationCode` (07); or move pointers to ISO
-- lapse Overrides naming any removed field → Review report
-- re-extraction is what lands new rules on stored Scholarships (content hash unchanged = old extraction kept): scales, Alternatives groups, GCSE/AP/R-score extras (05) · `incomeAmount` (06) · `fieldOfStudy`, `destination`, `destinationIsResidence` (07) · `atar`, `sat` (08)
-- live today: marks Criteria unknown for everyone until re-extraction (04)
-- audit: flag `incomeAmount` with unsupported currency/period (06)
 - known gap: country name wrapped across lines in HTML not read, sentence splitter breaks it (07)
 - known gap: "for NRIs" checks Citizenship `indian` only; no `not in` op for "not living in India" (03)
+- operator after deploy: `ingest` (re-extracts all, `EXTRACTION_VERSION` 2), then `audit`, `review`; record on ticket (09)
+
+## Any ticket changing extraction
+
+- bump `EXTRACTION_VERSION` (ingestion.service.ts) when unchanged text should be read again; approve Overrides on re-read Scholarships lapse (09)
 
 ## 10 Watchlist for Students abroad
 

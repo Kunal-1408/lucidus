@@ -236,10 +236,6 @@ export interface Profile {
   homeState?: ValueOf<typeof STATES>;
   residenceStatus?: ValueOf<typeof RESIDENCE_STATUSES>;
   citizenshipCountry?: string;
-  // Replaced by country of residence, region and Home state (a saved one is
-  // migrated on load); kept until the old fields are removed.
-  domicileState?: ValueOf<typeof STATES>;
-  schoolState?: ValueOf<typeof STATES>;
   schoolType?: ValueOf<typeof SCHOOL_TYPES>;
   citizenship?: ValueOf<typeof CITIZENSHIPS>;
   board?: ValueOf<typeof BOARDS>;

@@ -233,7 +233,8 @@ describe('PDF and JSON sources', () => {
       );
       // "Atlantis" is no Indian state, so it restricts no one.
       expect(
-        (await match({ ...GIRL, domicileState: 'kerala' })).eligible,
+        (await match({ ...GIRL, countryOfResidence: 'IN', region: 'IN-KL' }))
+          .eligible,
       ).toHaveLength(1);
     });
 
