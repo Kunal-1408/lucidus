@@ -37,3 +37,5 @@ See spec: "Ingestion", "Audit".
 - `SkippedResult` + `isSkipped` (override.schema.ts): invalid/lapsed handled once in ingestion, override-check, review report (`SkippedOverrideEntry`, replaces Invalid/LapsedOverrideEntry; JSON unchanged)
 - reuse decision: `reusable()` in ingestion.service.ts returns `ExtractionOrigin` (`stored` / `read again` / `new text`, extractor.ts); `checkOverride` takes the origin instead of `readAgain`
 - kept: approve Overrides lapse on re-extraction (spec owner's call)
+
+**2026-10-25 (agent):** Merged into `integrate/abroad-wave-3` (a250acd), Wave 3 review fixes (e51cd4a). Boxes met but the operator one. `npm run check` passes (backend 618, 1 skipped; frontend 122). `EXTRACTION_VERSION` now 3 (ticket 12). Status stays until merged to main + deploy + operator `ingest` / `audit` / `review`; then `Status: done`.

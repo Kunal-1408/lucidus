@@ -33,3 +33,5 @@ See spec: "Ingestion", Further Notes, and `.scratch/students-abroad/research-wat
 - consequence: a Student in India is no longer ruled out (negative Criterion out of scope, spec): with no destination SPDC is Tell us more, with destination `IN` it can match. Acceptance line "a Student in India doesn't" now covered only as this accepted gap
 - spdc e2e: OCI/PIO and NRI in UAE Class 12 75% see it; other nationality hidden; below 60% hidden; India Student without destination in Tell us more
 - Provider type: GLOSSARY term added; stored keys `scholarshipType` (Watchlist) / `type` (Scholarship) kept, glossary says why
+
+**2026-10-25 (agent):** Merged into `integrate/abroad-wave-3` (bf7218d), Wave 3 review fixes (e51cd4a). Boxes met but the post-deploy one. SPDC false positive for a Student in India with destination IN accepted by the spec owner (2026-10-25). SPDC Override awaits operator confirm. Status stays until merged to main + deploy + ingestion run; then `Status: done`.
