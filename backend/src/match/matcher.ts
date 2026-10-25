@@ -10,11 +10,14 @@ import {
 import { LEGACY_DESTINATIONS } from '../ingestion/normalise.js';
 import { INDIA } from './countries.js';
 import {
+  A_LEVEL_GRADES,
+  type ALevelGrade,
   type BoardResult,
   type IncomeAmount,
   type IncomeLimit,
   type IndianState,
   type Profile,
+  type ResultScale,
   STATE_REGIONS,
 } from './profile.js';
 
@@ -108,6 +111,16 @@ const FIELD_LABELS: Record<string, string> = {
   examsQualified: 'exams qualified',
 };
 
+// How each Result scale is named to a Student, after the result: "Class 12
+// result in IB points".
+const SCALE_LABELS: Record<ResultScale, string> = {
+  percentage: 'percentage',
+  cgpa_10: 'CGPA out of 10',
+  gpa_4: 'GPA out of 4',
+  ib_points: 'IB points',
+  a_level: 'A-level grades',
+};
+
 type Bucket = 'eligible' | 'withinReach' | 'tellUsMore';
 
 interface Placed {
@@ -145,13 +158,10 @@ function place(
   s: MatchableScholarship,
   today: string,
 ): Placed | undefined {
-  const outcomes = s.criteria.map((c) => ({ c, o: evaluate(c, profile) }));
-  const fails = outcomes.filter((x) => x.o === 'fail').map((x) => x.c);
-  const unknown = outcomes.filter((x) => x.o === 'unknown');
-  const missing = [...new Set(unknown.map((x) => x.c.field))].map((field) => ({
-    field,
-    label: FIELD_LABELS[field] ?? field,
-  }));
+  const judged = conditions(s.criteria).map((c) => judge(c, profile));
+  const fails = judged.filter((j) => j.outcome === 'fail');
+  const unknown = judged.flatMap((j) => j.unknown);
+  const missing = missingFields(unknown, profile);
   const status = deadlineStatus(s.deadline, today);
 
   if (fails.length === 0) {
@@ -163,7 +173,11 @@ function place(
     };
   }
   if (fails.length > MAX_GOALS) return undefined;
-  const goals = fails.map((c) => goalFor(c, profile));
+  // A failing alternatives group takes the Goal of the first member that
+  // has one.
+  const goals = fails.map((j) =>
+    j.failing.map((c) => goalFor(c, profile)).find((g) => g !== undefined),
+  );
   if (!goals.every((g): g is string => g !== undefined)) return undefined;
   // A next-class card stays visible after the deadline: the scheme recurs.
   const nextClass = goals.includes(NEXT_CLASS_GOAL);
@@ -173,6 +187,70 @@ function place(
     card: toCard(s, status, missing, goals),
     nextClass,
   };
+}
+
+// The conditions a Scholarship sets, in order: each Criterion that stands
+// alone, and each alternatives group with all its members.
+function conditions(criteria: Criterion[]): Criterion[][] {
+  const groups = new Map<string, Criterion[]>();
+  const result: Criterion[][] = [];
+  for (const criterion of criteria) {
+    const key = criterion.alternativeGroup;
+    if (!key) {
+      result.push([criterion]);
+      continue;
+    }
+    const group = groups.get(key);
+    if (group) {
+      group.push(criterion);
+    } else {
+      const members = [criterion];
+      groups.set(key, members);
+      result.push(members);
+    }
+  }
+  return result;
+}
+
+interface Judged {
+  outcome: Outcome;
+  // The members that left an unknown outcome undecided, and those that
+  // failed.
+  unknown: Criterion[];
+  failing: Criterion[];
+}
+
+// A condition passes when any member passes, fails when every member fails,
+// and is otherwise unknown (a Criterion standing alone is a group of one).
+function judge(condition: Criterion[], profile: Profile): Judged {
+  const outcomes = condition.map((c) => ({ c, o: evaluate(c, profile) }));
+  const membersWith = (o: Outcome) =>
+    outcomes.filter((x) => x.o === o).map((x) => x.c);
+  const unknown = membersWith('unknown');
+  const failing = membersWith('fail');
+  if (membersWith('pass').length)
+    return { outcome: 'pass', unknown: [], failing };
+  if (unknown.length) return { outcome: 'unknown', unknown, failing };
+  return { outcome: 'fail', unknown: [], failing };
+}
+
+// The answers that would settle the unknown Criteria, each named once. A
+// Board marks Criterion on another scale than the Student's result names the
+// scale it needs.
+function missingFields(unknown: Criterion[], profile: Profile): MissingField[] {
+  const missing = new Map<string, MissingField>();
+  for (const criterion of unknown) {
+    const { field } = criterion;
+    let label = FIELD_LABELS[field] ?? field;
+    if (isBoardMarksField(field)) {
+      const target = asBoardResult(criterion.value);
+      const answer = profile[field];
+      if (target && answer && target.scale !== answer.scale)
+        label = `${label} in ${SCALE_LABELS[target.scale]}`;
+    }
+    missing.set(label, { field, label });
+  }
+  return [...missing.values()];
 }
 
 const CLOSING_SOON_DAYS = 30;
@@ -204,6 +282,8 @@ function bySortOrder(a: Placed, b: Placed): number {
 const MAX_GOALS = 2;
 // A marks shortfall counts only while boards are upcoming, and only this big.
 const MAX_MARKS_GAP = 5;
+// The same on IB points; never on A-level grades, a CGPA or a GPA.
+const MAX_IB_POINTS_GAP = 2;
 // The class value a Criterion uses to require undergraduate admission.
 const UG = 'ug';
 const NEXT_CLASS_GOAL = 'Eligible from next year: watch for the next round';
@@ -238,8 +318,9 @@ function goalFor(criterion: Criterion, profile: Profile): string | undefined {
   return undefined;
 }
 
-// Today's marks rule on Board marks: a percentage shortfall of at most 5 is
-// a Goal while the boards for that result are still upcoming. Only a Class
+// Today's marks rule on Board marks: a percentage shortfall of at most 5,
+// or one of at most 2 IB points, is a Goal while the boards for that result
+// are still upcoming. Only a Class
 // 12 result can be: a Class 12 Student's upcoming boards are Class 12's
 // (their Class 10 result is final), and a Class 10 Student with boards
 // upcoming gives no Class 10 result (the Board marks grid).
@@ -253,20 +334,35 @@ function boardMarksGoal(
   if (field !== 'class12Result' || criterion.op !== 'gte') return undefined;
   if (!target || !answer) return undefined;
   if (profile.boardsUpcoming !== true || profile.class !== 12) return undefined;
-  if (target.scale !== 'percentage' || answer.scale !== 'percentage')
-    return undefined;
-  if (target.value > 100 || target.value - answer.value > MAX_MARKS_GAP)
-    return undefined;
-  return `Score ${target.value}% in Class 12 to unlock this`;
+  if (target.scale === 'percentage' && answer.scale === 'percentage') {
+    if (target.value > 100 || target.value - answer.value > MAX_MARKS_GAP)
+      return undefined;
+    return `Score ${target.value}% in Class 12 to unlock this`;
+  }
+  if (target.scale === 'ib_points' && answer.scale === 'ib_points') {
+    if (target.value > 45 || target.value - answer.value > MAX_IB_POINTS_GAP)
+      return undefined;
+    return `Score ${target.value} IB points to unlock this`;
+  }
+  return undefined;
 }
 
 // A Board marks result, or undefined when the value isn't one.
 function asBoardResult(value: unknown): BoardResult | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
-  const { scale, value: number } = value as Record<string, unknown>;
-  return typeof scale === 'string' && typeof number === 'number'
-    ? { scale: scale as BoardResult['scale'], value: number }
+  const { scale, value: result } = value as Record<string, unknown>;
+  if (scale === 'a_level') {
+    return Array.isArray(result) && result.every(isALevelGrade)
+      ? { scale, value: result }
+      : undefined;
+  }
+  return typeof scale === 'string' && typeof result === 'number'
+    ? { scale: scale as Exclude<ResultScale, 'a_level'>, value: result }
     : undefined;
+}
+
+function isALevelGrade(grade: unknown): grade is ALevelGrade {
+  return (A_LEVEL_GRADES as readonly unknown[]).includes(grade);
 }
 
 // A result passes a threshold on its own scale; on another scale it can't be
@@ -275,7 +371,24 @@ function compareBoardResult(threshold: unknown, answer: unknown): Outcome {
   const target = asBoardResult(threshold);
   const result = asBoardResult(answer);
   if (!target || !result || target.scale !== result.scale) return 'unknown';
+  if (target.scale === 'a_level' && result.scale === 'a_level')
+    return meetsGrades(result.value, target.value) ? 'pass' : 'fail';
+  if (target.scale === 'a_level' || result.scale === 'a_level')
+    return 'unknown';
   return result.value >= target.value ? 'pass' : 'fail';
+}
+
+// A-level grades meet those asked when, both taken best first, the Student
+// has as many grades and each is at least the one asked ("A*AB" meets
+// "AAB", not "AAA").
+function meetsGrades(grades: ALevelGrade[], asked: ALevelGrade[]): boolean {
+  const rank = (grade: ALevelGrade) => A_LEVEL_GRADES.indexOf(grade);
+  const bestFirst = (list: ALevelGrade[]) =>
+    list.map(rank).sort((a, b) => a - b);
+  const have = bestFirst(grades);
+  return bestFirst(asked).every(
+    (need, i) => i < have.length && have[i] <= need,
+  );
 }
 
 // Income bands in rupees. A Student's income lies somewhere inside their

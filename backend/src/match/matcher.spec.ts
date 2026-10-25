@@ -1,6 +1,6 @@
 import type { Criterion } from '../scholarships/scholarship.schema.js';
 import { match, type MatchableScholarship } from './matcher.js';
-import type { Profile } from './profile.js';
+import type { BoardResult, Profile } from './profile.js';
 
 const TODAY = '2026-07-20';
 
@@ -402,6 +402,162 @@ describe('Matcher: Board marks', () => {
     expect(bucketOf(class10Behind, resultAtLeast('class10Result', 60))).toBe(
       'hidden',
     );
+  });
+});
+
+describe('Matcher: Result scales', () => {
+  const result = (scale: BoardResult['scale'], value: unknown) =>
+    ({ scale, value }) as BoardResult;
+  const atLeast = (
+    threshold: BoardResult,
+    field: 'class10Result' | 'class12Result' = 'class12Result',
+    alternativeGroup?: string,
+  ): Partial<Criterion> => ({
+    field,
+    op: 'gte',
+    value: threshold,
+    changeable: true,
+    ...(alternativeGroup && { alternativeGroup }),
+  });
+  const ib36 = atLeast(result('ib_points', 36), 'class12Result', 'class12');
+  const aaa = atLeast(
+    result('a_level', ['A', 'A', 'A']),
+    'class12Result',
+    'class12',
+  );
+
+  it.each([
+    [
+      'CGPA out of 10',
+      'class10Result',
+      result('cgpa_10', 8),
+      result('cgpa_10', 8.4),
+      result('cgpa_10', 7.8),
+    ],
+    [
+      'GPA out of 4',
+      'class12Result',
+      result('gpa_4', 3.5),
+      result('gpa_4', 3.7),
+      result('gpa_4', 3.2),
+    ],
+    [
+      'IB points',
+      'class12Result',
+      result('ib_points', 36),
+      result('ib_points', 36),
+      result('ib_points', 35),
+    ],
+  ] as const)(
+    'passes and fails a threshold in %s on the same scale',
+    (_, field, threshold, passing, failing) => {
+      const s = scholarship([atLeast(threshold, field)]);
+      expect(bucketOf({ [field]: passing }, s)).toBe('eligible');
+      expect(bucketOf({ [field]: failing }, s)).toBe('hidden');
+    },
+  );
+
+  it('compares A-level grades best first, each at least the grade asked', () => {
+    const s = scholarship([aaa]);
+    const grades = (...value: string[]) => ({
+      class12Result: result('a_level', value),
+    });
+    expect(bucketOf(grades('A*', 'A', 'A'), s)).toBe('eligible');
+    expect(bucketOf(grades('B', 'A', 'A*', 'A'), s)).toBe('eligible');
+    expect(bucketOf(grades('A*', 'A*', 'B'), s)).toBe('hidden');
+    expect(bucketOf(grades('A', 'A'), s)).toBe('hidden');
+  });
+
+  it('names the result that would settle a Criterion on another scale', () => {
+    const card = cardFor(
+      { class12Result: result('percentage', 95) },
+      scholarship([atLeast(result('ib_points', 36))]),
+    );
+    expect(card.missing).toEqual([
+      { field: 'class12Result', label: 'Class 12 result in IB points' },
+    ]);
+  });
+
+  describe('alternatives across scales', () => {
+    const ibOrALevel = () => scholarship([ib36, aaa]);
+    const ibOrHigherIb = () =>
+      scholarship([
+        ib36,
+        atLeast(result('ib_points', 40), 'class12Result', 'class12'),
+      ]);
+
+    it('passes when any one alternative passes', () => {
+      expect(
+        bucketOf({ class12Result: result('ib_points', 38) }, ibOrALevel()),
+      ).toBe('eligible');
+      expect(
+        bucketOf(
+          { class12Result: result('a_level', ['A', 'A', 'A']) },
+          ibOrALevel(),
+        ),
+      ).toBe('eligible');
+    });
+
+    it('fails when every judgeable alternative fails and none is unknown', () => {
+      expect(
+        bucketOf({ class12Result: result('ib_points', 30) }, ibOrHigherIb()),
+      ).toBe('hidden');
+    });
+
+    it('is unknown when the judgeable alternatives fail but another is unknown', () => {
+      const card = cardFor(
+        { class12Result: result('ib_points', 30) },
+        ibOrALevel(),
+      );
+      expect(card.missing).toEqual([
+        { field: 'class12Result', label: 'Class 12 result in A-level grades' },
+      ]);
+      expect(
+        bucketOf({ class12Result: result('percentage', 95) }, ibOrALevel()),
+      ).toBe('tellUsMore');
+    });
+
+    it('counts a failing group as one fail, with a Goal from the member that has one', () => {
+      const profile: Profile = {
+        class: 12,
+        boardsUpcoming: true,
+        class12Result: result('ib_points', 34),
+      };
+      expect(cardFor(profile, ibOrHigherIb()).goals).toEqual([
+        'Score 36 IB points to unlock this',
+      ]);
+    });
+  });
+
+  describe('Goals', () => {
+    const upcoming = (class12Result: BoardResult): Profile => ({
+      class: 12,
+      boardsUpcoming: true,
+      class12Result,
+    });
+
+    it('offers a Goal on IB points within 2 points', () => {
+      const s = scholarship([atLeast(result('ib_points', 36))]);
+      expect(cardFor(upcoming(result('ib_points', 34)), s).goals).toEqual([
+        'Score 36 IB points to unlock this',
+      ]);
+      expect(bucketOf(upcoming(result('ib_points', 33)), s)).toBe('hidden');
+    });
+
+    it('never offers a Goal on A-level grades or a GPA', () => {
+      expect(
+        bucketOf(
+          upcoming(result('a_level', ['A', 'A', 'B'])),
+          scholarship([aaa]),
+        ),
+      ).toBe('hidden');
+      expect(
+        bucketOf(
+          upcoming(result('gpa_4', 3.4)),
+          scholarship([atLeast(result('gpa_4', 3.5))]),
+        ),
+      ).toBe('hidden');
+    });
   });
 });
 

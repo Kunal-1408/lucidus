@@ -8,16 +8,22 @@ import {
 } from '../input-checks.js';
 import {
   BOARD_MARKS_FIELDS,
+  type BoardMarksField,
   LEGACY_MARKS_FIELDS,
 } from '../scholarships/criterion-fields.js';
 import { INDIA } from './countries.js';
 import { CURRENCIES } from './currencies.js';
 import { INCOME_BANDS } from './matcher.js';
-import type {
-  BoardResult,
-  IncomeAmount,
-  Profile,
-  ResultScale,
+import {
+  A_LEVEL_GRADES,
+  type ALevelGrade,
+  type BoardResult,
+  type IncomeAmount,
+  NO_CLASS_10_EXAM_BOARDS,
+  NO_CLASS_12_EXAM_BOARDS,
+  type Profile,
+  RESULT_SCALE_RANGES,
+  SLOT_SCALES,
 } from './profile.js';
 
 export type ProfileParseResult =
@@ -191,16 +197,12 @@ function residenceContradictions(raw: Record<string, unknown>): string[] {
   return reasons;
 }
 
-// Board marks: each result a value inside its Result scale's range
-// (frontend copy: RESULT_SCALE_RANGES in frontend/src/app/profile-rules.ts).
-const RESULT_SCALE_RANGES: Record<ResultScale, [min: number, max: number]> = {
-  percentage: [0, 100],
-};
-const RESULT_SCALES = Object.keys(RESULT_SCALE_RANGES) as ResultScale[];
-
+// Board marks: each result on a scale its slot allows (SLOT_SCALES), with a
+// value inside that scale's range: whole IB points, A-level grades from A*
+// to E (frontend copy: checkBoardResult in frontend/src/app/profile-rules.ts).
 function boardResult(
   raw: Record<string, unknown>,
-  field: string,
+  field: BoardMarksField,
   reasons: string[],
 ): BoardResult | undefined {
   const answer = raw[field];
@@ -211,31 +213,56 @@ function boardResult(
   const scale = oneOf(
     answer,
     'scale',
-    RESULT_SCALES,
+    SLOT_SCALES[field],
     reasons,
     `${field}.scale`,
   );
   if (scale === undefined) return undefined;
+  const label = `${field}.value`;
+  if (scale === 'a_level') {
+    const grades = answer.value;
+    if (isALevelGrades(grades)) return { scale, value: grades };
+    reasons.push(`${label} must be A-level grades from A* to E`);
+    return undefined;
+  }
+  if (scale === 'ib_points') {
+    const [min, max] = RESULT_SCALE_RANGES.ib_points;
+    const points = answer.value;
+    const whole = typeof points === 'number' && Number.isInteger(points);
+    if (whole && points >= min && points <= max)
+      return { scale, value: points };
+    reasons.push(`${label} must be a whole number from ${min} to ${max}`);
+    return undefined;
+  }
   const [min, max] = RESULT_SCALE_RANGES[scale];
-  const value = numberBetween(
-    answer,
-    'value',
-    min,
-    max,
-    reasons,
-    `${field}.value`,
-  );
+  const value = numberBetween(answer, 'value', min, max, reasons, label);
   return value === undefined ? undefined : { scale, value };
+}
+
+function isALevelGrades(value: unknown): value is ALevelGrade[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((grade) =>
+      (A_LEVEL_GRADES as readonly unknown[]).includes(grade),
+    )
+  );
 }
 
 // The Board marks grid, as the form applies it: a Class 10 result from
 // Class 10 once its boards are done, a Class 12 result only in Class 12,
 // and boards upcoming only in a class that ends in board exams. A Student
-// who gives no class may give both results.
+// who gives no class may give both results. Board narrows it: no Class 10
+// result, nor boards upcoming in a class, where the board has no exam then.
 function boardMarksContradictions(raw: Record<string, unknown>): string[] {
   const reasons: string[] = [];
+  const board = raw.board as Profile['board'];
+  const noClass10Exam = board && NO_CLASS_10_EXAM_BOARDS.includes(board);
+  const noClass12Exam = board && NO_CLASS_12_EXAM_BOARDS.includes(board);
   const boardsAhead = raw.class === 10 && raw.boardsUpcoming === true;
-  if ('class10Result' in raw && (raw.class === 9 || boardsAhead)) {
+  if ('class10Result' in raw && noClass10Exam) {
+    reasons.push(`class10Result is not asked for the ${board} board`);
+  } else if ('class10Result' in raw && (raw.class === 9 || boardsAhead)) {
     reasons.push(
       'class10Result is only asked from Class 10, once Class 10 boards are done',
     );
@@ -245,6 +272,11 @@ function boardMarksContradictions(raw: Record<string, unknown>): string[] {
   }
   if ('boardsUpcoming' in raw && raw.class !== 10 && raw.class !== 12) {
     reasons.push('boardsUpcoming is only asked in Class 10 or 12');
+  } else if (
+    'boardsUpcoming' in raw &&
+    ((raw.class === 10 && noClass10Exam) || (raw.class === 12 && noClass12Exam))
+  ) {
+    reasons.push(`boardsUpcoming is not asked for the ${board} board`);
   }
   return reasons;
 }

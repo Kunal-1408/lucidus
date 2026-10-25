@@ -2,14 +2,19 @@
 // into the exact values the Matcher compares against the Profile.
 import { COUNTRIES, REGIONS } from '../match/countries.js';
 import { CURRENCIES } from '../match/currencies.js';
-import type {
-  BoardResult,
-  IncomeLimit,
-  IncomePeriod,
-  IndianState,
-  Profile,
+import {
+  type ALevelGrade,
+  type BoardResult,
+  type IncomeLimit,
+  type IncomePeriod,
+  type IndianState,
+  type Profile,
+  RESULT_SCALE_RANGES,
+  type ResultScale,
+  SLOT_SCALES,
 } from '../match/profile.js';
 import {
+  type BoardMarksField,
   isBoardMarksField,
   isLegacyMarksField,
 } from '../scholarships/criterion-fields.js';
@@ -237,7 +242,7 @@ export function normaliseValue(
     return toPercent(raw);
   }
   if (isBoardMarksField(field)) {
-    return toBoardResult(raw);
+    return toBoardResult(field, raw);
   }
   if (ISO_CODE_FIELDS.includes(field)) {
     const codes = asList(raw).map((code) => isoCode(field, code));
@@ -266,10 +271,45 @@ function toPercent(raw: string | string[]): number | undefined {
   return value > 0 && value <= 100 ? value : undefined;
 }
 
-// A Board marks threshold. Sources so far state percentages only.
-function toBoardResult(raw: string | string[]): BoardResult | undefined {
-  const value = toPercent(raw);
-  return value === undefined ? undefined : { scale: 'percentage', value };
+// A Board marks threshold, written as the rules, the LLM guide and
+// reviewers write it: "60" (a percentage), "8.5 CGPA", "3.5 GPA", "36 IB
+// points" or "A*AA at A-level". It is dropped when the scale isn't one its
+// slot takes (SLOT_SCALES) or the value is outside the scale.
+function toBoardResult(
+  field: BoardMarksField,
+  raw: string | string[],
+): BoardResult | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const result = readBoardResult(raw.trim());
+  return result && SLOT_SCALES[field].includes(result.scale)
+    ? result
+    : undefined;
+}
+
+const NUMBER_ON_SCALE: [Exclude<ResultScale, 'a_level'>, RegExp][] = [
+  ['percentage', /^(\d+(?:\.\d+)?)$/],
+  ['cgpa_10', /^(\d+(?:\.\d+)?)\s*CGPA$/i],
+  ['gpa_4', /^(\d+(?:\.\d+)?)\s*GPA$/i],
+  ['ib_points', /^(\d+)\s*IB points?$/i],
+];
+const A_LEVEL_RESULT = /^((?:A\*|[A-E])+)(?:\s+at\s+A-levels?)?$/;
+
+function readBoardResult(text: string): BoardResult | undefined {
+  const grades = text.match(A_LEVEL_RESULT);
+  if (grades) {
+    const value = [...grades[1].matchAll(/A\*|[A-E]/g)].map(
+      (m) => m[0] as ALevelGrade,
+    );
+    return { scale: 'a_level', value };
+  }
+  for (const [scale, pattern] of NUMBER_ON_SCALE) {
+    const m = text.match(pattern);
+    if (!m) continue;
+    const value = Number(m[1]);
+    const [, max] = RESULT_SCALE_RANGES[scale];
+    return value > 0 && value <= max ? { scale, value } : undefined;
+  }
+  return undefined;
 }
 
 function oneOf(

@@ -96,7 +96,7 @@
 
   <label>
     Board
-    <select (change)="setChoice('board', $any($event.target).value)">
+    <select (change)="setBoard($any($event.target).value)">
       <option value="">N.A</option>
       @for (b of boards; track b.value) {
         <option [value]="b.value" [selected]="profile().board === b.value">
@@ -120,17 +120,36 @@
   @for (question of boardMarksQuestions; track question) {
     @if (shown().has(question)) {
       <label>
-        {{ boardMarksLabel(question, profile()) }} (%)
-        <input
-          type="number"
-          min="0"
-          max="100"
-          step="0.1"
-          inputmode="decimal"
-          [value]="profile()[question]?.value ?? ''"
-          [attr.aria-invalid]="marksErrors()[question] ? true : null"
-          (change)="setMarks(question, $any($event.target).value)"
-        />
+        {{ boardMarksLabel(question, profile()) }}: scale
+        <select (change)="setScale(question, $any($event.target).value)">
+          @for (s of scalesFor(question); track s.value) {
+            <option [value]="s.value" [selected]="scaleOf(question) === s.value">
+              {{ s.label }}
+            </option>
+          }
+        </select>
+      </label>
+      <label>
+        {{ boardMarksLabel(question, profile()) }}
+        @if (scaleOf(question) === 'a_level') {
+          <input
+            type="text"
+            placeholder="For example A*AB"
+            [value]="shownResult(profile()[question])"
+            [attr.aria-invalid]="marksErrors()[question] ? true : null"
+            (change)="setMarks(question, $any($event.target).value)"
+          />
+        } @else {
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            [value]="shownResult(profile()[question])"
+            [attr.aria-invalid]="marksErrors()[question] ? true : null"
+            (change)="setMarks(question, $any($event.target).value)"
+          />
+        }
         @if (marksErrors()[question]; as error) {
           <span class="field-error" role="alert">{{ error }}</span>
         }

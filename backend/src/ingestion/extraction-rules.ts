@@ -25,9 +25,12 @@ export interface Found {
   raw: string | string[];
   changeable: boolean;
   sourceText: string;
+  alternativeGroup?: string;
 }
 
-export type FieldRule = (sentences: string[]) => Found | undefined;
+// Most rules find one Criterion; a Board marks rule finds one per Result
+// scale a source accepts, as an alternatives group.
+export type FieldRule = (sentences: string[]) => Found | Found[] | undefined;
 
 // The sentence filter: eligibility words, plus every keyword rule's words
 // (see isEligibilitySentence below).
@@ -199,20 +202,114 @@ function marksThresholds(sentences: string[]): MarksThreshold[] {
   });
 }
 
-// Board marks: a percentage for the Class 10 or Class 12 board exam. A
-// Student can still raise their marks, so both are changeable. Marks naming
-// no year are left to the LLM.
+// Results on the other Result scales, each written the way normaliseValue
+// reads it. IB points, A-level grades and a GPA are Class 12 results; a
+// CGPA out of 10 is a Class 10 (CBSE) one.
+const IB = /\bIB\b|\bInternational Baccalaureate\b/;
+const IB_POINTS = /\b(\d{1,2})\s*(?:total\s+)?points\b/i;
+const A_LEVEL = /\bA[- ]levels?\b/i;
+const A_LEVEL_GRADES = /(?<![\w*])((?:A\*|[A-E]){2,5})(?![\w*])/;
+// A minimum on a scale named by a word: "a minimum GPA of 3.0", "GPA of at
+// least 3.5", "8.5 CGPA or above". A bare figure beside the word is not one
+// ("CGPA X 9.5 will give the percentage").
+function minimumOn(unit: string): RegExp {
+  const n = String.raw`(\d{1,2}(?:\.\d{1,2})?)`;
+  return new RegExp(
+    [
+      String.raw`\b(?:minimum|at least|not less than)\s+(?:an?\s+)?(?:unweighted\s+)?${unit}\s+(?:of\s+)?${n}`,
+      String.raw`\b${unit}\s+of\s+(?:at least\s+|minimum(?: of)?\s+|not less than\s+)?${n}`,
+      String.raw`\b${n}\s+(?:unweighted\s+)?${unit}\s+(?:or above|or more|and above|or higher)`,
+    ].join('|'),
+    'i',
+  );
+}
+const GPA = minimumOn('GPA');
+const CGPA = minimumOn('CGPA');
+const figure = (m: RegExpMatchArray) => m[1] ?? m[2] ?? m[3];
+// A weighted GPA and AP scores are no scale the Profile takes (Extra
+// requirements). "AP" alone is often Andhra Pradesh in Indian sources.
+const WEIGHTED_GPA = /(?<!un)weighted\s+GPA\b/i;
+const AP = /\bAP (?:exams?|scores?|courses?|tests?)\b|\bAdvanced Placement\b/;
+
+interface ScaleRule {
+  field: BoardMarksField;
+  read: (sentence: string) => string | undefined;
+}
+
+const SCALE_RULES: ScaleRule[] = [
+  {
+    field: 'class12Result',
+    read: (s) => {
+      const points = IB.test(s) ? s.match(IB_POINTS) : null;
+      return points ? `${points[1]} IB points` : undefined;
+    },
+  },
+  {
+    field: 'class12Result',
+    read: (s) => {
+      const grades = A_LEVEL.test(s) ? s.match(A_LEVEL_GRADES) : null;
+      return grades ? `${grades[1]} at A-level` : undefined;
+    },
+  },
+  {
+    field: 'class12Result',
+    read: (s) => {
+      if (WEIGHTED_GPA.test(s) || /\bCGPA\b/i.test(s)) return undefined;
+      const m = s.match(GPA);
+      return m ? `${figure(m)} GPA` : undefined;
+    },
+  },
+  {
+    // Only a CGPA the sentence ties to Class 10: a degree CGPA is no board
+    // result.
+    field: 'class10Result',
+    read: (s) => {
+      const m = s.match(CGPA);
+      if (!m || marksYear(s, m.index ?? 0) !== 10) return undefined;
+      return `${figure(m)} CGPA`;
+    },
+  },
+];
+
+// Board marks for the Class 10 or Class 12 board exam: a percentage for a
+// named year, or a result on another Result scale. A Student can still
+// raise their marks, so both are changeable. A Student has one result per
+// slot, so results on several scales for the same slot ("36 points in the
+// IB Diploma or AAA at A-level") are alternatives: one Criterion per scale,
+// the first stated for each, grouped. Percentage marks naming no year are
+// left to the LLM.
 function boardMarksRule(field: BoardMarksField): FieldRule {
   const year = field === 'class10Result' ? 10 : 12;
   return (sentences) => {
+    const results: Found[] = [];
     const threshold = marksThresholds(sentences).find((t) => t.year === year);
-    return threshold && found(field, threshold.percent, threshold.sentence);
+    if (threshold) {
+      results.push(found(field, threshold.percent, threshold.sentence));
+    }
+    for (const rule of SCALE_RULES.filter((r) => r.field === field)) {
+      for (const sentence of sentences) {
+        const raw = rule.read(sentence);
+        if (raw === undefined) continue;
+        results.push(found(field, raw, sentence));
+        break;
+      }
+    }
+    if (results.length < 2) return results;
+    return results.map((r) => ({ ...r, alternativeGroup: field }));
   };
 }
 
-// Marks for any other year (NMMS's Class 7 or 8) are never asked, so they
-// are shown as Extra requirements rather than matched on the wrong result.
-export function otherYearMarks(sentences: string[]): ExtraRequirement[] {
+// Marks rules no Profile answer can settle, shown as Extra requirements
+// rather than matched on the wrong result: marks for any other year (NMMS's
+// Class 7 or 8), GCSE/IGCSE grades, and results on scales the Profile
+// doesn't take.
+export function marksExtraRequirements(
+  sentences: string[],
+): ExtraRequirement[] {
+  return [...otherYearMarks(sentences), ...unsupportedResults(sentences)];
+}
+
+function otherYearMarks(sentences: string[]): ExtraRequirement[] {
   return marksThresholds(sentences)
     .filter((t) => t.year !== 10 && t.year !== 12)
     .map((t) => ({
@@ -220,6 +317,24 @@ export function otherYearMarks(sentences: string[]): ExtraRequirement[] {
       sourceText: t.sentence,
     }));
 }
+
+const UNSUPPORTED_RESULTS: [text: string, pattern: RegExp][] = [
+  ['GCSE/IGCSE results', /\bI?GCSEs?\b/],
+  ['A weighted GPA', WEIGHTED_GPA],
+  ['AP exam scores', AP],
+  ["Quebec's R score", /\bR[- ]score\b|\bcote R\b/i],
+];
+
+function unsupportedResults(sentences: string[]): ExtraRequirement[] {
+  return sentences.flatMap((sentence) =>
+    UNSUPPORTED_RESULTS.filter(([, pattern]) => pattern.test(sentence)).map(
+      ([text]) => ({ text, sourceText: sentence }),
+    ),
+  );
+}
+
+// The words a Board marks sentence on another Result scale uses.
+const RESULT_WORDS = [IB, A_LEVEL, /\bC?GPA\b/i, /\bI?GCSEs?\b/, AP];
 
 // "studying ... in a Government, Government-aided and local body school".
 // Only where the Student studies now: "Passed class 10 from a government
@@ -339,6 +454,9 @@ const KEYWORD_FIELDS: KeywordField[] = [
     cue: new RegExp(
       String.raw`\b${STUDENTS}\b|\b(?:[Pp]assed|[Pp]assing|[Ss]tudying|[Aa]ffiliated)\b`,
     ),
+    // GCSE/IGCSE grades asked of every applicant are an Extra requirement,
+    // not the board the Student is on.
+    skip: /\bI?GCSEs?\b[^.]*\b(?:pass(?:es)?|grades?)\b|\b(?:pass(?:es)?|grades?)\b[^.]*\bI?GCSEs?\b/i,
     // "a recognized Board of Education including CBSE, ICSE, NIOS": any
     // board will do, the ones listed are examples.
     beyondOptions:
@@ -656,6 +774,7 @@ const RULE_WORDS = [
     ...spec.options.map(([, pattern]) => pattern),
   ]),
   ...RESIDENCE_WORDS,
+  ...RESULT_WORDS,
 ];
 
 // Neither a condition for keeping a scholarship once awarded nor how its

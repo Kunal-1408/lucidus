@@ -7,12 +7,21 @@ import { isDeepStrictEqual as isEqual } from 'node:util';
 import * as formPlaces from '../../../frontend/src/app/countries.js';
 import * as formMoney from '../../../frontend/src/app/currencies.js';
 import * as form from '../../../frontend/src/app/profile-fields.js';
+import * as rules from '../../../frontend/src/app/profile-rules.js';
 import { readValue } from '../ingestion/extractor.js';
 import { FIXED_LISTS } from '../ingestion/normalise.js';
 import { COUNTRIES, REGIONS } from '../match/countries.js';
 import { COUNTRY_CURRENCIES, CURRENCIES } from '../match/currencies.js';
 import { match } from '../match/matcher.js';
-import { type Profile, STATE_REGIONS } from '../match/profile.js';
+import {
+  A_LEVEL_GRADES,
+  NO_CLASS_10_EXAM_BOARDS,
+  NO_CLASS_12_EXAM_BOARDS,
+  type Profile,
+  RESULT_SCALE_RANGES,
+  SLOT_SCALES,
+  STATE_REGIONS,
+} from '../match/profile.js';
 import { CRITERION_FIELDS } from './criterion-fields.js';
 
 type FormOption = { value: string | number };
@@ -161,11 +170,25 @@ describe('Form ↔ Criteria contract', () => {
       expect(readValue(field, ['101'])).toBeUndefined();
     });
 
-    it('holds only Result scales the form can send', () => {
-      const scales = form.RESULT_SCALES.map((option) => option.value);
-      const value = readValue(field, ['85']) as { scale: string };
-      expect(scales).toContain(value.scale);
+    it('holds results on exactly the Result scales the form offers for it', () => {
+      // One threshold on every scale, as a source or a reviewer writes it.
+      const written = ['85', '8.5 CGPA', '3.5 GPA', '36 IB points', 'AAB'];
+      const held = written
+        .map((raw) => readValue(field, [raw]) as { scale: string } | undefined)
+        .flatMap((value) => (value ? [value.scale] : []));
+      const offered = rules.SLOT_SCALES[field as 'class10Result'];
+      expect(held.sort()).toEqual([...offered].sort());
+      const named = form.RESULT_SCALES.map((option) => option.value);
+      for (const scale of offered) expect(named).toContain(scale);
     });
+  });
+
+  it('the form and the backend take the same Result scales, slots and grades', () => {
+    expect(rules.SLOT_SCALES).toEqual(SLOT_SCALES);
+    expect(form.A_LEVEL_GRADES).toEqual(A_LEVEL_GRADES);
+    expect(rules.RESULT_SCALE_RANGES).toEqual(RESULT_SCALE_RANGES);
+    expect(rules.NO_CLASS_10_EXAM_BOARDS).toEqual(NO_CLASS_10_EXAM_BOARDS);
+    expect(rules.NO_CLASS_12_EXAM_BOARDS).toEqual(NO_CLASS_12_EXAM_BOARDS);
   });
 
   describe('incomeBand', () => {
