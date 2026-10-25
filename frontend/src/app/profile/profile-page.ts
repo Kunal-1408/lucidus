@@ -2,7 +2,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { COUNTRIES, REGIONS } from '../countries';
 import {
-  BoardResult,
   BOARDS,
   CATEGORIES,
   CITIZENSHIPS,
@@ -15,6 +14,8 @@ import {
   PARENT_OCCUPATIONS,
   Profile,
   RESIDENCE_STATUSES,
+  RESULT_SCALES,
+  ResultScale,
   SCHOOL_TYPES,
   STATES,
   STREAMS,
@@ -26,6 +27,10 @@ import {
   boardMarksLabel,
   checkAnswer,
   profileForMatch,
+  readResult,
+  resultScale,
+  shownResult,
+  SLOT_SCALES,
   visibleQuestions,
 } from '../profile-rules';
 import { ProfileStore } from '../profile-store';
@@ -85,6 +90,9 @@ export class ProfilePage {
   );
   // Why the last answer typed into a Board marks field was not saved.
   protected readonly marksErrors = signal<Partial<Record<BoardMarksQuestion, string>>>({});
+  // The scale the Student picked for each Board marks question, if any.
+  private readonly pickedScales = signal<Partial<Record<BoardMarksQuestion, ResultScale>>>({});
+  protected readonly shownResult = shownResult;
   // School state defaults to the Home state of a Student in India until the
   // Student changes it; abroad there is no default.
   protected readonly schoolState = computed(() => profileForMatch(this.profile()).schoolState);
@@ -106,11 +114,33 @@ export class ProfilePage {
     this.update({ [field]: value === '' ? undefined : value === 'yes' });
   }
 
+  // The scale each Board marks question is answered on (see resultScale).
+  protected scaleOf(question: BoardMarksQuestion): ResultScale {
+    return resultScale(question, this.profile(), this.pickedScales()[question]);
+  }
+
+  protected scalesFor(question: BoardMarksQuestion) {
+    return RESULT_SCALES.filter((option) => SLOT_SCALES[question].includes(option.value));
+  }
+
+  // A change of scale clears the result, which was on the old scale.
+  protected setScale(question: BoardMarksQuestion, scale: string) {
+    this.pickedScales.update((picked) => ({ ...picked, [question]: scale as ResultScale }));
+    this.marksErrors.update((errors) => ({ ...errors, [question]: undefined }));
+    this.update({ [question]: undefined });
+  }
+
+  // A change of board resets the scales to the new board's presets (the
+  // rules clear the results).
+  protected setBoard(value: string) {
+    this.pickedScales.set({});
+    this.setChoice('board', value);
+  }
+
   // An empty field clears the answer; an answer out of range is not saved and
-  // the field says why. Only the percentage scale exists so far.
-  protected setMarks(question: BoardMarksQuestion, value: string) {
-    const result: BoardResult | undefined =
-      value.trim() === '' ? undefined : { scale: 'percentage', value: Number(value) };
+  // the field says why.
+  protected setMarks(question: BoardMarksQuestion, typed: string) {
+    const result = readResult(this.scaleOf(question), typed);
     const error = result === undefined ? undefined : checkAnswer(question, result);
     this.marksErrors.update((errors) => ({ ...errors, [question]: error }));
     if (!error) this.update({ [question]: result });

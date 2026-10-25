@@ -148,9 +148,21 @@ export const BOARDS = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-// The scales a Board marks result can be given on. Results on different
-// scales are never compared.
-export const RESULT_SCALES = [{ value: 'percentage', label: 'Percentage' }] as const;
+// The scales a Board marks result can be given on (backend copy: ResultScale
+// in backend/src/match/profile.ts). Results on different scales are never
+// compared.
+export const RESULT_SCALES = [
+  { value: 'percentage', label: 'Percentage' },
+  { value: 'cgpa_10', label: 'CGPA out of 10' },
+  { value: 'gpa_4', label: 'GPA out of 4' },
+  { value: 'ib_points', label: 'IB points (out of 45)' },
+  { value: 'a_level', label: 'A-level grades' },
+] as const;
+
+// A-level grades, best first (backend copy: A_LEVEL_GRADES in
+// backend/src/match/profile.ts).
+export const A_LEVEL_GRADES = ['A*', 'A', 'B', 'C', 'D', 'E'] as const;
+export type ALevelGrade = (typeof A_LEVEL_GRADES)[number];
 
 export const STREAMS = [
   { value: 'science', label: 'Science' },
@@ -197,11 +209,12 @@ type ValueOf<T extends readonly { value: unknown }[]> = T[number]['value'];
 
 export type ResultScale = ValueOf<typeof RESULT_SCALES>;
 
-// A Board marks result: a value on its Result scale.
-export interface BoardResult {
-  scale: ResultScale;
-  value: number;
-}
+// A Board marks result: a value on its Result scale, a number on every scale
+// but A-level grades, which are a list of grades ("A*AB") (backend copy:
+// BoardResult in backend/src/match/profile.ts).
+export type BoardResult =
+  | { scale: Exclude<ResultScale, 'a_level'>; value: number }
+  | { scale: 'a_level'; value: ALevelGrade[] };
 
 // What a Student tells us about themselves. Every field is optional.
 export interface Profile {

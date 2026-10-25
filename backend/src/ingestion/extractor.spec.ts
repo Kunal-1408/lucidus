@@ -206,6 +206,62 @@ describe('Normalisation onto the fixed lists', () => {
     },
   );
 
+  it.each([
+    [
+      'Students must have a CGPA of at least 8.5 in Class 10.',
+      'class10Result',
+      { scale: 'cgpa_10', value: 8.5 },
+    ],
+    [
+      'Applicants need a minimum GPA of 3.0.',
+      'class12Result',
+      { scale: 'gpa_4', value: 3 },
+    ],
+    [
+      'Candidates must score 32 points in the IB Diploma.',
+      'class12Result',
+      { scale: 'ib_points', value: 32 },
+    ],
+    [
+      'Applicants must hold A*AB at A-level.',
+      'class12Result',
+      { scale: 'a_level', value: ['A*', 'A', 'B'] },
+    ],
+  ])('reads the result on its scale in "%s"', (text, field, value) => {
+    expect(criterion(text, field)).toEqual(
+      expect.objectContaining({ value, op: 'gte', changeable: true }),
+    );
+    expect(criterion(text, field)?.alternativeGroup).toBeUndefined();
+  });
+
+  it.each([
+    ['Applicants must have a weighted GPA of at least 3.8.', 'A weighted GPA'],
+    ['Students must have an R score of 30 or above.', "Quebec's R score"],
+    [
+      'Applicants must hold five IGCSE passes at grade C or above.',
+      'GCSE/IGCSE results',
+    ],
+  ])(
+    'shows the result on an unsupported scale in "%s" as an Extra requirement',
+    (text, requirement) => {
+      const extraction = extractByRules(text);
+      expect(
+        extraction.criteria.filter((c) => c.field.endsWith('Result')),
+      ).toEqual([]);
+      expect(extraction.criteria.map((c) => c.field)).not.toContain('board');
+      expect(extraction.extraRequirements).toEqual([
+        { text: requirement, sourceText: text },
+      ]);
+    },
+  );
+
+  it.each([
+    'To convert the CGPA into percentage; CGPA X 9.5 will give the percentage.',
+    'Students must hold a CGPA of at least 6.5 in their degree.',
+  ])('reads no Board marks from a CGPA not tied to Class 10: "%s"', (text) => {
+    expect(extractByRules(text).criteria).toEqual([]);
+  });
+
   it('leaves marks that name no year to the LLM', () => {
     const extraction = extractByRules(
       'Candidates who obtained 80% in the previous examination are eligible.',

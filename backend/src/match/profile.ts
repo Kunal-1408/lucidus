@@ -100,15 +100,55 @@ export type Citizenship = 'indian' | 'oci' | 'other';
 // The scales a Board marks result can be given on (frontend copy:
 // RESULT_SCALES in frontend/src/app/profile-fields.ts). Results on different
 // scales are never compared.
-export type ResultScale = 'percentage';
+export type ResultScale =
+  'percentage' | 'cgpa_10' | 'gpa_4' | 'ib_points' | 'a_level';
 
-// A Board marks result: a value on its Result scale. A Criterion on a Board
-// marks field holds its threshold in the same shape (frontend copy:
-// BoardResult in frontend/src/app/profile-fields.ts).
-export interface BoardResult {
-  scale: ResultScale;
-  value: number;
-}
+// A-level grades, best first (frontend copy: A_LEVEL_GRADES in
+// frontend/src/app/profile-fields.ts).
+export const A_LEVEL_GRADES = ['A*', 'A', 'B', 'C', 'D', 'E'] as const;
+export type ALevelGrade = (typeof A_LEVEL_GRADES)[number];
+
+// A Board marks result: a value on its Result scale, a number on every
+// scale but A-level grades, which are a list of grades ("A*AB"). A
+// Criterion on a Board marks field holds its threshold in the same shape
+// (frontend copy: BoardResult in frontend/src/app/profile-fields.ts).
+export type BoardResult =
+  | { scale: Exclude<ResultScale, 'a_level'>; value: number }
+  | { scale: 'a_level'; value: ALevelGrade[] };
+
+// The Result scales each Board marks result may be given on: CGPA only for
+// Class 10 (CBSE), the foreign Class 12 equivalents only for Class 12
+// (frontend copy: SLOT_SCALES in frontend/src/app/profile-rules.ts).
+export const SLOT_SCALES: Record<
+  'class10Result' | 'class12Result',
+  readonly ResultScale[]
+> = {
+  class10Result: ['percentage', 'cgpa_10'],
+  class12Result: ['percentage', 'gpa_4', 'ib_points', 'a_level'],
+};
+
+// The range of each Result scale given as a number; IB points are whole
+// numbers too (frontend copy: RESULT_SCALE_RANGES in
+// frontend/src/app/profile-rules.ts).
+export const RESULT_SCALE_RANGES: Record<
+  Exclude<ResultScale, 'a_level'>,
+  [min: number, max: number]
+> = {
+  percentage: [0, 100],
+  cgpa_10: [0, 10],
+  gpa_4: [0, 4],
+  ib_points: [0, 45],
+};
+
+// Board narrowing (frontend copies of the same names in
+// frontend/src/app/profile-rules.ts): Cambridge/UK, IB and US high school
+// have no Class 10 board exam, so no Class 10 result and no boards upcoming
+// in Class 10; US high school has no Class 12 board exam either, its GPA
+// sits in the Class 12 slot.
+export const NO_CLASS_10_EXAM_BOARDS: readonly NonNullable<Profile['board']>[] =
+  ['cambridge', 'ib', 'us_high_school'];
+export const NO_CLASS_12_EXAM_BOARDS: readonly NonNullable<Profile['board']>[] =
+  ['us_high_school'];
 
 export interface Profile {
   class?: 9 | 10 | 11 | 12;

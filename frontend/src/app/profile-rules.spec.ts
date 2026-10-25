@@ -6,6 +6,9 @@ import {
   migrateSavedProfile,
   profileForMatch,
   Question,
+  readResult,
+  resultScale,
+  SLOT_SCALES,
   visibleQuestions,
 } from './profile-rules';
 
@@ -169,6 +172,112 @@ describe('Board marks', () => {
       class: 11,
       class10Result: percent(70),
     });
+  });
+});
+
+// Result scales: the scale a board presets, board narrowing of the grid, the
+// range each scale allows, and the answers a change of board clears.
+describe('Result scales', () => {
+  const asked = (profile: Profile) => {
+    const shown = visibleQuestions(profile);
+    return {
+      class10Result: shown.has('class10Result'),
+      class12Result: shown.has('class12Result'),
+      boardsUpcoming: shown.has('boardsUpcoming'),
+    };
+  };
+
+  it.each([
+    ['IB, Class 10', { board: 'ib', class: 10 }, false, false, false],
+    ['IB, Class 11', { board: 'ib', class: 11 }, false, false, false],
+    ['IB, Class 12', { board: 'ib', class: 12 }, false, true, true],
+    ['Cambridge/UK, Class 12', { board: 'cambridge', class: 12 }, false, true, true],
+    ['US high school, Class 10', { board: 'us_high_school', class: 10 }, false, false, false],
+    ['US high school, Class 12', { board: 'us_high_school', class: 12 }, false, true, false],
+    ['IB, class not given', { board: 'ib' }, false, true, false],
+    ['CBSE, Class 12', { board: 'cbse', class: 12 }, true, true, true],
+  ] as const)(
+    'narrows the grid by board for %s',
+    (_, profile, class10Result, class12Result, boardsUpcoming) => {
+      expect(asked(profile)).toEqual({ class10Result, class12Result, boardsUpcoming });
+    },
+  );
+
+  it.each([
+    ['class12Result', 'cbse', 'percentage'],
+    ['class12Result', 'cisce', 'percentage'],
+    ['class12Result', 'state', 'percentage'],
+    ['class12Result', 'cambridge', 'a_level'],
+    ['class12Result', 'ib', 'ib_points'],
+    ['class12Result', 'us_high_school', 'gpa_4'],
+    ['class12Result', undefined, 'percentage'],
+    ['class10Result', 'cbse', 'percentage'],
+  ] as const)('presets the %s scale for the %s board to %s', (question, board, scale) => {
+    expect(resultScale(question, { board })).toBe(scale);
+  });
+
+  it('keeps the scale the Student picked, or the one their result is on', () => {
+    expect(resultScale('class10Result', { board: 'cbse' }, 'cgpa_10')).toBe('cgpa_10');
+    expect(resultScale('class12Result', { board: 'ib', class12Result: percent(80) })).toBe(
+      'percentage',
+    );
+    // CGPA is a Class 10 scale only.
+    expect(resultScale('class12Result', { board: 'cbse' }, 'cgpa_10')).toBe('percentage');
+  });
+
+  it('offers CGPA only for the Class 10 result, and the foreign scales only for Class 12', () => {
+    expect(SLOT_SCALES.class10Result).toEqual(['percentage', 'cgpa_10']);
+    expect(SLOT_SCALES.class12Result).toEqual(['percentage', 'gpa_4', 'ib_points', 'a_level']);
+  });
+
+  it('clears both results when the board changes', () => {
+    expect(
+      applyChange(
+        { class: 12, board: 'cbse', class10Result: percent(90), class12Result: percent(85) },
+        { board: 'state' },
+      ),
+    ).toEqual({ class: 12, board: 'state' });
+    const kept = { class: 12, board: 'cbse', class12Result: percent(85) } as const;
+    expect(applyChange(kept, { gender: 'male' })).toEqual({ ...kept, gender: 'male' });
+  });
+
+  it.each([
+    ['class10Result', { scale: 'cgpa_10', value: 9.2 }],
+    ['class12Result', { scale: 'gpa_4', value: 4 }],
+    ['class12Result', { scale: 'ib_points', value: 45 }],
+    ['class12Result', { scale: 'a_level', value: ['A*', 'A', 'E'] }],
+  ] as const)('accepts a %s of %j', (question, result) => {
+    expect(checkAnswer(question, result)).toBeUndefined();
+  });
+
+  it.each([
+    ['class10Result', { scale: 'cgpa_10', value: 10.5 }, 'Enter a CGPA from 0 to 10.'],
+    ['class12Result', { scale: 'gpa_4', value: 4.3 }, 'Enter a GPA from 0 to 4.'],
+    ['class12Result', { scale: 'ib_points', value: 46 }, 'Enter whole IB points from 0 to 45.'],
+    ['class12Result', { scale: 'ib_points', value: 36.5 }, 'Enter whole IB points from 0 to 45.'],
+    [
+      'class12Result',
+      { scale: 'a_level', value: ['A', 'F*'] },
+      'Enter A-level grades from A* to E, such as A*AB.',
+    ],
+    [
+      'class12Result',
+      { scale: 'a_level', value: [] },
+      'Enter A-level grades from A* to E, such as A*AB.',
+    ],
+    ['class12Result', { scale: 'cgpa_10', value: 9 }, 'Pick the scale your result is given on.'],
+  ] as const)('refuses a %s of %j', (question, result, message) => {
+    expect(checkAnswer(question, result)).toBe(message);
+  });
+
+  it('reads a typed result on its scale', () => {
+    expect(readResult('a_level', 'a*ab')).toEqual({ scale: 'a_level', value: ['A*', 'A', 'B'] });
+    expect(readResult('a_level', 'A* A F*')).toEqual({
+      scale: 'a_level',
+      value: ['A*', 'A', 'F*'],
+    });
+    expect(readResult('ib_points', '38')).toEqual({ scale: 'ib_points', value: 38 });
+    expect(readResult('gpa_4', ' ')).toBeUndefined();
   });
 });
 

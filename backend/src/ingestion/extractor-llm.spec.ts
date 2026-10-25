@@ -106,6 +106,39 @@ describe('Extractor with the LLM for what the rules miss', () => {
     ]);
   });
 
+  it('reads results on several Result scales as an alternatives group', async () => {
+    const marks =
+      'Entry needs 36 in the Diploma or straight As at advanced level.';
+    const { llm } = fakeLlm({
+      criteria: [
+        {
+          field: 'class12Result',
+          values: ['36 IB points', 'AAA at A-level'],
+          quote: marks,
+        },
+      ],
+    });
+    const { criteria } = await extract(marks, llm);
+    expect(
+      criteria.map(({ value, alternativeGroup, confidence }) => ({
+        value,
+        alternativeGroup,
+        confidence,
+      })),
+    ).toEqual([
+      {
+        value: { scale: 'ib_points', value: 36 },
+        alternativeGroup: 'class12Result',
+        confidence: 'medium',
+      },
+      {
+        value: { scale: 'a_level', value: ['A', 'A', 'A'] },
+        alternativeGroup: 'class12Result',
+        confidence: 'medium',
+      },
+    ]);
+  });
+
   it('sets the same op on an LLM Criterion as the rules set for its field', async () => {
     const ladies = 'Only young ladies may apply.';
     const passport = 'Applicants must hold a passport issued by India.';

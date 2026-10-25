@@ -40,6 +40,10 @@ _Avoid_: Latest marks, previous-year marks, grades
 The scale a result is given on: percentage, CGPA out of 10, GPA out of 4, IB points out of 45 or A-level grades. Results on different scales are never compared.
 _Avoid_: Grading system, conversion
 
+**Alternatives group**:
+Criteria a Scholarship accepts in place of each other, one per Result scale ("36 IB points or AAA at A-level"). The group passes when any member passes, fails when every member that can be judged fails and none is unknown, and is otherwise unknown.
+_Avoid_: OR-criteria, either-or
+
 **Field of study group**:
 One of a few broad groups (Engineering, Medicine and health, Natural sciences, and so on) that every subject a Student can pick belongs to. Criteria name groups; a subject the Student types in belongs to the group Other.
 _Avoid_: Course, stream, subject (for the group)
