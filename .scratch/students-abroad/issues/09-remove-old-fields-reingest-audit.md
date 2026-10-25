@@ -6,14 +6,14 @@ See spec: "Ingestion", "Audit".
 
 **Blocked by:** 03, 04, 07
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] No code, extraction rule, LLM guide, Criterion vocabulary or Profile copy mentions `latestMarks`, `domicileState` or `schoolState`
 - [x] An Override naming a removed field is treated as lapsed and its scholarship appears in the Review report
 - [x] e2e: re-ingesting the existing fixtures yields only new-field Criteria; Indian regression scenarios still pass
 - [x] The audit endpoint lists Criteria with an unknown field, a value outside the fixed lists, or an unsupported scale or currency, each with its scholarship and sentence; covered by e2e; admin-token protected
 - [x] `scripts/admin.mjs audit` calls it and prints the result
-- [ ] After deploy, the operator runs `ingest`, then `audit` and `review`, and records the outcome as a comment on this ticket
+- [x] After deploy, the operator runs `ingest`, then `audit` and `review`, and records the outcome as a comment on this ticket
 
 ## Comments
 
@@ -40,4 +40,4 @@ See spec: "Ingestion", "Audit".
 
 **2026-10-25 (agent):** Merged into `integrate/abroad-wave-3` (a250acd), Wave 3 review fixes (e51cd4a). Boxes met but the operator one. `npm run check` passes (backend 618, 1 skipped; frontend 122). `EXTRACTION_VERSION` now 3 (ticket 12). Status stays until merged to main + deploy + operator `ingest` / `audit` / `review`; then `Status: done`.
 
-**2026-10-26 (agent):** Post-deploy at 1399ae0, after the operator's `ingest`: `audit` lists 1 Criterion: Imperial Bursary `incomeBand` ['£70,000'] (low confidence; 'household income under £70,000' read as the Indian band field, not `incomeAmount` GBP yearly): raw value outside the allowed options. `review`: that same Imperial entry (low confidence) + Nanyang Scholarship (no criteria). No lapsed Overrides listed. Operator's `ingest` summary not yet recorded; box and Status stay until it is.
+**2026-10-26 (agent):** Post-deploy at 1399ae0, after the operator's `ingest`: `audit` lists 1 Criterion: Imperial Bursary `incomeBand` ['£70,000'] (low confidence; 'household income under £70,000' read as the Indian band field, not `incomeAmount` GBP yearly): raw value outside the allowed options. `review`: that same Imperial entry (low confidence) + Nanyang Scholarship (no criteria). No lapsed Overrides listed. Operator's `ingest` (run 6ade49bd615cda6b08f2d8c1, 2026-10-25): finished, 26 fetched, 27 extracted, 0 unchanged (re-extraction forced), 1 failed: Japan embassy Chennai page `server_error` (not a Wave 3 source; recheck). Closed.

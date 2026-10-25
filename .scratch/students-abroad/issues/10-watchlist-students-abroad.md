@@ -6,13 +6,13 @@ See spec: "Ingestion", Further Notes, and `.scratch/students-abroad/research-wat
 
 **Blocked by:** 03, 04, 05, 06, 07, 08
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `foundation` is a valid provider type, accepted by the seed file parser and the admin endpoint; foundation drafts use it
 - [x] SPDC is on the Watchlist with its current-year guidelines URL; an e2e test with an SPDC fixture shows an NRI / PIO / OCI Student in Class 12 with 60%+ sees it, and a Student in India doesn't
 - [x] Each shortlisted source is added only after its official page and selectors are checked live; any source that can't be verified is left out and listed in a comment on this ticket
 - [x] A fixture per new page-splitting source proves it splits into the expected scholarships (n/a: no page-splitting source passed the live check, see comment)
-- [ ] After deploy, an ingestion run reports each new source ok, and anything landing in the Review report is noted in a comment
+- [x] After deploy, an ingestion run reports each new source ok, and anything landing in the Review report is noted in a comment
 
 ## Comments
 
@@ -36,4 +36,4 @@ See spec: "Ingestion", Further Notes, and `.scratch/students-abroad/research-wat
 
 **2026-10-25 (agent):** Merged into `integrate/abroad-wave-3` (bf7218d), Wave 3 review fixes (e51cd4a). Boxes met but the post-deploy one. SPDC false positive for a Student in India with destination IN accepted by the spec owner (2026-10-25). SPDC Override awaits operator confirm. Status stays until merged to main + deploy + ingestion run; then `Status: done`.
 
-**2026-10-26 (agent):** Smoke check at 1399ae0 passes, 27/27 seed entries live. Review report after ingestion: Imperial Bursary (low confidence `incomeBand`, see 09) and Nanyang Scholarship (no criteria). Loran, Schulich, Gates and the SPDC Override do not appear. Operator's `ingest` summary (each new source ok) not yet recorded; box and Status stay until it is.
+**2026-10-26 (agent):** Smoke check at 1399ae0 passes, 27/27 seed entries live. Review report after ingestion: Imperial Bursary (low confidence `incomeBand`, see 09) and Nanyang Scholarship (no criteria). Loran, Schulich, Gates and the SPDC Override do not appear. Ingestion run 6ade49bd615cda6b08f2d8c1 (2026-10-25): all 11 new sources `ok` (SPDC, CBSE SGC, Cambridge, Imperial, JKCF, Coca-Cola, Gates, Loran, Schulich, NTU, Tuckwell). Closed.
