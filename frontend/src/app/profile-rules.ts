@@ -3,10 +3,12 @@
 // renders what these return. The backend applies the same rules to a Match
 // request in backend/src/match/profile-input.ts.
 import { INDIA, REGIONS } from './countries';
+import { COUNTRY_CURRENCIES, CURRENCIES } from './currencies';
 import {
   A_LEVEL_GRADES,
   ALevelGrade,
   BoardResult,
+  IncomeAmount,
   Profile,
   ResultScale,
   STATE_REGIONS,
@@ -34,6 +36,7 @@ const QUESTIONS: readonly Question[] = [
   'fieldOfStudy',
   'destination',
   'incomeBand',
+  'incomeAmount',
   'gender',
   'category',
   'minority',
@@ -196,7 +199,23 @@ export function checkAnswer(question: Question, answer: unknown): string | undef
   if ((BOARD_MARKS_FIELDS as readonly Question[]).includes(question)) {
     return checkBoardResult(question as BoardMarksQuestion, answer);
   }
+  if (question === 'incomeAmount') return checkIncomeAmount(answer);
   return undefined;
+}
+
+function checkIncomeAmount(answer: unknown): string | undefined {
+  const { currency, value } = (answer ?? {}) as Partial<Record<keyof IncomeAmount, unknown>>;
+  if (!CURRENCIES.some((option) => option.value === currency)) {
+    return 'Pick the currency your family income is in.';
+  }
+  return typeof value === 'number' && value >= 0 ? undefined : 'Enter an amount of 0 or more.';
+}
+
+// The currency the family income question offers: the one the Student gave,
+// else their country's own. A country with no currency of its own offers
+// none.
+export function incomeCurrency(profile: Profile): string | undefined {
+  return profile.incomeAmount?.currency ?? COUNTRY_CURRENCIES[profile.countryOfResidence ?? ''];
 }
 
 // The range of each Result scale given as a number; IB points are whole
@@ -273,15 +292,21 @@ export function profileForMatch(profile: Profile): Profile {
 }
 
 // Where the Student lives and their Citizenship: the state or region needs a
-// country; Home state and Residence status are asked only abroad (in India,
-// the region is the Home state); the Citizenship country only of another
-// nationality; category of everyone but another nationality.
+// country; Home state, Residence status and a family income amount are asked
+// only abroad (in India, the region is the Home state and income is a rupee
+// band, as it is for a Student who gives no country); the Citizenship
+// country only of another nationality; category of everyone but another
+// nationality.
 
 function unaskedForResidence(profile: Profile): Question[] {
   const unasked: Question[] = [];
   const country = profile.countryOfResidence;
   if (country === undefined) unasked.push('region');
-  if (country === undefined || country === INDIA) unasked.push('homeState', 'residenceStatus');
+  if (country === undefined || country === INDIA) {
+    unasked.push('homeState', 'residenceStatus', 'incomeAmount');
+  } else {
+    unasked.push('incomeBand');
+  }
   if (profile.citizenship !== 'other') unasked.push('citizenshipCountry');
   else unasked.push('category');
   return unasked;

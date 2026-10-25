@@ -12,6 +12,8 @@ import {
   A_LEVEL_GRADES,
   type ALevelGrade,
   type BoardResult,
+  type IncomeAmount,
+  type IncomeLimit,
   type IndianState,
   type Profile,
   type ResultScale,
@@ -97,6 +99,7 @@ const FIELD_LABELS: Record<string, string> = {
   fieldOfStudy: 'intended field of study',
   destination: 'study destination',
   incomeBand: 'family income',
+  incomeAmount: 'family income',
   gender: 'gender',
   category: 'category',
   minority: 'minority status',
@@ -412,6 +415,9 @@ function derivedAnswer(profile: Profile, field: string): unknown {
     profile.homeState ?? homeStateInIndia(profile) ?? profile.domicileState;
   if (field === 'homeState') return homeState;
   if (field === 'domicileState') return profile.domicileState ?? homeState;
+  // A Student abroad may give their income in rupees, which a rupee limit
+  // can judge.
+  if (field === 'incomeBand') return profile.incomeBand ?? profile.incomeAmount;
   if (field === 'citizenshipCountry') {
     return (
       profile.citizenshipCountry ??
@@ -446,6 +452,15 @@ function compare(criterion: Criterion, answer: unknown): Outcome {
   if (isBoardMarksField(criterion.field) && op === 'gte') {
     return compareBoardResult(value, answer);
   }
+  if (criterion.field === 'incomeAmount' && op === 'lte') {
+    return compareIncomeAmount(value, answer);
+  }
+  if (criterion.field === 'incomeBand' && asIncomeAmount(answer)) {
+    // A rupee limit is a yearly limit in INR.
+    if (op !== 'lte') return 'unknown';
+    const limit = { currency: RUPEES, period: 'yearly', value: Number(value) };
+    return compareIncomeAmount(limit, answer);
+  }
   if (criterion.field === 'incomeBand' && (op === 'lte' || op === 'gte')) {
     return compareIncome(op, Number(value), String(answer));
   }
@@ -460,6 +475,31 @@ function compare(criterion: Criterion, answer: unknown): Outcome {
             : Number(a) >= Number(value),
         );
   return passes ? 'pass' : 'fail';
+}
+
+const RUPEES = 'INR';
+const MONTHS_IN_A_YEAR = 12;
+
+// An income amount, or undefined when the value isn't one.
+function asIncomeAmount(value: unknown): IncomeAmount | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { currency, value: amount } = value as Record<string, unknown>;
+  return typeof currency === 'string' && typeof amount === 'number'
+    ? { currency, value: amount }
+    : undefined;
+}
+
+// A yearly income against a limit in the same currency, a monthly limit
+// counted as twelve months. In another currency it can't be judged, since
+// incomes are never converted.
+function compareIncomeAmount(threshold: unknown, answer: unknown): Outcome {
+  const limit = asIncomeAmount(threshold);
+  const income = asIncomeAmount(answer);
+  if (!limit || !income || limit.currency !== income.currency) return 'unknown';
+  const period = (threshold as Partial<IncomeLimit>).period;
+  const yearly =
+    period === 'monthly' ? limit.value * MONTHS_IN_A_YEAR : limit.value;
+  return income.value <= yearly ? 'pass' : 'fail';
 }
 
 function compareIncome(

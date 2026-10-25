@@ -12,11 +12,13 @@ import {
   LEGACY_MARKS_FIELDS,
 } from '../scholarships/criterion-fields.js';
 import { INDIA } from './countries.js';
+import { CURRENCIES } from './currencies.js';
 import { INCOME_BANDS } from './matcher.js';
 import {
   A_LEVEL_GRADES,
   type ALevelGrade,
   type BoardResult,
+  type IncomeAmount,
   NO_CLASS_10_EXAM_BOARDS,
   NO_CLASS_12_EXAM_BOARDS,
   type Profile,
@@ -100,9 +102,10 @@ export function parseProfile(body: unknown): ProfileParseResult {
   for (const field of BOARD_MARKS_FIELDS) {
     if (field in raw) keep(field, boardResult(raw, field, reasons));
   }
+  if ('incomeAmount' in raw) keep('incomeAmount', incomeAmount(raw, reasons));
 
   reasons.push(...contradictions(raw), ...boardMarksContradictions(raw));
-  reasons.push(...residenceContradictions(raw));
+  reasons.push(...residenceContradictions(raw), ...incomeContradictions(raw));
   if (reasons.length > 0) return { ok: false, reasons };
   return { ok: true, profile: profile as Profile };
 }
@@ -273,6 +276,57 @@ function boardMarksContradictions(raw: Record<string, unknown>): string[] {
     reasons.push(`boardsUpcoming is not asked for the ${board} board`);
   }
   return reasons;
+}
+
+// Family income abroad: an amount of 0 or more in an ISO 4217 currency
+// (frontend copy: checkIncomeAmount in frontend/src/app/profile-rules.ts).
+const CURRENCY_CODES = CURRENCIES.map((currency) => currency.value);
+
+function incomeAmount(
+  raw: Record<string, unknown>,
+  reasons: string[],
+): IncomeAmount | undefined {
+  const answer = raw.incomeAmount;
+  if (!isObject(answer)) {
+    reasons.push('incomeAmount must be an amount with a currency and a value');
+    return undefined;
+  }
+  const currency = oneOf(
+    answer,
+    'currency',
+    CURRENCY_CODES,
+    reasons,
+    'incomeAmount.currency',
+    'incomeAmount.currency must be an ISO 4217 currency code',
+  );
+  const { value } = answer;
+  const amount = typeof value === 'number' && value >= 0 ? value : undefined;
+  if (amount === undefined) {
+    reasons.push(
+      value === undefined
+        ? 'incomeAmount.value is required'
+        : 'incomeAmount.value must be 0 or more',
+    );
+  }
+  return currency === undefined || amount === undefined
+    ? undefined
+    : { currency, value: amount };
+}
+
+// Family income as the form asks it: a rupee band in India (or when no
+// country is given), an amount abroad.
+function incomeContradictions(raw: Record<string, unknown>): string[] {
+  const country = raw.countryOfResidence;
+  const abroad = country !== undefined && country !== INDIA;
+  if ('incomeAmount' in raw && !abroad) {
+    return ['incomeAmount is only asked when countryOfResidence is not IN'];
+  }
+  if ('incomeBand' in raw && abroad) {
+    return [
+      'incomeBand is only asked when countryOfResidence is IN or not given',
+    ];
+  }
+  return [];
 }
 
 // The fields that hold an answer: absent and null both mean not given.

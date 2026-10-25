@@ -8,7 +8,14 @@ import type {
   Criterion,
   ExtraRequirement,
 } from '../scholarships/scholarship.schema.js';
-import { DATE, escape, MONEY, STATE_NAMES, toClass } from './normalise.js';
+import {
+  DATE,
+  escape,
+  MONEY,
+  STATE_NAMES,
+  toClass,
+  toIncomeLimit,
+} from './normalise.js';
 
 // What a rule found, before normalisation: the raw value as the source
 // wrote it ("₹3,50,000/-", "IX", "Andhra Pradesh") and its sentence.
@@ -99,9 +106,9 @@ const classRule: FieldRule = (sentences) => {
 
 // "parental income ... not more than ₹3,50,000/-", "income below Rs.2.5
 // lakh": an upper limit on family income.
+const INCOME_CUE = String.raw`\bincome\b[^.]{0,80}?\b(?:not more than|not exceeding|does not exceed|should not exceed|not exceed|less than|below|up to|upto|within|under|maximum of|limit of|ceiling of)\b`;
 const INCOME_LIMIT = new RegExp(
-  String.raw`\bincome\b[^.]{0,80}?\b(?:not more than|not exceeding|does not exceed|should not exceed|not exceed|less than|below|up to|upto|within|under|maximum of|limit of|ceiling of)\b[^.\d₹]{0,40}?` +
-    `(${MONEY.source})`,
+  INCOME_CUE + String.raw`[^.\d₹]{0,40}?` + `(${MONEY.source})`,
   'i',
 );
 
@@ -109,6 +116,27 @@ const incomeRule: FieldRule = (sentences) => {
   for (const sentence of sentences) {
     const m = sentence.match(INCOME_LIMIT);
     if (m) return found('incomeBand', m[1], sentence);
+  }
+  return undefined;
+};
+
+// The same limit in another currency, with how often it is counted: "household
+// monthly income ... should NOT exceed an amount equivalent to US Dollar Five
+// Thousand (US$ 5000)", "household income of under £62,215 a year".
+const FOREIGN_INCOME_CUE = new RegExp(INCOME_CUE, 'i');
+const FOREIGN_INCOME_REACH = 80;
+
+const foreignIncomeRule: FieldRule = (sentences) => {
+  for (const sentence of sentences) {
+    const cue = sentence.match(FOREIGN_INCOME_CUE);
+    if (!cue || INCOME_LIMIT.test(sentence)) continue;
+    const start = (cue.index ?? 0) + cue[0].length;
+    const after = sentence.slice(start, start + FOREIGN_INCOME_REACH);
+    const limit = toIncomeLimit(after.split(/\.(?!\d)/)[0]);
+    if (!limit) continue;
+    const period = toIncomeLimit(sentence)?.period ?? limit.period;
+    const raw = `${limit.currency} ${limit.value} ${period}`;
+    return found('incomeAmount', raw, sentence);
   }
   return undefined;
 };
@@ -656,6 +684,7 @@ export const FIELD_RULES: FieldRule[] = [
   genderRule,
   classRule,
   incomeRule,
+  foreignIncomeRule,
   ...BOARD_MARKS_FIELDS.map(boardMarksRule),
   schoolTypeRule,
   ...KEYWORD_FIELDS.map(keywordRule),

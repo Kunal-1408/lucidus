@@ -1,9 +1,12 @@
 // Normalisation: turns the raw values the rules (and, later, the LLM) find
 // into the exact values the Matcher compares against the Profile.
 import { COUNTRIES, REGIONS } from '../match/countries.js';
+import { CURRENCIES } from '../match/currencies.js';
 import {
   type ALevelGrade,
   type BoardResult,
+  type IncomeLimit,
+  type IncomePeriod,
   type IndianState,
   type Profile,
   RESULT_SCALE_RANGES,
@@ -198,6 +201,14 @@ export function normaliseValue(
     // writes it) is rupees.
     return toRupees(/^\d[\d,]*$/.test(raw.trim()) ? `₹${raw.trim()}` : raw);
   }
+  if (field === 'incomeAmount') {
+    if (typeof raw !== 'string') return undefined;
+    // The LLM or a reviewer may write the code in lower case ("sgd 70000").
+    const tidy = raw
+      .trim()
+      .replace(/^[a-z]{3}\b/i, (code) => code.toUpperCase());
+    return toIncomeLimit(tidy);
+  }
   if (field === 'class') {
     const levels = [
       ...new Set(
@@ -341,4 +352,46 @@ export function toRupees(text: string): number | undefined {
   if (unit.startsWith('crore')) return Math.round(number * CRORE);
   if (unit.startsWith('la')) return Math.round(number * LAKH);
   return number;
+}
+
+// Signs that name one currency. A bare "$" is left out: Canada, Australia,
+// Singapore and the US all write it.
+const CURRENCY_SIGNS: Record<string, string> = {
+  US$: 'USD',
+  C$: 'CAD',
+  A$: 'AUD',
+  S$: 'SGD',
+  NZ$: 'NZD',
+  HK$: 'HKD',
+  '£': 'GBP',
+  '€': 'EUR',
+};
+const CURRENCY_CODES = CURRENCIES.map((currency) => currency.value);
+const RUPEES = 'INR';
+// A currency sign or an upper-case ISO 4217 code, then a figure:
+// "US$ 5000", "£62,215", "AED 250,000".
+const FOREIGN_MONEY =
+  /([A-Z]{1,2}\$|£|€|\b[A-Z]{3}\b)\s*\(?\s*(\d[\d,]*(?:\.\d+)?)/g;
+const MONTHLY = /\bmonth(?:ly)?\b|\bper mensem\b/i;
+
+// How often an income limit is counted: monthly when the text says so, else
+// yearly, as income limits usually are.
+export function incomePeriod(text: string): IncomePeriod {
+  return MONTHLY.test(text) ? 'monthly' : 'yearly';
+}
+
+// An income limit in a currency other than rupees, from the first figure
+// with a currency in the text: monthly when the text says so, else yearly.
+// Rupee limits are rupee band limits (incomeBand), never these.
+export function toIncomeLimit(text: string): IncomeLimit | undefined {
+  for (const [, sign, figure] of text.matchAll(FOREIGN_MONEY)) {
+    const currency =
+      CURRENCY_SIGNS[sign] ??
+      (CURRENCY_CODES.includes(sign) ? sign : undefined);
+    if (currency === undefined) continue;
+    const value = Number(figure.replace(/,/g, ''));
+    if (currency === RUPEES || !(value > 0)) return undefined;
+    return { currency, period: incomePeriod(text), value };
+  }
+  return undefined;
 }

@@ -216,6 +216,14 @@ export type BoardResult =
   | { scale: Exclude<ResultScale, 'a_level'>; value: number }
   | { scale: 'a_level'; value: ALevelGrade[] };
 
+// Family income abroad: a yearly amount in an ISO 4217 currency
+// (CURRENCIES in currencies.ts). Incomes in different currencies are never
+// compared (backend copy: IncomeAmount in backend/src/match/profile.ts).
+export interface IncomeAmount {
+  currency: string;
+  value: number;
+}
+
 // What a Student tells us about themselves. Every field is optional.
 export interface Profile {
   class?: ValueOf<typeof CLASSES>;
@@ -242,6 +250,9 @@ export interface Profile {
   fieldOfStudy?: ValueOf<typeof FIELDS_OF_STUDY>;
   destination?: ValueOf<typeof DESTINATIONS>;
   incomeBand?: ValueOf<typeof INCOME_BANDS>;
+  // Only for a Student living outside India, who gives an amount in place of
+  // a rupee band.
+  incomeAmount?: IncomeAmount;
   gender?: ValueOf<typeof GENDERS>;
   category?: ValueOf<typeof CATEGORIES>;
   minority?: boolean;

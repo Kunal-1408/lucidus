@@ -150,6 +150,27 @@ export const NO_CLASS_10_EXAM_BOARDS: readonly NonNullable<Profile['board']>[] =
 export const NO_CLASS_12_EXAM_BOARDS: readonly NonNullable<Profile['board']>[] =
   ['us_high_school'];
 
+// Family income abroad: a yearly amount in an ISO 4217 currency
+// (CURRENCIES in currencies.ts). Incomes in different currencies are never
+// compared (frontend copy: IncomeAmount in
+// frontend/src/app/profile-fields.ts).
+export interface IncomeAmount {
+  currency: string;
+  value: number;
+}
+
+// How often an income limit is counted. A monthly limit is compared as
+// twelve months.
+export type IncomePeriod = 'monthly' | 'yearly';
+
+// An income limit on a Criterion: at most this amount, in this currency,
+// per this period.
+export interface IncomeLimit {
+  currency: string;
+  period: IncomePeriod;
+  value: number;
+}
+
 export interface Profile {
   class?: 9 | 10 | 11 | 12;
   // Where the Student lives and who they are: an ISO 3166-1 alpha-2 country
@@ -201,6 +222,9 @@ export interface Profile {
     | '4_5l_6l'
     | '6l_8l'
     | 'over_8l';
+  // Only for a Student living outside India, who gives an amount in place of
+  // a rupee band.
+  incomeAmount?: IncomeAmount;
   gender?: 'female' | 'male' | 'other';
   category?: 'general' | 'sc' | 'st' | 'obc' | 'ews' | 'ebc' | 'dnt';
   minority?: boolean;

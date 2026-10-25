@@ -3,12 +3,15 @@
 // every value a Criterion can hold is one the form can send. The frontend
 // keeps its own copy of the fixed lists (there is no shared types package),
 // so this test reads them straight from frontend/src/app/profile-fields.ts.
+import { isDeepStrictEqual as isEqual } from 'node:util';
 import * as formPlaces from '../../../frontend/src/app/countries.js';
+import * as formMoney from '../../../frontend/src/app/currencies.js';
 import * as form from '../../../frontend/src/app/profile-fields.js';
 import * as rules from '../../../frontend/src/app/profile-rules.js';
 import { readValue } from '../ingestion/extractor.js';
 import { FIXED_LISTS } from '../ingestion/normalise.js';
 import { COUNTRIES, REGIONS } from '../match/countries.js';
+import { COUNTRY_CURRENCIES, CURRENCIES } from '../match/currencies.js';
 import { match } from '../match/matcher.js';
 import {
   A_LEVEL_GRADES,
@@ -50,6 +53,8 @@ const FORM_LISTS: Record<string, readonly FormOption[]> = {
 const YES_NO_FIELDS = ['minority', 'disability', 'singleGirlChild'];
 // Board marks: fields the form asks as a result on a Result scale.
 const BOARD_MARKS_FIELDS = ['class10Result', 'class12Result'];
+// Fields the form asks as an amount in a currency.
+const AMOUNT_FIELDS = ['incomeAmount'];
 
 // Values deliberately on one side only, each with the reason.
 const FORM_ONLY_FIELDS: Record<string, string> = {
@@ -87,6 +92,7 @@ describe('Form ↔ Criteria contract', () => {
     ...Object.keys(FORM_LISTS),
     ...YES_NO_FIELDS,
     ...BOARD_MARKS_FIELDS,
+    ...AMOUNT_FIELDS,
   ];
 
   it('the form asks about every field a Criterion can check, or it is listed with a reason', () => {
@@ -224,6 +230,38 @@ describe('Form ↔ Criteria contract', () => {
     it('holds a limit in rupees', () => {
       expect(readValue('incomeBand', ['250000'])).toBe(250_000);
       expect(readValue('incomeBand', ['Rs. 2.5 lakh'])).toBe(250_000);
+    });
+  });
+
+  describe('incomeAmount', () => {
+    const formCurrencies = formMoney.CURRENCIES.map((option) => option.value);
+
+    it('the form and the backend hold the same currencies, and the same currency for each country', () => {
+      expect(formMoney.CURRENCIES).toEqual(CURRENCIES);
+      expect(formMoney.COUNTRY_CURRENCIES).toEqual(COUNTRY_CURRENCIES);
+    });
+
+    it("every country's currency is one the form offers", () => {
+      const unoffered = Object.values(COUNTRY_CURRENCIES).filter(
+        (currency) => !formCurrencies.includes(currency),
+      );
+      expect(unoffered).toEqual([]);
+    });
+
+    it('every currency the form can send, but rupees, is one a Criterion can hold', () => {
+      // A rupee limit is a rupee band limit (incomeBand), which a rupee
+      // amount is judged against instead.
+      const unread = formCurrencies.filter(
+        (currency) =>
+          currency !== 'INR' &&
+          !isEqual(readValue('incomeAmount', [`${currency} 1000 yearly`]), {
+            currency,
+            period: 'yearly',
+            value: 1000,
+          }),
+      );
+      expect(unread).toEqual([]);
+      expect(readValue('incomeAmount', ['INR 1000 yearly'])).toBeUndefined();
     });
   });
 

@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { COUNTRIES, REGIONS } from '../countries';
+import { CURRENCIES } from '../currencies';
 import {
   BOARDS,
   CATEGORIES,
@@ -11,6 +12,7 @@ import {
   FIELDS_OF_STUDY,
   GENDERS,
   INCOME_BANDS,
+  IncomeAmount,
   PARENT_OCCUPATIONS,
   Profile,
   RESIDENCE_STATUSES,
@@ -26,6 +28,7 @@ import {
   BoardMarksQuestion,
   boardMarksLabel,
   checkAnswer,
+  incomeCurrency,
   profileForMatch,
   readResult,
   resultScale,
@@ -79,6 +82,7 @@ export class ProfilePage {
   protected readonly exams = EXAMS;
   protected readonly countries = COUNTRIES;
   protected readonly residenceStatuses = RESIDENCE_STATUSES;
+  protected readonly currencies = CURRENCIES;
   protected readonly boardMarksQuestions = BOARD_MARKS_FIELDS;
   protected readonly boardMarksLabel = boardMarksLabel;
 
@@ -96,13 +100,41 @@ export class ProfilePage {
   // School state defaults to the Home state of a Student in India until the
   // Student changes it; abroad there is no default.
   protected readonly schoolState = computed(() => profileForMatch(this.profile()).schoolState);
+  // The currency of the family income amount: one picked before any amount
+  // is typed, else the answer's, else the country's own.
+  private readonly pickedCurrency = signal<string | undefined>(undefined);
+  protected readonly incomeCurrency = computed(
+    () => this.pickedCurrency() ?? incomeCurrency(this.profile()),
+  );
+  // Why the last amount typed was not saved.
+  protected readonly incomeError = signal<string | undefined>(undefined);
 
   protected setClass(value: string) {
     this.update({ class: value ? (Number(value) as Profile['class']) : undefined });
   }
 
   protected setChoice(field: ChoiceField, value: string) {
+    // A new country offers its own currency again.
+    if (field === 'countryOfResidence') this.pickedCurrency.set(undefined);
     this.update({ [field]: value || undefined });
+  }
+
+  protected setIncomeCurrency(currency: string) {
+    this.pickedCurrency.set(currency || undefined);
+    const amount = this.profile().incomeAmount;
+    if (amount !== undefined) this.setIncomeAmount(String(amount.value));
+  }
+
+  // An empty field clears the answer; an amount that can't be saved isn't,
+  // and the field says why.
+  protected setIncomeAmount(value: string) {
+    const answer: IncomeAmount | undefined =
+      value.trim() === ''
+        ? undefined
+        : { currency: this.incomeCurrency() ?? '', value: Number(value) };
+    const error = answer === undefined ? undefined : checkAnswer('incomeAmount', answer);
+    this.incomeError.set(error);
+    if (!error) this.update({ incomeAmount: answer });
   }
 
   protected yesNo(field: YesNoField): '' | 'yes' | 'no' {

@@ -15,6 +15,9 @@ export const CRITERION_FIELDS: Record<
   class10Marks: { op: 'gte', changeable: true },
   latestMarks: { op: 'gte', changeable: true },
   incomeBand: { op: 'lte', changeable: false },
+  // Family income abroad: the value is an income limit with its currency
+  // and period.
+  incomeAmount: { op: 'lte', changeable: false },
   gender: { op: 'eq', changeable: false },
   category: { op: 'in', changeable: false },
   minority: { op: 'eq', changeable: false },
